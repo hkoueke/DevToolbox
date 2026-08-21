@@ -1,0 +1,56 @@
+<Project>
+
+  <!--
+    Propriétés MSBuild partagées par tous les projets de DevToolbox.
+    La compilation sans avertissement et les choix de pile technique sont imposés ici plutôt que projet par
+    projet, afin qu'un nouveau projet ne puisse pas s'y soustraire par simple omission.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      Choix explicite : activé.
+      La correspondance des noms de variables se fait en OrdinalIgnoreCase et rien dans l'outil ne dépend de
+      la culture, si bien que le mode invariant ne coûte rien et supprime la dépendance à ICU.
+    -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
+    <!-- NU1507 : plusieurs sources de paquets sans mappage de source. Cela relève de la configuration machine. -->
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Analyseurs. PrivateAssets="all" les tient hors du graphe de dépendances des consommateurs.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
+    <PackageReference Include="AsyncFixer" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    API interdites. Voir BannedSymbols.txt.
+    Le projet de tests fixe EnableBannedApiCheck=false : il construit HttpClient directement au-dessus de
+    FakeHttpMessageHandler, ce qui est précisément l'objet de la vérification du client typé.
+  -->
+  <ItemGroup Condition="'$(EnableBannedApiCheck)' != 'false'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
+</Project>

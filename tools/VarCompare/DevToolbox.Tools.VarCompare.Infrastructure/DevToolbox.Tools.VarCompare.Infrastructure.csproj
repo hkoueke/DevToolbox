@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevToolbox.Tools.VarCompare.Core\DevToolbox.Tools.VarCompare.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Infrastructure\DevToolbox.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Les rouages internes de l'analyseur sont éprouvés directement par le projet de tests plutôt que rendus publics. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DevToolbox.Tests" />
+  </ItemGroup>
+
+</Project>

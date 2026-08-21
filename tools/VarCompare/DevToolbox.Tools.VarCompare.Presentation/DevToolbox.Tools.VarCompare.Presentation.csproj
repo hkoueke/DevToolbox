@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevToolbox.Tools.VarCompare.Core\DevToolbox.Tools.VarCompare.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Presentation\DevToolbox.Presentation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DevToolbox.Application/DevToolbox.Application.csproj" />
+    <Project Path="src/DevToolbox.Console/DevToolbox.Console.csproj" />
+    <Project Path="src/DevToolbox.Domain/DevToolbox.Domain.csproj" />
+    <Project Path="src/DevToolbox.Infrastructure/DevToolbox.Infrastructure.csproj" />
+    <Project Path="src/DevToolbox.Presentation/DevToolbox.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DevToolbox.Tests/DevToolbox.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/" />
+  <Folder Name="/tools/VarCompare/">
+    <Project Path="tools/VarCompare/DevToolbox.Tools.VarCompare.Core/DevToolbox.Tools.VarCompare.Core.csproj" />
+    <Project Path="tools/VarCompare/DevToolbox.Tools.VarCompare.Infrastructure/DevToolbox.Tools.VarCompare.Infrastructure.csproj" />
+    <Project Path="tools/VarCompare/DevToolbox.Tools.VarCompare.Presentation/DevToolbox.Tools.VarCompare.Presentation.csproj" />
+  </Folder>
+</Solution>

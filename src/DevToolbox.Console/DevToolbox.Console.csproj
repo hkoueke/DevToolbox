@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DevToolbox.Console</RootNamespace>
+    <AssemblyName>DevToolbox</AssemblyName>
+    <ApplicationIcon>devtoolbox.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevToolbox.Infrastructure\DevToolbox.Infrastructure.csproj" />
+    <ProjectReference Include="..\DevToolbox.Presentation\DevToolbox.Presentation.csproj" />
+    <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Presentation\DevToolbox.Tools.VarCompare.Presentation.csproj" />
+    <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Infrastructure\DevToolbox.Tools.VarCompare.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- La racine de composition est résolue par un test de fumée plutôt que recopiée dans celui-ci. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DevToolbox.Tests" />
+  </ItemGroup>
+
+</Project>

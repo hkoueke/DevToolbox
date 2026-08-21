@@ -1,0 +1,45 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coverlet.json
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Local configuration overrides — may contain a real server URL
+appsettings.Development.json
+appsettings.Local.json
+*.local.json
+
+# Logs and scratch
+*.log
+*.tmp
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outillage d'assistance et artefacts de spécification
+.claude/
+.specify/
+specs/
+CLAUDE.md

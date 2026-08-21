@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Noyau partagé. Ce projet ne comporte AUCUNE référence de paquet, et cela n'est pas négociable.
+    C'est le seul assemblage dont l'absence d'entrées-sorties est vérifiable mécaniquement, et le test
+    d'architecture de tests/DevToolbox.Tests/Architecture le vérifie précisément. N'ajoutez pas de
+    PackageReference ici.
+  -->
+
+</Project>

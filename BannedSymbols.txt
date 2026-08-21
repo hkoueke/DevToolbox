@@ -1,0 +1,17 @@
+; API interdites.
+; Format : <DocumentationCommentId>;<message>
+; RS0030 est signalé sur le site d'appel. Les seules dérogations admises sont les deux usages encadrés de
+; DevToolbox.Presentation/Shell (le repli d'amorçage et le point d'entrée Ctrl+C), qui portent des pragmas.
+
+T:System.Console;Spectre.Console est le seul moteur de rendu. L'usage direct de System.Console est interdit hors du repli d'amorçage encadré et du point d'entrée Ctrl+C de DevToolbox.Presentation/Shell.
+M:System.Net.Http.HttpClient.#ctor;Obtenir HttpClient depuis IHttpClientFactory sous forme de client typé. En construire un directement contourne la chaîne de résilience et le gestionnaire d'authentification intégrée.
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler);Obtenir HttpClient depuis IHttpClientFactory sous forme de client typé.
+M:System.Net.Http.HttpClient.#ctor(System.Net.Http.HttpMessageHandler,System.Boolean);Obtenir HttpClient depuis IHttpClientFactory sous forme de client typé.
+P:System.Net.Http.HttpMethod.Post;varcompare est en lecture seule. Chaque requête doit être un GET.
+P:System.Net.Http.HttpMethod.Put;varcompare est en lecture seule. Chaque requête doit être un GET.
+P:System.Net.Http.HttpMethod.Patch;varcompare est en lecture seule. Chaque requête doit être un GET.
+P:System.Net.Http.HttpMethod.Delete;varcompare est en lecture seule. Chaque requête doit être un GET.
+M:System.Net.Http.HttpClient.PostAsync(System.String,System.Net.Http.HttpContent);Lecture seule. Utiliser un GET.
+M:System.Net.Http.HttpClient.PutAsync(System.String,System.Net.Http.HttpContent);Lecture seule. Utiliser un GET.
+M:System.Net.Http.HttpClient.PatchAsync(System.String,System.Net.Http.HttpContent);Lecture seule. Utiliser un GET.
+M:System.Net.Http.HttpClient.DeleteAsync(System.String);Lecture seule. Utiliser un GET.

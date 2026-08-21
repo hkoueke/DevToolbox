@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Les règles de comparaison et les ports que cet outil possède. Ni HttpClient, ni Spectre.Console, ni
+    système de fichiers. Le test d'architecture le vérifie.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\DevToolbox.Application\DevToolbox.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Domain\DevToolbox.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
