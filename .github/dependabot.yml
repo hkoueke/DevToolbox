@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # Les actions sont épinglées sur une version majeure : Dependabot signale les sauts de majeure,
+  # que l'on veut relire, plutôt que de laisser une référence vieillir en silence.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: deps
+    ignore:
+      # FluentAssertions 8 est passé sous licence commerciale : la branche 7.x est délibérée.
+      - dependency-name: FluentAssertions
+        versions: ['>=8.0.0']
