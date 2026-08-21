@@ -44,7 +44,7 @@ public sealed class StackedRendererTests
         string grid = Render(comparison, ComparisonLayout.SideBySide, width: 400);
         string stacked = Render(comparison, ComparisonLayout.Stacked, width: 400);
 
-        foreach (string state in new[] { "set", "missing", "secret" })
+        foreach (string state in new[] { "définie", "absente", "secrète" })
         {
             grid.Should().Contain(state);
             stacked.Should().Contain(state);
@@ -65,8 +65,8 @@ public sealed class StackedRendererTests
         // La légende accompagne la comparaison, quelle que soit la disposition employée.
         string output = RenderStacked(ManyGroups(6));
 
-        output.Should().Contain("Legend");
-        output.Should().Contain("sourced from a key vault");
+        output.Should().Contain("Légende");
+        output.Should().Contain("issue d'un coffre de clés");
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class StackedRendererTests
 
         // Les espaces sont normalisés car, à cette largeur, l'explication elle-même se replie. Ce qui compte
         // est qu'elle soit dite, pas l'endroit où les lignes se coupent.
-        Flatten(output).Should().Contain("too narrow to show every group and every variable");
+        Flatten(output).Should().Contain("trop étroit pour montrer tous les groupes et toutes les variables");
         output.Should().NotContain("Api__BaseUrl");
     }
 
@@ -93,7 +93,7 @@ public sealed class StackedRendererTests
 
         string output = Render(comparison, ComparisonLayout.SideBySide, width: 200);
 
-        output.Should().Contain("spelled differently");
+        output.Should().Contain("ne sont pas orthographiées pareil");
         output.Should().Contain("API_KEY / Api_Key");
     }
 

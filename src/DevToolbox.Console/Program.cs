@@ -55,14 +55,14 @@ internal static class Program
             // Le fichier de réglages voyage avec le binaire. S'il manque, l'installation est cassée, et le
             // dire simplement vaut mieux qu'une trace d'appel.
             console.MarkupLine(
-                "[red]DevToolbox cannot start: " + SettingsFileName + " is missing from "
+                "[red]DevToolbox ne peut pas démarrer : " + SettingsFileName + " est absent de "
                 + Markup.Escape(AppContext.BaseDirectory) + ".[/]");
 
             return ExitCodes.InvalidConfiguration;
         }
         catch (OperationCanceledException)
         {
-            console.MarkupLine("[yellow]Cancelled.[/]");
+            console.MarkupLine("[yellow]Annulé.[/]");
             return ExitCodes.Cancelled;
         }
     }
@@ -129,7 +129,8 @@ internal static class Program
     {
         // Une adresse enregistrée qui ne passe plus la validation : nommer le réglage fautif plutôt que
         // d'échouer obscurément.
-        console.MarkupLine("[red]DevToolbox cannot start: its server configuration is not valid.[/]");
+        console.MarkupLine(
+            "[red]DevToolbox ne peut pas démarrer : sa configuration de serveur n'est pas valide.[/]");
 
         foreach (string failure in exception.Failures)
         {
@@ -137,7 +138,8 @@ internal static class Program
         }
 
         console.MarkupLine(
-            "[grey]Delete the saved address to be asked again, or correct it in the settings file.[/]");
+            "[grey]Supprimez l'adresse enregistrée pour qu'elle vous soit redemandée, ou corrigez-la dans "
+            + "le fichier de réglages.[/]");
 
         return ExitCodes.InvalidConfiguration;
     }
@@ -244,8 +246,12 @@ internal static class Program
         AzureDevOpsServerOptions options = new();
         configuration.GetSection(AzureDevOpsServerOptions.SectionName).Bind(options);
 
+        // La même lecture que partout ailleurs : un nom court est une adresse valable, et la cible partagée
+        // ne doit pas être la seule à l'ignorer.
+        ServerAddress.TryNormalise(options.BaseUrl, options.AllowInsecureHttp, out Uri? address, out _);
+
         return new ServerTarget(
-            new Uri(options.BaseUrl, UriKind.Absolute), options.Collection, options.ApiVersion);
+            address ?? new Uri(options.BaseUrl, UriKind.Absolute), options.Collection, options.ApiVersion);
     }
 
     private static VarCompareOptions BuildVarCompareOptions(ConfigurationManager configuration)

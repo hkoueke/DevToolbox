@@ -48,8 +48,9 @@ public static class LayoutSelector
 
         string reason = string.Create(
             CultureInfo.InvariantCulture,
-            $"{comparison.Groups.Count} groups need about {required} columns of width and the terminal has "
-                + $"{terminalWidth}. Switching to the stacked layout so that nothing is clipped.");
+            $"{comparison.Groups.Count} groupes demandent environ {required} colonnes de largeur et le "
+                + $"terminal en offre {terminalWidth}. Passage à la disposition empilée pour que rien ne "
+                + $"soit tronqué.");
 
         return new LayoutDecision(ComparisonLayout.Stacked, WarnBeforeRendering: true, reason);
     }

@@ -31,13 +31,13 @@ public sealed class RetrievalProgress : IRetrievalProgress
         {
             // Poursuite après un échec : dire clairement que le travail acquis est réutilisé, pas refait.
             _console.MarkupLine(
-                $"[grey]Reusing {alreadyRetrieved} group(s) already read in this session.[/]");
+                $"[grey]Réutilisation de {alreadyRetrieved} groupe(s) déjà lu(s) dans cette session.[/]");
         }
     }
 
     /// <inheritdoc />
     public void Retrieving(string groupName) =>
-        _console.MarkupLine($"[grey]Reading {Markup.Escape(groupName)}…[/]");
+        _console.MarkupLine($"[grey]Lecture de {Markup.Escape(groupName)}…[/]");
 
     /// <inheritdoc />
     public void Retrieved(string groupName)
@@ -54,13 +54,13 @@ public sealed class RetrievalProgress : IRetrievalProgress
     /// <inheritdoc />
     public void Retrying(string groupName, int attempt, int maxAttempts) =>
         _console.MarkupLine(
-            $"[yellow]retrying[/] {Markup.Escape(groupName)} [grey]({attempt}/{maxAttempts})[/]");
+            $"[yellow]nouvel essai[/] {Markup.Escape(groupName)} [grey]({attempt}/{maxAttempts})[/]");
 
     /// <inheritdoc />
     public void Throttled(TimeSpan retryAfter) =>
         _console.MarkupLine(
-            $"[yellow]The service is throttling. Waiting {retryAfter.TotalSeconds:F0}s as instructed "
-            + "rather than hammering it.[/]");
+            $"[yellow]Le service limite le débit. Attente de {retryAfter.TotalSeconds:F0} s comme demandé, "
+            + "plutôt que de le solliciter sans relâche.[/]");
 
     /// <inheritdoc />
     public void Complete() => _console.WriteLine();

@@ -1,3 +1,4 @@
+using DevToolbox.Domain.AzureDevOps;
 using DevToolbox.Infrastructure.Platform;
 using DevToolbox.Infrastructure.Storage;
 using DevToolbox.Presentation.Shell;
@@ -58,10 +59,18 @@ internal sealed class ServerConfigurationResolver
         return Overrides(answer.BaseUrl, answer.Collection);
     }
 
+    /// <summary>
+    /// Superpose l'adresse résolue, normalisée au passage. Une valeur enregistrée sous la forme courte par
+    /// laquelle un serveur se désigne en interne — <c>azure</c> — est ainsi utilisable telle quelle par tout
+    /// ce qui s'y lie ensuite.
+    /// </summary>
     private static Dictionary<string, string?> Overrides(string baseUrl, string collection) =>
         new(StringComparer.Ordinal)
         {
-            [BaseUrlKey] = baseUrl,
+            [BaseUrlKey] =
+                ServerAddress.TryNormalise(baseUrl, allowInsecureHttp: true, out Uri? address, out _)
+                    ? address!.AbsoluteUri
+                    : baseUrl,
             [CollectionKey] = collection,
         };
 

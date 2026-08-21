@@ -42,6 +42,8 @@ public sealed class NoCredentialPromptTests
     [Fact]
     public void No_prompt_asks_for_a_password_a_token_or_a_user_name()
     {
+        // Les tournures anglaises restent surveillées : l'interface est en français, mais rien n'empêche
+        // qu'une invite soit un jour ajoutée dans l'autre langue.
         string[] forbidden =
         [
             "Enter your password",
@@ -49,6 +51,10 @@ public sealed class NoCredentialPromptTests
             "Personal access token",
             "Enter your user name",
             "Enter your username",
+            "Saisissez votre mot de passe",
+            "Saisissez votre jeton",
+            "Jeton d'accès personnel",
+            "Saisissez votre nom d'utilisateur",
         ];
 
         foreach (string file in UiSourceFiles())
@@ -71,7 +77,13 @@ public sealed class NoCredentialPromptTests
             "tools", "VarCompare", "DevToolbox.Tools.VarCompare.Presentation",
             "ComparisonSession.cs"));
 
-        foreach (string forbidden in new[] { "\"Edit ", "\"Add ", "\"Apply", "\"Set value", "\"Update " })
+        string[] labels =
+        [
+            "\"Edit ", "\"Add ", "\"Apply", "\"Set value", "\"Update ",
+            "\"Modifier", "\"Ajouter", "\"Appliquer", "\"Définir la valeur", "\"Mettre à jour",
+        ];
+
+        foreach (string forbidden in labels)
         {
             session.Should().NotContain(forbidden);
         }
@@ -87,7 +99,7 @@ public sealed class NoCredentialPromptTests
             "ComparisonSession.cs"));
 
         session.Should().Contain("Pipelines > Library");
-        session.Should().Contain("read-only");
+        session.Should().Contain("lecture seule");
     }
 
     [Fact]

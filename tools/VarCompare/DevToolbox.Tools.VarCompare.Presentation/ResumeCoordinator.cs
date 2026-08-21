@@ -112,9 +112,9 @@ public sealed class ResumeCoordinator
         {
             // Le dire, et poursuivre avec ce qui reste plutôt que de refuser la reprise.
             _console.MarkupLine(
-                "[yellow]These groups are no longer there, or you can no longer read them: "
+                "[yellow]Ces groupes ne sont plus là, ou vous ne pouvez plus les lire : "
                 + Markup.Escape(string.Join(", ", dropped))
-                + ". Continuing with the rest.[/]");
+                + ". La suite continue avec les autres.[/]");
         }
 
         return kept;

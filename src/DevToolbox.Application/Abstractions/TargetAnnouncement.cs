@@ -10,5 +10,5 @@ namespace DevToolbox.Application.Abstractions;
 public sealed record TargetAnnouncement(string ServerHost, string Collection)
 {
     /// <summary>Comment l'outil s'authentifie. Constant : un seul mécanisme, sans alternative.</summary>
-    public static string AuthenticationMode => "integrated Windows authentication";
+    public static string AuthenticationMode => "authentification Windows intégrée";
 }

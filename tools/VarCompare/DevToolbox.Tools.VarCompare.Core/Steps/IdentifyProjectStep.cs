@@ -70,7 +70,7 @@ public sealed class IdentifyProjectStep : IToolStep
 
         if (chosen is null)
         {
-            return Result.Fail(FailureReason.Cancelled, "No project was chosen.");
+            return Result.Fail(FailureReason.Cancelled, "Aucun projet n'a été choisi.");
         }
 
         context.Set(VarCompareContextKeys.Project, chosen);

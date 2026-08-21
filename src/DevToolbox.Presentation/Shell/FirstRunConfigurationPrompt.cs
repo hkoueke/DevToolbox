@@ -1,3 +1,4 @@
+using DevToolbox.Domain.AzureDevOps;
 using Spectre.Console;
 
 namespace DevToolbox.Presentation.Shell;
@@ -11,6 +12,11 @@ namespace DevToolbox.Presentation.Shell;
 /// censé modifier avant la première utilisation : elle est proposée par défaut, si bien que l'accepter tient
 /// à une touche. Ce qui est confirmé est écrit dans le fichier de réglages propre à l'utilisateur, puis
 /// réutilisé à chaque démarrage suivant.
+/// </para>
+/// <para>
+/// La saisie attendue est celle que le développeur écrit tous les jours : un nom court tel que <c>azure</c>
+/// ou <c>azure/</c> suffit, le schéma étant complété par <see cref="ServerAddress"/>. Exiger la forme
+/// canonique reviendrait à refuser l'usage de la maison.
 /// </para>
 /// <para>
 /// Cette invite saisit une adresse de serveur. Ce n'est pas, et ne doit jamais devenir, une demande
@@ -32,77 +38,98 @@ public sealed class FirstRunConfigurationPrompt
     /// <summary>Demande l'URL de base et la collection, en validant chaque réponse.</summary>
     /// <param name="suggestedBaseUrl">La suggestion issue d'<c>appsettings.json</c>, proposée par défaut.</param>
     /// <param name="suggestedCollection">La suggestion de collection, proposée par défaut.</param>
-    /// <returns>L'adresse confirmée.</returns>
+    /// <returns>L'adresse confirmée, sous sa forme normalisée.</returns>
     public ServerConfigurationAnswer Ask(string suggestedBaseUrl, string suggestedCollection)
     {
-        _console.Write(new Rule("[bold]First run — where is your Azure DevOps Server?[/]").LeftJustified());
+        _console.Write(new Rule("[bold]Premier démarrage — où se trouve votre serveur Azure DevOps ?[/]")
+            .LeftJustified());
         _console.MarkupLine(
-            "[grey]DevToolbox signs in with your Windows session, so it never asks for a password or a "
-            + "token. It only needs to know which server to read.[/]");
+            "[grey]DevToolbox s'authentifie avec votre session Windows : il ne demande donc ni mot de passe "
+            + "ni jeton. Il a seulement besoin de savoir quel serveur lire.[/]");
+        _console.MarkupLine(
+            "[grey]Le nom court du serveur suffit, par exemple [bold]azure[/] : le préfixe https:// est "
+            + "ajouté pour vous.[/]");
         _console.WriteLine();
 
         string baseUrl = _console.Prompt(
-            new TextPrompt<string>("Server base URL:")
+            new TextPrompt<string>("Adresse du serveur :")
                 .DefaultValue(suggestedBaseUrl)
                 .Validate(ValidateBaseUrl));
 
         string collection = _console.Prompt(
-            new TextPrompt<string>("Collection:")
+            new TextPrompt<string>("Collection :")
                 .DefaultValue(suggestedCollection)
                 .Validate(ValidateCollection));
 
         _console.WriteLine();
 
-        return new ServerConfigurationAnswer(baseUrl.Trim(), collection.Trim());
+        return new ServerConfigurationAnswer(Normalise(baseUrl), collection.Trim());
     }
 
     /// <summary>Signale qu'une adresse enregistrée n'est plus utilisable, avant de redemander.</summary>
     /// <param name="reason">Pourquoi la valeur enregistrée a été rejetée.</param>
     public void ReportSavedValueRejected(string reason)
     {
-        _console.MarkupLine("[yellow]The saved server address cannot be used: " + Markup.Escape(reason) + "[/]");
+        _console.MarkupLine(
+            "[yellow]L'adresse de serveur enregistrée n'est plus utilisable : "
+            + Markup.Escape(reason) + "[/]");
         _console.WriteLine();
     }
 
-    private static ValidationResult ValidateBaseUrl(string value)
+    /// <summary>
+    /// La forme retenue d'une adresse déjà validée. Ce qui est enregistré est donc toujours canonique, quelle
+    /// que soit la manière dont il a été saisi.
+    /// </summary>
+    /// <param name="value">L'adresse saisie.</param>
+    /// <returns>L'adresse normalisée.</returns>
+    internal static string Normalise(string value) =>
+        ServerAddress.TryNormalise(value, allowInsecureHttp: false, out Uri? address, out _)
+            ? address!.AbsoluteUri
+            : value.Trim();
+
+    /// <summary>Le motif de rejet d'une adresse, dit dans les termes de celui qui vient de la saisir.</summary>
+    /// <param name="problem">Ce qui empêche la saisie d'être retenue.</param>
+    /// <returns>Une phrase à afficher.</returns>
+    internal static string Explain(ServerAddressProblem problem) => problem switch
     {
-        string candidate = value.Trim();
+        ServerAddressProblem.Empty =>
+            "Saisissez l'adresse du serveur, par exemple azure ou https://devops.entreprise.local",
 
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            return ValidationResult.Error("[red]Enter the server address, for example https://devops.contoso.local[/]");
-        }
+        ServerAddressProblem.MissingHost or ServerAddressProblem.Malformed =>
+            "Cette saisie ne se lit pas comme une adresse de serveur.",
 
-        if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri))
-        {
-            return ValidationResult.Error("[red]That is not an absolute URL.[/]");
-        }
+        // Le HTTP simple reste possible dans la configuration, mais volontairement pas ici : l'autoriser
+        // doit demander une modification délibérée, pas une frappe au clavier devant une invite.
+        ServerAddressProblem.InsecureScheme =>
+            "L'adresse doit utiliser HTTPS.",
 
-        // HTTPS uniquement. L'option permettant le HTTP simple existe dans la configuration mais n'est
-        // volontairement pas proposée ici : l'autoriser doit demander une modification délibérée, pas une
-        // frappe au clavier devant une invite.
-        return uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+        ServerAddressProblem.UnsupportedScheme =>
+            "Seules les adresses https:// sont acceptées ici.",
+
+        ServerAddressProblem.CarriesCredentials =>
+            "Une adresse de serveur ne porte pas d'identifiants : DevToolbox utilise votre session Windows.",
+
+        _ => "Cette adresse ne peut pas être utilisée.",
+    };
+
+    private static ValidationResult ValidateBaseUrl(string value) =>
+        ServerAddress.TryNormalise(value, allowInsecureHttp: false, out _, out ServerAddressProblem problem)
             ? ValidationResult.Success()
-            : ValidationResult.Error("[red]The address must use HTTPS.[/]");
-    }
+            : ValidationResult.Error("[red]" + Markup.Escape(Explain(problem)) + "[/]");
 
     private static ValidationResult ValidateCollection(string value)
     {
         string candidate = value.Trim();
 
-        if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > 64)
+        if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > ServerTarget.MaxCollectionLength)
         {
-            return ValidationResult.Error("[red]Enter a collection name of 1 to 64 characters.[/]");
+            return ValidationResult.Error("[red]Saisissez un nom de collection de 1 à 64 caractères.[/]");
         }
 
         // La collection devient un segment d'URL : refuser tout ce qui pourrait en changer le sens.
-        bool unsafeSegment = candidate.Contains('/', StringComparison.Ordinal)
-            || candidate.Contains('\\', StringComparison.Ordinal)
-            || candidate.Contains("..", StringComparison.Ordinal)
-            || candidate.Any(char.IsControl);
-
-        return unsafeSegment
-            ? ValidationResult.Error("[red]A collection name cannot contain a path separator or '..'.[/]")
-            : ValidationResult.Success();
+        return ServerTarget.IsSafeCollection(candidate)
+            ? ValidationResult.Success()
+            : ValidationResult.Error(
+                "[red]Un nom de collection ne peut contenir ni séparateur de chemin ni « .. ».[/]");
     }
 }

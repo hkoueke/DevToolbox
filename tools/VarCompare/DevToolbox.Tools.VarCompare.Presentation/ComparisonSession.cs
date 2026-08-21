@@ -16,15 +16,15 @@ namespace DevToolbox.Tools.VarCompare.Presentation;
 /// </remarks>
 public sealed class ComparisonSession
 {
-    private const string NextPage = "Next page";
-    private const string PreviousPage = "Previous page";
-    private const string ShowDifferencesOnly = "Show only differences";
-    private const string ShowAllRows = "Show all rows";
-    private const string UseStacked = "Switch to the stacked layout";
-    private const string UseSideBySide = "Switch to the side-by-side layout";
-    private const string OpenVariable = "Open a variable";
-    private const string Refresh = "Refresh (re-read the groups)";
-    private const string Back = "Back to the menu";
+    private const string NextPage = "Page suivante";
+    private const string PreviousPage = "Page précédente";
+    private const string ShowDifferencesOnly = "N'afficher que les différences";
+    private const string ShowAllRows = "Afficher toutes les lignes";
+    private const string UseStacked = "Passer à la disposition empilée";
+    private const string UseSideBySide = "Passer à la disposition en colonnes";
+    private const string OpenVariable = "Ouvrir une variable";
+    private const string Refresh = "Rafraîchir (relire les groupes)";
+    private const string Back = "Retour au menu";
 
     private readonly IAnsiConsole _console;
     private readonly ComparisonPresenter _presenter;
@@ -73,7 +73,7 @@ public sealed class ComparisonSession
 
             string choice = _console.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("What next?")
+                    .Title("Et maintenant ?")
                     .AddChoices(BuildChoices(page)));
 
             if (string.Equals(choice, Back, StringComparison.Ordinal))
@@ -175,9 +175,9 @@ public sealed class ComparisonSession
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Which [bold]variable[/]?")
+                .Title("Quelle [bold]variable[/] ?")
                 .PageSize(15)
-                .MoreChoicesText("[grey](move up and down for more)[/]")
+                .MoreChoicesText("[grey](déplacez-vous vers le haut ou le bas pour en voir plus)[/]")
                 .AddChoices(rows.Select(row => row.DisplayName)));
 
         ComparisonRow? row = rows.FirstOrDefault(
@@ -191,7 +191,7 @@ public sealed class ComparisonSession
         _console.Clear();
         _detail.Render(VariableDetail.Build(snapshots, row.CanonicalName));
 
-        _console.MarkupLine("[grey]Press enter to go back to the comparison.[/]");
+        _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir à la comparaison.[/]");
         _console.Input.ReadKey(intercept: true);
     }
 
@@ -211,8 +211,9 @@ public sealed class ComparisonSession
             .position;
 
         _console.MarkupLine(
-            $"[grey]{Markup.Escape(missing.DisplayName)} is missing from "
-            + $"'{Markup.Escape(comparison.Groups[index].Name)}'. This tool is read-only — add it in "
-            + $"Azure DevOps: Pipelines > Library > {Markup.Escape(comparison.Groups[index].Name)}[/]");
+            $"[grey]{Markup.Escape(missing.DisplayName)} est absente de "
+            + $"« {Markup.Escape(comparison.Groups[index].Name)} ». Cet outil est en lecture seule — "
+            + "ajoutez-la dans Azure DevOps : Pipelines > Library > "
+            + $"{Markup.Escape(comparison.Groups[index].Name)}[/]");
     }
 }

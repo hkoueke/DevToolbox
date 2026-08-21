@@ -49,10 +49,10 @@ public sealed class FailureRendererTests
         string unreachable = Render(FailureReason.ServerUnreachable, "could not reach the server");
         string denied = Render(FailureReason.PermissionDenied, "you cannot read this");
 
-        Flatten(unreachable).Should().Contain("connectivity problem, not a permissions one");
-        Flatten(denied).Should().Contain("read access");
+        Flatten(unreachable).Should().Contain("problème de connectivité, et non de droits");
+        Flatten(denied).Should().Contain("accès en lecture");
 
-        Flatten(unreachable).Should().NotContain("read access");
+        Flatten(unreachable).Should().NotContain("accès en lecture");
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class FailureRendererTests
         // Un échec d'authentification n'est jamais une raison de se mettre à réclamer des identifiants.
         string output = Render(FailureReason.AuthenticationFailed, "rejected");
 
-        Flatten(output).Should().Contain("never asks for a password or a token");
+        Flatten(output).Should().Contain("ne demande jamais de mot de passe ni de jeton");
     }
 
     [Theory]
@@ -84,7 +84,7 @@ public sealed class FailureRendererTests
     {
         string output = Flatten(Render(reason, "something went wrong"));
 
-        foreach (string forbidden in new[] { "enter your password", "enter your token", "sign in with" })
+        foreach (string forbidden in new[] { "saisissez votre mot de passe", "saisissez votre jeton" })
         {
             output.Should().NotContain(forbidden);
         }
@@ -95,7 +95,7 @@ public sealed class FailureRendererTests
     {
         // Le signaler comme indisponible plutôt que de reprendre indéfiniment.
         Flatten(Render(FailureReason.ServiceUnavailable, "gave up"))
-            .Should().Contain("stopped retrying");
+            .Should().Contain("cessé de réessayer");
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public sealed class FailureRendererTests
     {
         // Les identifiants ne suivent jamais une redirection.
         Flatten(Render(FailureReason.RedirectRefused, "redirect refused"))
-            .Should().Contain("never presented to another host");
+            .Should().Contain("jamais présentés à un autre hôte");
     }
 
     [Fact]
@@ -111,14 +111,14 @@ public sealed class FailureRendererTests
     {
         // La validation des certificats n'est jamais désactivée.
         Flatten(Render(FailureReason.ServerUntrusted, "untrusted"))
-            .Should().Contain("never disables certificate validation");
+            .Should().Contain("ne désactive jamais la validation des certificats");
     }
 
     [Fact]
     public void Cancelling_reassures_that_nothing_was_changed()
     {
         Flatten(Render(FailureReason.Cancelled, "cancelled"))
-            .Should().Contain("only ever reads");
+            .Should().Contain("ne fait jamais que lire");
     }
 
     private static string Flatten(string output) =>

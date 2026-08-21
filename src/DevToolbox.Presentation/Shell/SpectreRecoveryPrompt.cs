@@ -14,10 +14,10 @@ namespace DevToolbox.Presentation.Shell;
 /// </remarks>
 public sealed class SpectreRecoveryPrompt : IRecoveryPrompt
 {
-    private const string RetryLabel = "Retry this step";
-    private const string ContinueLabel = "Continue from this step, keeping what it produced";
-    private const string RestartLabel = "Restart from the beginning";
-    private const string AbortLabel = "Abort";
+    private const string RetryLabel = "Relancer cette étape";
+    private const string ContinueLabel = "Poursuivre à partir de cette étape, en gardant ce qu'elle a produit";
+    private const string RestartLabel = "Recommencer depuis le début";
+    private const string AbortLabel = "Abandonner";
 
     private readonly IAnsiConsole _console;
 
@@ -36,12 +36,12 @@ public sealed class SpectreRecoveryPrompt : IRecoveryPrompt
 
         _console.WriteLine();
         _console.MarkupLine(
-            $"[red]Step '{Markup.Escape(failed.Name)}' failed:[/] "
-            + Markup.Escape(failed.FailureReason ?? "no reason was recorded."));
+            $"[red]L'étape « {Markup.Escape(failed.Name)} » a échoué :[/] "
+            + Markup.Escape(failed.FailureReason ?? "aucune raison n'a été consignée."));
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("What would you like to do?")
+                .Title("Que souhaitez-vous faire ?")
                 .AddChoices(RetryLabel, ContinueLabel, RestartLabel, AbortLabel));
 
         RecoveryChoice choice = chosen switch

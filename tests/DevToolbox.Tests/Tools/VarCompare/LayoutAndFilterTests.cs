@@ -53,7 +53,7 @@ public sealed class LayoutAndFilterTests
 
         decision.Layout.Should().Be(ComparisonLayout.Stacked);
         decision.WarnBeforeRendering.Should().BeTrue();
-        decision.Reason.Should().Contain("stacked");
+        decision.Reason.Should().Contain("empilée");
     }
 
     [Fact]

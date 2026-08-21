@@ -38,8 +38,9 @@ dotnet run --project src/DevToolbox.Console
 ```
 
 Au premier démarrage, l'outil demande quel serveur Azure DevOps lire, en proposant par défaut la valeur
-présente dans `appsettings.json`. Votre réponse est enregistrée et réutilisée : vous n'avez pas à modifier le
-fichier livré.
+présente dans `appsettings.json`. Le nom court suffit — `azure`, ou `azure/` : le préfixe `https://` est
+ajouté pour vous, et un schéma explicite est repris tel quel. Votre réponse est enregistrée et réutilisée :
+vous n'avez pas à modifier le fichier livré.
 
 Ensuite : onglet **Azure DevOps** → **varcompare**.
 

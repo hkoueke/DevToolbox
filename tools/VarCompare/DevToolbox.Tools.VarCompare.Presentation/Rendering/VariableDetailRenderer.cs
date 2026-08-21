@@ -35,9 +35,9 @@ public sealed class VariableDetailRenderer
         Table table = new Table()
             .Border(TableBorder.Rounded)
             .Title("[bold]" + Markup.Escape(detail.DisplayName) + "[/]")
-            .AddColumn(new TableColumn("[bold]Group[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]State[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Value[/]"));
+            .AddColumn(new TableColumn("[bold]Groupe[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]État[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Valeur[/]"));
 
         foreach (VariableDetailEntry entry in detail.PerGroup)
         {
@@ -48,7 +48,8 @@ public sealed class VariableDetailRenderer
         }
 
         _console.Write(table);
-        _console.MarkupLine("[grey]Values are shown here only, never in the comparison.[/]");
+        _console.MarkupLine(
+            "[grey]Les valeurs ne s'affichent qu'ici, jamais dans la comparaison.[/]");
     }
 
     /// <summary>
@@ -73,7 +74,7 @@ public sealed class VariableDetailRenderer
 
         return flattened.Length <= MaxValueLength
             ? flattened
-            : string.Concat(flattened.AsSpan(0, MaxValueLength), "… (shortened)");
+            : string.Concat(flattened.AsSpan(0, MaxValueLength), "… (abrégée)");
     }
 
     private string FormatState(VariableDetailEntry entry) =>
@@ -90,11 +91,11 @@ public sealed class VariableDetailRenderer
         if (entry.ExistsButUnreadable)
         {
             // Jamais un substitut qu'on pourrait prendre pour le contenu lui-même.
-            return "[blue]value exists — not retrievable[/]";
+            return "[blue]la valeur existe — elle n'est pas récupérable[/]";
         }
 
         return entry.Value is { Length: 0 }
-            ? "[yellow](empty)[/]"
+            ? "[yellow](vide)[/]"
             : Markup.Escape(Shorten(entry.Value ?? string.Empty));
     }
 }
