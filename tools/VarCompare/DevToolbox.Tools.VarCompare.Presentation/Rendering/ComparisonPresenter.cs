@@ -101,13 +101,14 @@ public sealed class ComparisonPresenter : IComparisonPresenter
         }
 
         grid.AddRow(
-            $"[magenta]{Markup.Escape(SymbolSet.KeyVaultQualifier)}[/]", "sourced from a key vault");
+            $"[magenta]{Markup.Escape(SymbolSet.KeyVaultQualifier)}[/]", "issue d'un coffre de clés");
         grid.AddRow(
-            $"[dim]{Markup.Escape(SymbolSet.ReadOnlyQualifier)}[/]", "marked read-only in that group");
-        grid.AddRow(_symbols.DiffersMarker, "present everywhere, readable values differ");
-        grid.AddRow(SymbolSet.CasingMarker, "groups spell the name differently");
+            $"[dim]{Markup.Escape(SymbolSet.ReadOnlyQualifier)}[/]",
+            "marquée en lecture seule dans ce groupe");
+        grid.AddRow(_symbols.DiffersMarker, "présente partout, les valeurs lisibles diffèrent");
+        grid.AddRow(SymbolSet.CasingMarker, "les groupes n'orthographient pas le nom pareil");
 
-        _console.Write(new Panel(grid).Header("[bold]Legend[/]").Border(BoxBorder.Rounded));
+        _console.Write(new Panel(grid).Header("[bold]Légende[/]").Border(BoxBorder.Rounded));
     }
 
     private void RenderGrid(VariableComparison comparison, IReadOnlyList<ComparisonRow> rows)
@@ -134,10 +135,11 @@ public sealed class ComparisonPresenter : IComparisonPresenter
         // Aucune disposition ne peut abandonner un groupe ou une ligne. Quand tout ne peut pas être montré,
         // le dire est la seule option honnête : une comparaison partielle serait lue comme complète.
         _console.MarkupLine(
-            "[red]This terminal is too narrow to show every group and every variable without clipping.[/]");
+            "[red]Ce terminal est trop étroit pour montrer tous les groupes et toutes les variables sans "
+            + "troncature.[/]");
         _console.MarkupLine(
-            "[grey]Nothing is shown rather than a partial comparison, which would mislead. "
-            + "Widen the terminal and try again.[/]");
+            "[grey]Rien n'est affiché plutôt qu'une comparaison partielle, qui induirait en erreur. "
+            + "Élargissez le terminal, puis réessayez.[/]");
     }
 
     private string[] BuildRowCells(ComparisonRow row)
@@ -205,36 +207,38 @@ public sealed class ComparisonPresenter : IComparisonPresenter
 
         _console.MarkupLine(
             "[grey]"
-            + $"{summary.TotalVariables} variables compared across {comparison.Groups.Count} groups · "
-            + $"{summary.MissingSomewhere} missing somewhere · {summary.DifferingValues} differing · "
-            + $"{summary.SecretCells} secret · {summary.KeyVaultSourcedCells} key-vault-sourced"
+            + $"{summary.TotalVariables} variables comparées sur {comparison.Groups.Count} groupes · "
+            + $"{summary.MissingSomewhere} absentes quelque part · {summary.DifferingValues} divergentes · "
+            + $"{summary.SecretCells} secrètes · {summary.KeyVaultSourcedCells} issues d'un coffre de clés"
             + "[/]");
 
         if (summary.UndeterminedCells > 0)
         {
-            _console.MarkupLine($"[grey]{summary.UndeterminedCells} cell(s) could not be determined.[/]");
+            _console.MarkupLine($"[grey]{summary.UndeterminedCells} cellule(s) n'ont pas pu être établies.[/]");
         }
 
         int hidden = comparison.HiddenRowCount(options.DifferencesOnly);
 
         if (hidden > 0)
         {
-            _console.MarkupLine($"[grey]{hidden} identical row(s) hidden.[/]");
+            _console.MarkupLine($"[grey]{hidden} ligne(s) identique(s) masquée(s).[/]");
         }
 
         if (page.IsPaged)
         {
             _console.MarkupLine(
-                $"[grey]rows {page.FirstRowNumber}-{page.LastRowNumber} of {page.TotalRows} "
-                + $"(page {page.PageNumber} of {page.PageCount})[/]");
+                $"[grey]lignes {page.FirstRowNumber} à {page.LastRowNumber} sur {page.TotalRows} "
+                + $"(page {page.PageNumber} sur {page.PageCount})[/]");
         }
 
         _console.MarkupLine(
-            "[grey]as at " + comparison.RetrievedAt.ToLocalTime().ToString("u", null) + "[/]");
+            "[grey]au " + comparison.RetrievedAt.ToLocalTime().ToString("u", null) + "[/]");
 
         if (!_capabilities.SupportsColour)
         {
-            _console.MarkupLine("[grey]Colour is unavailable; every state is named in words above.[/]");
+            _console.MarkupLine(
+                "[grey]La couleur n'est pas disponible ; chaque état est nommé en toutes lettres "
+                + "ci-dessus.[/]");
         }
     }
 
@@ -251,8 +255,9 @@ public sealed class ComparisonPresenter : IComparisonPresenter
         }
 
         _console.MarkupLine(
-            $"[yellow]{SymbolSet.CasingMarker} {divergent.Count} variable(s) are spelled differently "
-            + "between groups. Azure DevOps does not distinguish them, so they compare as one.[/]");
+            $"[yellow]{SymbolSet.CasingMarker} {divergent.Count} variable(s) ne sont pas orthographiées "
+            + "pareil d'un groupe à l'autre. Azure DevOps ne les distingue pas : elles se comparent donc "
+            + "comme une seule.[/]");
 
         foreach (ComparisonRow row in divergent.Take(5))
         {
@@ -267,10 +272,10 @@ public sealed class ComparisonPresenter : IComparisonPresenter
 
     private static string DescribeState(CellState state) => state switch
     {
-        CellState.PresentWithValue => "present, with a value",
-        CellState.PresentEmpty => "present, value is empty",
-        CellState.PresentSecret => "present, secret — the value cannot be read",
-        CellState.Absent => "not present in that group",
-        _ => "state could not be determined",
+        CellState.PresentWithValue => "présente, avec une valeur",
+        CellState.PresentEmpty => "présente, valeur vide",
+        CellState.PresentSecret => "présente, secrète — la valeur ne peut pas être lue",
+        CellState.Absent => "absente de ce groupe",
+        _ => "l'état n'a pas pu être établi",
     };
 }

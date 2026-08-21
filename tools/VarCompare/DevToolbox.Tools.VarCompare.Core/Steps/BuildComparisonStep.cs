@@ -32,7 +32,7 @@ public sealed class BuildComparisonStep : IToolStep
         if (selected is null || snapshots is null)
         {
             return Task.FromResult(
-                Result.Fail(FailureReason.InvalidConfiguration, "No groups have been retrieved yet."));
+                Result.Fail(FailureReason.InvalidConfiguration, "Aucun groupe n'a encore été lu."));
         }
 
         // L'ordre des colonnes suit l'ordre de sélection, et non celui dans lequel les réponses sont arrivées.
@@ -51,7 +51,7 @@ public sealed class BuildComparisonStep : IToolStep
             return Task.FromResult(
                 Result.Fail(
                     FailureReason.GroupNotFound,
-                    "Fewer than two groups could be read, so there is nothing to compare."));
+                    "Moins de deux groupes ont pu être lus : il n'y a rien à comparer."));
         }
 
         context.Set(VarCompareContextKeys.Comparison, ComparisonBuilder.Build(ordered));

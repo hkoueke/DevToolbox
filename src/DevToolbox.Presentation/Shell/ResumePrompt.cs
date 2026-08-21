@@ -14,9 +14,9 @@ namespace DevToolbox.Presentation.Shell;
 /// </remarks>
 public sealed class ResumePrompt
 {
-    private const string ResumeLabel = "Resume it (the groups will be read again)";
-    private const string DiscardLabel = "Discard it and start fresh";
-    private const string StartFreshLabel = "Start fresh";
+    private const string ResumeLabel = "Reprendre (les groupes seront relus)";
+    private const string DiscardLabel = "Oublier cette exécution et repartir de zéro";
+    private const string StartFreshLabel = "Repartir de zéro";
 
     private readonly IAnsiConsole _console;
 
@@ -46,16 +46,16 @@ public sealed class ResumePrompt
         PersistedRun candidate = candidates[0];
 
         _console.Write(new Panel(Describe(candidate))
-            .Header("[bold]An earlier run did not finish[/]")
+            .Header("[bold]Une exécution précédente ne s'est pas terminée[/]")
             .Border(BoxBorder.Rounded));
 
         _console.MarkupLine(
-            "[grey]Only your selection was remembered. Resuming reads the groups again, so you never act "
-            + "on a stale picture.[/]");
+            "[grey]Seule votre sélection a été mémorisée. Reprendre relit les groupes, si bien que vous "
+            + "n'agissez jamais sur une image périmée.[/]");
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("What would you like to do?")
+                .Title("Que souhaitez-vous faire ?")
                 .AddChoices(ResumeLabel, DiscardLabel, StartFreshLabel));
 
         ResumeDecision decision = chosen switch
@@ -75,18 +75,18 @@ public sealed class ResumePrompt
         grid.AddColumn();
 
         grid.AddRow("[grey]collection[/]", Markup.Escape(run.Collection));
-        grid.AddRow("[grey]project[/]", Markup.Escape(run.Project));
+        grid.AddRow("[grey]projet[/]", Markup.Escape(run.Project));
         grid.AddRow(
-            "[grey]groups[/]",
+            "[grey]groupes[/]",
             Markup.Escape(string.Join(", ", run.SelectedGroups.Select(group => group.Name))));
-        grid.AddRow("[grey]started[/]", run.StartedAt.ToLocalTime().ToString("u", null));
-        grid.AddRow("[grey]got as far as[/]", DescribeProgress(run));
+        grid.AddRow("[grey]démarrée le[/]", run.StartedAt.ToLocalTime().ToString("u", null));
+        grid.AddRow("[grey]parvenue à[/]", DescribeProgress(run));
 
         return grid;
     }
 
     private static string DescribeProgress(PersistedRun run) =>
         run.CompletedSteps.Count == 0
-            ? "[grey]nothing was completed[/]"
+            ? "[grey]aucune étape n'a été achevée[/]"
             : Markup.Escape(run.CompletedSteps[^1]);
 }

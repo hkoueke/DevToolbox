@@ -39,7 +39,7 @@ public sealed class SelectGroupsStep : IToolStep
 
         if (available is null)
         {
-            return Result.Fail(FailureReason.InvalidConfiguration, "The group list has not been read yet.");
+            return Result.Fail(FailureReason.InvalidConfiguration, "La liste des groupes n'a pas encore été lue.");
         }
 
         if (available.Count < VariableComparison.MinimumGroups)
@@ -48,8 +48,9 @@ public sealed class SelectGroupsStep : IToolStep
             return Result.Fail(
                 FailureReason.GroupNotFound,
                 available.Count == 0
-                    ? "No variable groups were found that you can read in this project."
-                    : "This project has only one variable group, and a comparison needs at least two.");
+                    ? "Aucun groupe de variables lisible n'a été trouvé dans ce projet."
+                    : "Ce projet ne compte qu'un seul groupe de variables, or une comparaison en demande "
+                        + "au moins deux.");
         }
 
         // Une exécution reprise sait déjà ce qui avait été choisi, et redemander serait une cérémonie inutile.
@@ -67,7 +68,7 @@ public sealed class SelectGroupsStep : IToolStep
 
         if (selected.Count < VariableComparison.MinimumGroups)
         {
-            return Result.Fail(FailureReason.Cancelled, "Fewer than two groups were selected.");
+            return Result.Fail(FailureReason.Cancelled, "Moins de deux groupes ont été sélectionnés.");
         }
 
         context.Set(VarCompareContextKeys.SelectedGroups, selected);

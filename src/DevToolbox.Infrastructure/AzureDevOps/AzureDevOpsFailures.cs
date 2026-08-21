@@ -19,30 +19,32 @@ public static class AzureDevOpsFailures
         {
             HttpStatusCode.Unauthorized => Failure.Of(
                 FailureReason.AuthenticationFailed,
-                $"The server rejected your Windows credentials. Server: {serverHost}. "
-                + $"Collection: {collection}. Check that you are on the corporate network and that your "
-                + "account has access."),
+                $"Le serveur a refusé vos identifiants Windows. Serveur : {serverHost}. "
+                + $"Collection : {collection}. Vérifiez que vous êtes sur le réseau de l'entreprise et "
+                + "que votre compte y a accès."),
 
             HttpStatusCode.Forbidden => Failure.Of(
                 FailureReason.PermissionDenied,
-                "You do not have permission to read this. The tool works strictly within your own rights."),
+                "Vous n'avez pas le droit de lire ceci. L'outil travaille strictement dans le cadre de vos "
+                + "propres droits."),
 
             HttpStatusCode.NotFound => Failure.Of(
                 FailureReason.GroupNotFound,
-                "The server reports that this no longer exists."),
+                "Le serveur indique que cela n'existe plus."),
 
             HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable => Failure.Of(
                 FailureReason.ServiceUnavailable,
-                "The service is throttling or unavailable. The tool waited as instructed and gave up."),
+                "Le service limite le débit ou est indisponible. L'outil a patienté comme demandé, puis a "
+                + "renoncé."),
 
             _ when IsRedirect(statusCode) => Failure.Of(
                 FailureReason.RedirectRefused,
-                "The server answered with a redirect, which was refused so that your Windows credentials "
-                + "are never presented to another host."),
+                "Le serveur a répondu par une redirection, refusée afin que vos identifiants Windows ne "
+                + "soient jamais présentés à un autre hôte."),
 
             _ => Failure.Of(
                 FailureReason.ServiceUnavailable,
-                "The server returned an unexpected response and the request could not be completed."),
+                "Le serveur a renvoyé une réponse inattendue et la requête n'a pas pu aboutir."),
         };
 
     /// <summary>Fait correspondre une exception de transport à un échec métier.</summary>
@@ -56,26 +58,28 @@ public static class AzureDevOpsFailures
         {
             return Failure.Of(
                 FailureReason.ServerUntrusted,
-                "The certificate presented by the server could not be validated. Certificate validation is "
-                + "never disabled by this tool.");
+                "Le certificat présenté par le serveur n'a pas pu être validé. Cet outil ne désactive "
+                + "jamais la validation des certificats.");
         }
 
         return Failure.Of(
             FailureReason.ServerUnreachable,
-            "The server could not be reached. Are you on the corporate network, or is the VPN down?");
+            "Le serveur n'a pas pu être joint. Êtes-vous sur le réseau de l'entreprise, ou le VPN est-il "
+            + "coupé ?");
     }
 
     /// <summary>L'échec employé quand le budget de reprises est épuisé ou le disjoncteur ouvert.</summary>
     /// <returns>L'échec.</returns>
     public static Failure ServiceUnavailable() => Failure.Of(
         FailureReason.ServiceUnavailable,
-        "The server appears to be unavailable. The tool stopped retrying rather than continuing to call it.");
+        "Le serveur semble indisponible. L'outil a cessé de réessayer plutôt que de continuer à "
+        + "l'appeler.");
 
     /// <summary>L'échec employé quand le développeur annule.</summary>
     /// <returns>L'échec.</returns>
     public static Failure Cancelled() => Failure.Of(
         FailureReason.Cancelled,
-        "The operation was cancelled.");
+        "L'opération a été annulée.");
 
     private static bool IsRedirect(HttpStatusCode statusCode) =>
         (int)statusCode is >= 300 and < 400;

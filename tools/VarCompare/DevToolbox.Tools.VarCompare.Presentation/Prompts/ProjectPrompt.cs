@@ -10,7 +10,7 @@ namespace DevToolbox.Tools.VarCompare.Presentation.Prompts;
 /// </summary>
 public sealed class ProjectPrompt : IProjectChooser
 {
-    private const string BackLabel = "Back";
+    private const string BackLabel = "Retour";
 
     private readonly IAnsiConsole _console;
 
@@ -47,17 +47,17 @@ public sealed class ProjectPrompt : IProjectChooser
         grid.AddColumn();
 
         grid.AddRow("[grey]collection[/]", Markup.Escape(detected.Collection));
-        grid.AddRow("[grey]project[/]", Markup.Escape(detected.Project.Name));
-        grid.AddRow("[grey]repository[/]", Markup.Escape(detected.RepositoryName));
-        grid.AddRow("[grey]remote[/]", Markup.Escape(detected.RemoteName));
+        grid.AddRow("[grey]projet[/]", Markup.Escape(detected.Project.Name));
+        grid.AddRow("[grey]dépôt[/]", Markup.Escape(detected.RepositoryName));
+        grid.AddRow("[grey]distant[/]", Markup.Escape(detected.RemoteName));
         grid.AddRow("[grey]url[/]", Markup.Escape(detected.SourceUrl));
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Detected from the folder you are in[/]")
+            .Header("[bold]Déduit du dossier où vous vous trouvez[/]")
             .Border(BoxBorder.Rounded));
 
         bool accepted = _console.Confirm(
-            $"Compare variable groups in [bold]{Markup.Escape(detected.Project.Name)}[/]?");
+            $"Comparer les groupes de variables de [bold]{Markup.Escape(detected.Project.Name)}[/] ?");
 
         confirmed = accepted ? detected.Project : null;
 
@@ -68,7 +68,7 @@ public sealed class ProjectPrompt : IProjectChooser
     {
         if (available.Count == 0)
         {
-            _console.MarkupLine("[yellow]You do not have access to any project in this collection.[/]");
+            _console.MarkupLine("[yellow]Vous n'avez accès à aucun projet de cette collection.[/]");
             return null;
         }
 
@@ -83,9 +83,9 @@ public sealed class ProjectPrompt : IProjectChooser
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Which [bold]project[/]?")
+                .Title("Quel [bold]projet[/] ?")
                 .PageSize(15)
-                .MoreChoicesText("[grey](move up and down for more)[/]")
+                .MoreChoicesText("[grey](déplacez-vous vers le haut ou le bas pour en voir plus)[/]")
                 .AddChoices(choices));
 
         return byName.TryGetValue(chosen, out ProjectIdentifier? selected) ? selected : null;

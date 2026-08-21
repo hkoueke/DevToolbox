@@ -44,22 +44,22 @@ public sealed class AbortSummaryRenderer
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
 
-        grid.AddRow("[grey]outcome[/]", DescribeOutcome(run.Outcome));
+        grid.AddRow("[grey]issue[/]", DescribeOutcome(run.Outcome));
 
         if (selected.Count == 0)
         {
-            grid.AddRow("[grey]groups[/]", "[grey]no groups had been chosen yet[/]");
+            grid.AddRow("[grey]groupes[/]", "[grey]aucun groupe n'avait encore été choisi[/]");
         }
         else
         {
-            grid.AddRow("[grey]read[/]", Describe(selected.Where(g => snapshots.ContainsKey(g.Id))));
-            grid.AddRow("[grey]not read[/]", Describe(selected.Where(g => !snapshots.ContainsKey(g.Id))));
+            grid.AddRow("[grey]lus[/]", Describe(selected.Where(g => snapshots.ContainsKey(g.Id))));
+            grid.AddRow("[grey]non lus[/]", Describe(selected.Where(g => !snapshots.ContainsKey(g.Id))));
         }
 
-        grid.AddRow("[grey]changed[/]", "[green]nothing — this tool only ever reads[/]");
+        grid.AddRow("[grey]modifié[/]", "[green]rien — cet outil ne fait jamais que lire[/]");
 
         _console.Write(new Panel(grid)
-            .Header("[yellow]The run ended early[/]")
+            .Header("[yellow]L'exécution s'est arrêtée avant terme[/]")
             .Border(BoxBorder.Rounded));
     }
 
@@ -68,15 +68,15 @@ public sealed class AbortSummaryRenderer
         string[] names = [.. groups.Select(group => group.Name)];
 
         return names.Length == 0
-            ? "[grey]none[/]"
+            ? "[grey]aucun[/]"
             : Markup.Escape(string.Join(", ", names));
     }
 
     private static string DescribeOutcome(RunOutcome outcome) => outcome switch
     {
-        RunOutcome.Abandoned => "you chose to abort",
-        RunOutcome.Cancelled => "cancelled",
-        RunOutcome.Failed => "a step failed and was not recovered",
+        RunOutcome.Abandoned => "vous avez choisi d'abandonner",
+        RunOutcome.Cancelled => "annulée",
+        RunOutcome.Failed => "une étape a échoué sans être reprise",
         _ => outcome.ToString(),
     };
 }

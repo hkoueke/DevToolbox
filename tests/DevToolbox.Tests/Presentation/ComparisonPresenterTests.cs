@@ -39,10 +39,10 @@ public sealed class ComparisonPresenterTests
         // exactement ce qu'affiche un terminal monochrome.
         (TestConsole console, string output) = Render(ComparisonViewOptions.Default);
 
-        output.Should().Contain("set");
-        output.Should().Contain("missing");
-        output.Should().Contain("empty");
-        output.Should().Contain("secret");
+        output.Should().Contain("définie");
+        output.Should().Contain("absente");
+        output.Should().Contain("vide");
+        output.Should().Contain("secrète");
 
         console.Dispose();
     }
@@ -52,10 +52,10 @@ public sealed class ComparisonPresenterTests
     {
         (TestConsole console, string output) = Render(ComparisonViewOptions.Default);
 
-        output.Should().Contain("Legend");
-        output.Should().Contain("sourced from a key vault");
-        output.Should().Contain("marked read-only in that group");
-        output.Should().Contain("readable values differ");
+        output.Should().Contain("Légende");
+        output.Should().Contain("issue d'un coffre de clés");
+        output.Should().Contain("marquée en lecture seule dans ce groupe");
+        output.Should().Contain("les valeurs lisibles diffèrent");
 
         console.Dispose();
     }
@@ -72,7 +72,7 @@ public sealed class ComparisonPresenterTests
         output.Should().Contain("OnlyInDev");
         output.Should().Contain("dev");
         output.Should().Contain("prod");
-        output.Should().Contain("4 variables compared across 2 groups");
+        output.Should().Contain("4 variables comparées sur 2 groupes");
 
         console.Dispose();
     }
@@ -84,7 +84,7 @@ public sealed class ComparisonPresenterTests
         (TestConsole console, string output) =
             Render(new ComparisonViewOptions(ComparisonLayout.Auto, DifferencesOnly: true));
 
-        output.Should().Contain("identical row(s) hidden");
+        output.Should().Contain("ligne(s) identique(s) masquée(s)");
 
         console.Dispose();
     }
@@ -94,7 +94,7 @@ public sealed class ComparisonPresenterTests
     {
         (TestConsole console, string output) = Render(ComparisonViewOptions.Default);
 
-        output.Should().Contain("as at");
+        output.Should().Contain("au " + ReadAt.ToLocalTime().ToString("u", null));
 
         console.Dispose();
     }

@@ -75,7 +75,7 @@ public sealed class CompositionRootTests
 
         tool.Id.Should().Be("varcompare");
         tool.Tab.Should().Be("Azure DevOps");
-        tool.Description.Should().Contain("read-only");
+        tool.Description.Should().Contain("lecture seule");
     }
 
     [Fact]

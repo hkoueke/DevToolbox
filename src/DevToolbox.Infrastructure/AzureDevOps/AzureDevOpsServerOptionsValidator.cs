@@ -1,3 +1,4 @@
+using DevToolbox.Domain.AzureDevOps;
 using Microsoft.Extensions.Options;
 
 namespace DevToolbox.Infrastructure.AzureDevOps;
@@ -6,6 +7,11 @@ namespace DevToolbox.Infrastructure.AzureDevOps;
 /// Valide les options du serveur au démarrage, pour qu'une installation mal configurée échoue de façon
 /// lisible plutôt qu'à la première requête. Les messages nomment le réglage fautif et le fichier à corriger.
 /// </summary>
+/// <remarks>
+/// L'adresse de base est jugée par <see cref="ServerAddress"/>, la même lecture que celle de l'invite du
+/// premier démarrage. Un nom court tel que <c>azure</c> passe donc ici comme il y passe là-bas : deux
+/// jugements divergents sur la même saisie seraient la pire des réponses.
+/// </remarks>
 public sealed class AzureDevOpsServerOptionsValidator : IValidateOptions<AzureDevOpsServerOptions>
 {
     private readonly string _settingsPath;
@@ -21,37 +27,30 @@ public sealed class AzureDevOpsServerOptionsValidator : IValidateOptions<AzureDe
 
         List<string> failures = [];
 
-        if (string.IsNullOrWhiteSpace(options.BaseUrl))
+        if (!ServerAddress.TryNormalise(
+                options.BaseUrl, options.AllowInsecureHttp, out _, out ServerAddressProblem problem))
         {
-            failures.Add(Missing(nameof(options.BaseUrl), "for example https://devops.entreprise.local"));
-        }
-        else if (!Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out Uri? baseUri))
-        {
-            failures.Add(Invalid(nameof(options.BaseUrl), options.BaseUrl, "it is not an absolute URL"));
-        }
-        else if (!IsPermittedScheme(baseUri, options.AllowInsecureHttp))
-        {
-            failures.Add(Invalid(
-                nameof(options.BaseUrl),
-                options.BaseUrl,
-                "it must use HTTPS. Set AllowInsecureHttp to true only if you genuinely intend plain HTTP"));
+            failures.Add(problem == ServerAddressProblem.Empty
+                ? Missing(nameof(options.BaseUrl), "par exemple azure ou https://devops.entreprise.local")
+                : Invalid(nameof(options.BaseUrl), options.BaseUrl, Explain(problem)));
         }
 
         if (string.IsNullOrWhiteSpace(options.Collection))
         {
-            failures.Add(Missing(nameof(options.Collection), "for example DefaultCollection"));
+            failures.Add(Missing(nameof(options.Collection), "par exemple DefaultCollection"));
         }
-        else if (!IsSafeSegment(options.Collection))
+        else if (!ServerTarget.IsSafeCollection(options.Collection))
         {
             failures.Add(Invalid(
                 nameof(options.Collection),
                 options.Collection,
-                "it must not contain a path separator, a parent-directory marker, or a control character"));
+                "il ne doit contenir ni séparateur de chemin, ni marqueur de dossier parent, ni caractère "
+                + "de contrôle"));
         }
 
         if (string.IsNullOrWhiteSpace(options.ApiVersion))
         {
-            failures.Add(Missing(nameof(options.ApiVersion), "for example 7.1"));
+            failures.Add(Missing(nameof(options.ApiVersion), "par exemple 7.1"));
         }
 
         return failures.Count == 0
@@ -59,25 +58,25 @@ public sealed class AzureDevOpsServerOptionsValidator : IValidateOptions<AzureDe
             : ValidateOptionsResult.Fail(failures);
     }
 
-    /// <summary>Indique si un segment de chemin peut être placé sans risque dans une URL.</summary>
-    /// <param name="segment">Le segment à tester.</param>
-    /// <returns><see langword="true"/> si le segment est sûr.</returns>
-    internal static bool IsSafeSegment(string segment) =>
-        !string.IsNullOrWhiteSpace(segment)
-        && segment.Length <= 64
-        && !segment.Contains('/', StringComparison.Ordinal)
-        && !segment.Contains('\\', StringComparison.Ordinal)
-        && !segment.Contains("..", StringComparison.Ordinal)
-        && !segment.Any(char.IsControl);
 
-    private static bool IsPermittedScheme(Uri baseUri, bool allowInsecureHttp) =>
-        baseUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-        || (allowInsecureHttp
-            && baseUri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
+    private static string Explain(ServerAddressProblem problem) => problem switch
+    {
+        ServerAddressProblem.InsecureScheme =>
+            "elle doit utiliser HTTPS. N'activez AllowInsecureHttp que si vous voulez réellement du HTTP "
+            + "simple",
+
+        ServerAddressProblem.UnsupportedScheme => "son schéma n'est ni https ni http",
+
+        ServerAddressProblem.CarriesCredentials =>
+            "elle porte des identifiants, ce qu'une adresse de serveur ne doit jamais faire",
+
+        _ => "elle ne se lit pas comme une adresse de serveur",
+    };
 
     private string Missing(string setting, string hint) =>
-        $"AzureDevOpsServer:{setting} is not set ({hint}). Set it in {_settingsPath}.";
+        $"AzureDevOpsServer:{setting} n'est pas renseigné ({hint}). Renseignez-le dans {_settingsPath}.";
 
     private string Invalid(string setting, string value, string why) =>
-        $"AzureDevOpsServer:{setting} is '{value}', which cannot be used because {why}. Edit {_settingsPath}.";
+        $"AzureDevOpsServer:{setting} vaut « {value} », ce qui ne peut pas être utilisé car {why}. "
+        + $"Corrigez {_settingsPath}.";
 }

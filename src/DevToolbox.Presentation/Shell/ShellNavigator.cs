@@ -9,8 +9,8 @@ namespace DevToolbox.Presentation.Shell;
 /// </summary>
 public sealed class ShellNavigator
 {
-    private const string ExitLabel = "Exit";
-    private const string BackLabel = "Back";
+    private const string ExitLabel = "Quitter";
+    private const string BackLabel = "Retour";
 
     private readonly IAnsiConsole _console;
 
@@ -31,7 +31,7 @@ public sealed class ShellNavigator
 
         if (tabs.Count == 0)
         {
-            _console.MarkupLine("[yellow]No tools are registered.[/]");
+            _console.MarkupLine("[yellow]Aucun outil n'est enregistré.[/]");
             return null;
         }
 
@@ -39,7 +39,7 @@ public sealed class ShellNavigator
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Choose a [bold]category[/]:")
+                .Title("Choisissez une [bold]catégorie[/] :")
                 .AddChoices(choices));
 
         return string.Equals(chosen, ExitLabel, StringComparison.Ordinal) ? null : chosen;
@@ -54,7 +54,7 @@ public sealed class ShellNavigator
 
         if (tools.Count == 0)
         {
-            _console.MarkupLine("[yellow]No tools in this category yet.[/]");
+            _console.MarkupLine("[yellow]Aucun outil dans cette catégorie pour l'instant.[/]");
             return null;
         }
 
@@ -69,7 +69,7 @@ public sealed class ShellNavigator
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Choose a [bold]tool[/]:")
+                .Title("Choisissez un [bold]outil[/] :")
                 .AddChoices(choices));
 
         return byLabel.TryGetValue(chosen, out ITool? selected) ? selected : null;
