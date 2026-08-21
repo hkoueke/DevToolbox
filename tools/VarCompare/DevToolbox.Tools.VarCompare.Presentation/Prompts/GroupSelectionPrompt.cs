@@ -46,9 +46,10 @@ public sealed class GroupSelectionPrompt : IGroupChooser
             }
 
             _console.MarkupLine(
-                "[yellow]Choose at least two groups — a comparison needs something to compare against.[/]");
+                "[yellow]Choisissez au moins deux groupes : une comparaison a besoin d'un point de "
+                + "comparaison.[/]");
 
-            if (!_console.Confirm("Try again?"))
+            if (!_console.Confirm("Réessayer ?"))
             {
                 return Task.FromResult<IReadOnlyList<VariableGroupSummary>>([]);
             }
@@ -68,7 +69,7 @@ public sealed class GroupSelectionPrompt : IGroupChooser
         }
 
         string filter = _console.Prompt(
-            new TextPrompt<string>($"Filter {available.Count} groups by name (blank for all):")
+            new TextPrompt<string>($"Filtrer les {available.Count} groupes par nom (laissez vide pour tous) :")
                 .AllowEmpty()
                 .DefaultValue(NoFilter)
                 .HideDefaultValue());
@@ -86,7 +87,7 @@ public sealed class GroupSelectionPrompt : IGroupChooser
 
         if (matches.Count == 0)
         {
-            _console.MarkupLine("[yellow]No group matched that filter; showing all of them.[/]");
+            _console.MarkupLine("[yellow]Aucun groupe ne correspond à ce filtre ; ils sont tous affichés.[/]");
             return available;
         }
 
@@ -105,10 +106,10 @@ public sealed class GroupSelectionPrompt : IGroupChooser
         }
 
         MultiSelectionPrompt<string> prompt = new MultiSelectionPrompt<string>()
-            .Title("Which [bold]groups[/] do you want to compare?")
+            .Title("Quels [bold]groupes[/] voulez-vous comparer ?")
             .PageSize(15)
-            .MoreChoicesText("[grey](move up and down for more)[/]")
-            .InstructionsText("[grey](space to toggle, enter to accept)[/]")
+            .MoreChoicesText("[grey](déplacez-vous vers le haut ou le bas pour en voir plus)[/]")
+            .InstructionsText("[grey](espace pour cocher, Entrée pour valider)[/]")
             .AddChoices(byLabel.Keys);
 
         // Garder cochés les choix déjà faits, pour qu'une sélection refusée se corrige au lieu de se refaire.
@@ -133,6 +134,6 @@ public sealed class GroupSelectionPrompt : IGroupChooser
     /// </summary>
     private static string Label(VariableGroupSummary group) =>
         group.IsKeyVaultBacked
-            ? $"{group.Name}  (#{group.Id}, key vault)"
-            : $"{group.Name}  (#{group.Id})";
+            ? $"{group.Name}  (n° {group.Id}, coffre de clés)"
+            : $"{group.Name}  (n° {group.Id})";
 }

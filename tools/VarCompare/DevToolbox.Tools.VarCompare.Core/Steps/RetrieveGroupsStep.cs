@@ -68,7 +68,8 @@ public sealed class RetrieveGroupsStep : IToolStep
 
         if (project is null || selected is null)
         {
-            return Result.Fail(FailureReason.InvalidConfiguration, "No groups have been selected yet.");
+            return Result.Fail(
+                FailureReason.InvalidConfiguration, "Aucun groupe n'a encore été sélectionné.");
         }
 
         Dictionary<int, VariableGroupSnapshot> snapshots =

@@ -32,12 +32,12 @@ public sealed class SpectreTargetAnnouncer : ITargetAnnouncer
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
 
-        grid.AddRow("[grey]server[/]", Markup.Escape(target.ServerHost));
+        grid.AddRow("[grey]serveur[/]", Markup.Escape(target.ServerHost));
         grid.AddRow("[grey]collection[/]", Markup.Escape(target.Collection));
-        grid.AddRow("[grey]sign-in[/]", Markup.Escape(TargetAnnouncement.AuthenticationMode));
+        grid.AddRow("[grey]connexion[/]", Markup.Escape(TargetAnnouncement.AuthenticationMode));
 
         _console.Write(new Panel(grid)
-            .Header("[bold]About to read[/]")
+            .Header("[bold]Sur le point de lire[/]")
             .Border(BoxBorder.Rounded));
     }
 }

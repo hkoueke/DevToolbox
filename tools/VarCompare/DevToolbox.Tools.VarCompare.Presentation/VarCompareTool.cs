@@ -77,7 +77,7 @@ public sealed class VarCompareTool : ITool
     public string Tab => "Azure DevOps";
 
     /// <inheritdoc />
-    public string Description => "compare Azure DevOps variable groups (read-only)";
+    public string Description => "comparer des groupes de variables Azure DevOps (lecture seule)";
 
     /// <inheritdoc />
     public async Task<ToolRun> RunAsync(CancellationToken cancellationToken)
@@ -108,7 +108,7 @@ public sealed class VarCompareTool : ITool
             RenderUnfinished(run);
             _abortSummary.Render(run, context);
 
-            _console.MarkupLine("[grey]Press enter to return to the menu.[/]");
+            _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir au menu.[/]");
             _console.Input.ReadKey(intercept: true);
         }
 
@@ -186,11 +186,11 @@ public sealed class VarCompareTool : ITool
         if (failed?.FailureReason is { } reason)
         {
             _console.MarkupLine(
-                $"[red]{Markup.Escape(failed.Name)} did not complete:[/] {Markup.Escape(reason)}");
+                $"[red]{Markup.Escape(failed.Name)} ne s'est pas achevée :[/] {Markup.Escape(reason)}");
         }
         else
         {
-            _console.MarkupLine("[yellow]The run did not complete.[/]");
+            _console.MarkupLine("[yellow]L'exécution ne s'est pas achevée.[/]");
         }
     }
 

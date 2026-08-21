@@ -38,7 +38,7 @@ public sealed class ListGroupsStep : IToolStep
 
         if (project is null)
         {
-            return Result.Fail(FailureReason.InvalidConfiguration, "No project has been chosen yet.");
+            return Result.Fail(FailureReason.InvalidConfiguration, "Aucun projet n'a encore été choisi.");
         }
 
         Result<IReadOnlyList<VariableGroupSummary>> groups =

@@ -46,11 +46,11 @@ public sealed class SymbolSet
     /// <returns>Un mot court.</returns>
     public static string Text(CellState state) => state switch
     {
-        CellState.PresentWithValue => "set",
-        CellState.PresentEmpty => "empty",
-        CellState.PresentSecret => "secret",
-        CellState.Absent => "missing",
-        _ => "unknown",
+        CellState.PresentWithValue => "définie",
+        CellState.PresentEmpty => "vide",
+        CellState.PresentSecret => "secrète",
+        CellState.Absent => "absente",
+        _ => "indéterminée",
     };
 
     /// <summary>La couleur Spectre associée à un état.</summary>

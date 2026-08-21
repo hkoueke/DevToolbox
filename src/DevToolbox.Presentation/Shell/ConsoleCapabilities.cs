@@ -41,8 +41,8 @@ public sealed class ConsoleCapabilities
     public int ReportNonInteractiveAndExit()
     {
         _console.MarkupLine(
-            "[yellow]DevToolbox is an interactive tool and this session cannot accept input.[/]");
-        _console.MarkupLine("Run it from a terminal that supports interactive prompts.");
+            "[yellow]DevToolbox est un outil interactif, et cette session ne peut pas recevoir de saisie.[/]");
+        _console.MarkupLine("Lancez-le depuis un terminal qui accepte les invites interactives.");
 
         return ExitCodes.NotInteractive;
     }

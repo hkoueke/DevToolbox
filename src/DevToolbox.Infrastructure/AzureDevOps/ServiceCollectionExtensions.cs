@@ -1,3 +1,4 @@
+using DevToolbox.Domain.AzureDevOps;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -30,6 +31,7 @@ public static class ServiceCollectionExtensions
         services
             .AddOptions<AzureDevOpsServerOptions>()
             .Bind(configuration.GetSection(AzureDevOpsServerOptions.SectionName))
+            .PostConfigure(NormaliseBaseUrl)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -73,6 +75,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AzureDevOpsApiReader>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Complète le schéma sous-entendu d'une adresse de base avant que quoi que ce soit ne la valide ou ne
+    /// s'y lie. Un serveur interne se désigne par son nom court, et la configuration doit accepter cette
+    /// forme d'où qu'elle vienne : réglages enregistrés, fichier livré, variable d'environnement.
+    /// </summary>
+    /// <remarks>
+    /// Une adresse qui ne se lit pas est laissée intacte : la dire mal formée revient au validateur, dont
+    /// c'est le rôle et qui sait nommer le réglage fautif.
+    /// </remarks>
+    private static void NormaliseBaseUrl(AzureDevOpsServerOptions options)
+    {
+        if (ServerAddress.TryNormalise(
+                options.BaseUrl, options.AllowInsecureHttp, out Uri? address, out _))
+        {
+            options.BaseUrl = address!.AbsoluteUri;
+        }
     }
 
     private static void ConfigureClient(IServiceProvider provider, HttpClient client)

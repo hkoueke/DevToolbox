@@ -46,7 +46,7 @@ public sealed class FailureRenderer
         if (failure.Reason == FailureReason.AuthenticationFailed)
         {
             grid.AddRow(string.Empty);
-            grid.AddRow("[grey]server[/]      " + Markup.Escape(_target.Host));
+            grid.AddRow("[grey]serveur[/]     " + Markup.Escape(_target.Host));
             grid.AddRow("[grey]collection[/]  " + Markup.Escape(_target.Collection));
         }
 
@@ -61,7 +61,8 @@ public sealed class FailureRenderer
         {
             // Aucune demande d'identifiants ne suit. Jamais.
             _console.MarkupLine(
-                "[grey]DevToolbox never asks for a password or a token — it uses your Windows session.[/]");
+                "[grey]DevToolbox ne demande jamais de mot de passe ni de jeton : il utilise votre session "
+                + "Windows.[/]");
         }
     }
 
@@ -71,49 +72,51 @@ public sealed class FailureRenderer
     public static (string Heading, string Advice) Describe(FailureReason reason) => reason switch
     {
         FailureReason.AuthenticationFailed => (
-            "The server rejected your Windows credentials",
-            "Check that you are on the corporate network and that your account has access to this "
+            "Le serveur a refusé vos identifiants Windows",
+            "Vérifiez que vous êtes sur le réseau de l'entreprise et que votre compte a accès à cette "
                 + "collection."),
 
         FailureReason.PermissionDenied => (
-            "You do not have permission to read this",
-            "Ask whoever administers the project to grant you read access to its variable groups. "
-                + "DevToolbox works strictly within your own rights and never tries to work around a denial."),
+            "Vous n'avez pas le droit de lire ceci",
+            "Demandez à l'administrateur du projet un accès en lecture à ses groupes de variables. "
+                + "DevToolbox travaille strictement dans le cadre de vos propres droits et ne cherche "
+                + "jamais à contourner un refus."),
 
         FailureReason.GroupNotFound => (
-            "That variable group no longer exists",
-            "It may have been renamed or deleted since the list was read. Refresh and choose again."),
+            "Ce groupe de variables n'existe plus",
+            "Il a pu être renommé ou supprimé depuis la lecture de la liste. Rafraîchissez, puis "
+                + "choisissez de nouveau."),
 
         FailureReason.ServiceUnavailable => (
-            "The server appears to be unavailable",
-            "DevToolbox stopped retrying rather than continuing to call a failing service. "
-                + "Wait a moment and try again."),
+            "Le serveur semble indisponible",
+            "DevToolbox a cessé de réessayer plutôt que de continuer à appeler un service en échec. "
+                + "Patientez un instant, puis réessayez."),
 
         FailureReason.ServerUnreachable => (
-            "The server could not be reached",
-            "This is a connectivity problem, not a permissions one. Are you on the corporate network, "
-                + "or is the VPN down?"),
+            "Le serveur n'a pas pu être joint",
+            "C'est un problème de connectivité, et non de droits. Êtes-vous sur le réseau de "
+                + "l'entreprise, ou le VPN est-il coupé ?"),
 
         FailureReason.ServerUntrusted => (
-            "The server's certificate could not be validated",
-            "DevToolbox never disables certificate validation. Check the server's certificate with "
-                + "whoever administers it."),
+            "Le certificat du serveur n'a pas pu être validé",
+            "DevToolbox ne désactive jamais la validation des certificats. Faites vérifier le certificat "
+                + "du serveur par son administrateur."),
 
         FailureReason.RedirectRefused => (
-            "The server answered with a redirect, which was refused",
-            "Redirects are disabled so your Windows credentials are never presented to another host. "
-                + "Check that the configured server address is correct."),
+            "Le serveur a répondu par une redirection, qui a été refusée",
+            "Les redirections sont désactivées afin que vos identifiants Windows ne soient jamais "
+                + "présentés à un autre hôte. Vérifiez que l'adresse de serveur configurée est correcte."),
 
         FailureReason.InvalidConfiguration => (
-            "The configuration is not usable",
-            "Correct the setting named above and start DevToolbox again."),
+            "La configuration n'est pas utilisable",
+            "Corrigez le réglage nommé ci-dessus, puis relancez DevToolbox."),
 
         FailureReason.Cancelled => (
-            "Cancelled",
-            "Nothing was changed — DevToolbox only ever reads."),
+            "Annulé",
+            "Rien n'a été modifié : DevToolbox ne fait jamais que lire."),
 
         _ => (
-            "The request could not be completed",
-            "Try again; if it keeps happening, check the log file for the run."),
+            "La requête n'a pas pu aboutir",
+            "Réessayez ; si cela persiste, consultez le fichier de journal de l'exécution."),
     };
 }
