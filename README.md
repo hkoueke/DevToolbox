@@ -114,15 +114,18 @@ git switch -c feature/mon-sujet
 git push -u origin feature/mon-sujet   # puis demande de tirage vers develop
 ```
 
-`master` est protégée par un ruleset : poussée directe refusée, demande de tirage obligatoire, job `ci`
-vert exigé, et ni suppression ni réécriture d'historique. Les fichiers correspondants sont dans
-[`.github/rulesets/`](.github/rulesets/) avec la marche à suivre pour les appliquer — une protection de
-branche est un réglage de serveur, elle ne s'active pas toute seule en arrivant dans le dépôt.
+`master` est protégée par un ruleset : poussée directe refusée, demande de tirage obligatoire, job
+`build` de la chaîne `ci-cd` vert exigé, et ni suppression ni réécriture d'historique. Les fichiers
+correspondants sont dans [`.github/rulesets/`](.github/rulesets/) avec la marche à suivre pour les
+appliquer — une protection de branche est un réglage de serveur, elle ne s'active pas toute seule en
+arrivant dans le dépôt.
 
 ## Publier une version
 
-L'intégration continue compile, teste et vérifie la publication mono-fichier à chaque poussée sur `master`
-ou `develop`, et à chaque demande de tirage vers l'une des deux.
+Intégration et livraison tiennent dans un seul workflow, [`ci-cd`](.github/workflows/ci-cd.yml), pour que
+tout se lise sur une seule exécution : le job `build` compile, teste et vérifie la publication
+mono-fichier à chaque poussée sur `master` ou `develop` et à chaque demande de tirage vers l'une des deux ;
+le job `release` ne s'ajoute que lorsque le déclencheur est une balise.
 
 Une version se coupe en reportant `develop` sur `master`, puis en balisant :
 
@@ -141,6 +144,10 @@ La chaîne recompile, rejoue les tests, puis publie un exécutable **Windows x64
 empaqueté avec son `appsettings.json` dans `DevToolbox-<version>-win-x64.zip`, accompagné de son empreinte
 SHA-256, et attaché à une release GitHub. Le runtime .NET n'a pas à être installé sur le poste cible. Une
 balise portant un suffixe (`v1.0.0-rc.1`) produit une préversion.
+
+Poser la balise depuis l'interface GitHub — **Releases → Draft a new release** — fonctionne aussi, mais la
+release existe alors avant que la chaîne ne tourne. Le job `release` le reconnaît : il téléverse les
+fichiers sur la release déjà là plutôt que d'échouer, et ne remplace sa description que si elle est vide.
 
 ## Contribuer
 
