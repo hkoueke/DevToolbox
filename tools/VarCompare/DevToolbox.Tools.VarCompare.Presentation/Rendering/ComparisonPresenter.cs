@@ -51,7 +51,10 @@ public sealed class ComparisonPresenter : IComparisonPresenter
         ArgumentNullException.ThrowIfNull(comparison);
         ArgumentNullException.ThrowIfNull(options);
 
-        LayoutDecision decision = LayoutSelector.Decide(options.Layout, comparison, _capabilities.Width);
+        LayoutMetrics metrics = Measure(comparison);
+
+        LayoutDecision decision =
+            LayoutSelector.Decide(options.Layout, comparison, _capabilities.Width, metrics);
 
         if (decision.WarnBeforeRendering && decision.Reason is not null)
         {
@@ -60,7 +63,7 @@ public sealed class ComparisonPresenter : IComparisonPresenter
             _console.WriteLine();
         }
 
-        if (!LayoutSelector.CanShowEverything(decision.Layout, comparison, _capabilities.Width))
+        if (!LayoutSelector.CanShowEverything(decision.Layout, comparison, _capabilities.Width, metrics))
         {
             RenderCannotShowEverything();
             return new ComparisonPage([], 0, 0, comparison.Rows.Count, 1, 1);
@@ -110,6 +113,48 @@ public sealed class ComparisonPresenter : IComparisonPresenter
 
         _console.Write(new Panel(grid).Header("[bold]Légende[/]").Border(BoxBorder.Rounded));
     }
+
+    /// <summary>
+    /// Mesure la place que prendra chaque colonne, pour que la grille reste la disposition retenue chaque
+    /// fois qu'elle tient.
+    /// </summary>
+    /// <remarks>
+    /// La mesure porte sur toute la comparaison et non sur la page affichée : une disposition qui changerait
+    /// d'une page à l'autre serait plus déroutante que quelques colonnes de trop.
+    /// </remarks>
+    /// <param name="comparison">La comparaison à mesurer.</param>
+    /// <returns>Les largeurs de contenu, colonne par colonne.</returns>
+    private LayoutMetrics Measure(VariableComparison comparison)
+    {
+        int[] groupColumns = new int[comparison.Groups.Count];
+
+        for (int index = 0; index < comparison.Groups.Count; index++)
+        {
+            // L'en-tête porte le nom du groupe : la colonne ne peut pas être plus étroite que lui.
+            groupColumns[index] = Width(GroupHeader(comparison.Groups[index]));
+        }
+
+        int nameColumn = 0;
+
+        foreach (ComparisonRow row in comparison.Rows)
+        {
+            nameColumn = Math.Max(nameColumn, Width(FormatName(row)));
+
+            for (int index = 0; index < row.Cells.Count && index < groupColumns.Length; index++)
+            {
+                groupColumns[index] = Math.Max(groupColumns[index], Width(FormatCell(row.Cells[index])));
+            }
+        }
+
+        return new LayoutMetrics(nameColumn, groupColumns);
+    }
+
+    /// <summary>
+    /// La largeur à l'écran d'un texte balisé, c'est-à-dire une fois ses balises retirées.
+    /// </summary>
+    /// <param name="markup">Le texte tel qu'il sera écrit, balises comprises.</param>
+    /// <returns>Un nombre de colonnes de terminal.</returns>
+    private static int Width(string markup) => Markup.Remove(markup).Length;
 
     private void RenderGrid(VariableComparison comparison, IReadOnlyList<ComparisonRow> rows)
     {

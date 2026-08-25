@@ -16,7 +16,7 @@ gh api repos/{owner}/{repo}/rulesets --method POST --input .github/rulesets/mast
 gh api repos/{owner}/{repo}/rulesets --method POST --input .github/rulesets/develop.json
 ```
 
-Les deux règles supposent que la branche existe déjà côté serveur et que le workflow `ci` y a tourné au
+Les deux règles supposent que la branche existe déjà côté serveur et que le workflow `ci-cd` y a tourné au
 moins une fois, sans quoi le contrôle requis `build` n'apparaît pas dans la liste proposée par l'interface.
 
 ## Ce que `master.json` impose
@@ -24,7 +24,7 @@ moins une fois, sans quoi le contrôle requis `build` n'apparaît pas dans la li
 | Règle | Effet |
 |-------|-------|
 | `pull_request` | Aucune poussée directe. Passer par une demande de tirage est le seul chemin. |
-| `required_status_checks` → `build` | Le job `build` du workflow `ci` doit être vert, et la branche à jour. |
+| `required_status_checks` → `build` | Le job `build` du workflow `ci-cd` doit être vert, et la branche à jour. |
 | `non_fast_forward` | Pas de réécriture d'historique : un `push --force` est refusé. |
 | `deletion` | La branche ne peut pas être supprimée. |
 

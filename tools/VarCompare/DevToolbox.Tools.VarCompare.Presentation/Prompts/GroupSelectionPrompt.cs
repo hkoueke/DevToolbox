@@ -1,3 +1,4 @@
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Comparison;
 using DevToolbox.Tools.VarCompare.Core.Groups;
@@ -9,8 +10,14 @@ namespace DevToolbox.Tools.VarCompare.Presentation.Prompts;
 /// Retient les groupes de variables à comparer, avec un filtre sur le nom et un minimum de deux groupes.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Une sélection de moins de deux groupes est expliquée puis redemandée en conservant les choix déjà faits,
 /// plutôt que de renvoyer le développeur au point de départ.
+/// </para>
+/// <para>
+/// La liste porte sa propre sortie. Une invite à choix multiples exige au moins une case cochée : sans
+/// entrée de retour, arriver ici sans vouloir comparer quoi que ce soit n'aurait laissé que Ctrl+C.
+/// </para>
 /// </remarks>
 public sealed class GroupSelectionPrompt : IGroupChooser
 {
@@ -38,7 +45,16 @@ public sealed class GroupSelectionPrompt : IGroupChooser
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            selected = Ask(candidates, selected);
+            List<VariableGroupSummary>? asked = Ask(candidates, selected);
+
+            // Retour demandé : on s'en va sans sermon sur le nombre de groupes, puisque le développeur
+            // n'a justement pas voulu en choisir.
+            if (asked is null)
+            {
+                return Task.FromResult<IReadOnlyList<VariableGroupSummary>>([]);
+            }
+
+            selected = asked;
 
             if (selected.Count >= VariableComparison.MinimumGroups)
             {
@@ -94,7 +110,14 @@ public sealed class GroupSelectionPrompt : IGroupChooser
         return matches;
     }
 
-    private List<VariableGroupSummary> Ask(
+    /// <summary>Demande quels groupes comparer.</summary>
+    /// <param name="candidates">Les groupes proposés.</param>
+    /// <param name="previouslySelected">Ce qui était déjà coché, à reproposer coché.</param>
+    /// <returns>
+    /// Les groupes retenus, ou <see langword="null"/> si le retour a été demandé — ce qui n'est pas la même
+    /// chose qu'une liste vide, laquelle veut dire « rien de coché parmi les groupes ».
+    /// </returns>
+    private List<VariableGroupSummary>? Ask(
         IReadOnlyList<VariableGroupSummary> candidates,
         IReadOnlyList<VariableGroupSummary> previouslySelected)
     {
@@ -105,12 +128,19 @@ public sealed class GroupSelectionPrompt : IGroupChooser
             byLabel[Label(group)] = group;
         }
 
+        // Le retour arrive après les groupes et porte sa flèche : cocher « Retour » ne peut pas se
+        // confondre avec cocher un groupe de plus.
+        List<string> choices = [.. byLabel.Keys, NavigationLabels.Back];
+
         MultiSelectionPrompt<string> prompt = new MultiSelectionPrompt<string>()
             .Title("Quels [bold]groupes[/] voulez-vous comparer ?")
             .PageSize(15)
+            .WrapAround()
             .MoreChoicesText("[grey](déplacez-vous vers le haut ou le bas pour en voir plus)[/]")
-            .InstructionsText("[grey](espace pour cocher, Entrée pour valider)[/]")
-            .AddChoices(byLabel.Keys);
+            .InstructionsText(
+                "[grey](espace pour cocher, Entrée pour valider — cochez « " + NavigationLabels.Back
+                + " », en fin de liste, pour revenir en arrière)[/]")
+            .AddChoices(choices);
 
         // Garder cochés les choix déjà faits, pour qu'une sélection refusée se corrige au lieu de se refaire.
         foreach (VariableGroupSummary group in previouslySelected)
@@ -124,6 +154,11 @@ public sealed class GroupSelectionPrompt : IGroupChooser
         }
 
         List<string> chosen = _console.Prompt(prompt);
+
+        if (chosen.Contains(NavigationLabels.Back, StringComparer.Ordinal))
+        {
+            return null;
+        }
 
         return [.. chosen.Where(byLabel.ContainsKey).Select(label => byLabel[label])];
     }

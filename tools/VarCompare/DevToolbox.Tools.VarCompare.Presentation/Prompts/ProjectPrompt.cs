@@ -1,4 +1,5 @@
 using DevToolbox.Domain.AzureDevOps;
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Targets;
 using Spectre.Console;
@@ -10,7 +11,7 @@ namespace DevToolbox.Tools.VarCompare.Presentation.Prompts;
 /// </summary>
 public sealed class ProjectPrompt : IProjectChooser
 {
-    private const string BackLabel = "Retour";
+    private const string BackLabel = NavigationLabels.Back;
 
     private readonly IAnsiConsole _console;
 
@@ -79,12 +80,15 @@ public sealed class ProjectPrompt : IProjectChooser
             byName[project.Name] = project;
         }
 
+        // Le retour se tient à l'écart des projets, précédé de sa flèche : sur une liste paginée, la seule
+        // chose pire qu'une sortie introuvable est une sortie qui ressemble à un projet de plus.
         List<string> choices = [.. byName.Keys, BackLabel];
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Quel [bold]projet[/] ?")
+                .Title("Quel [bold]projet[/] ?" + NavigationLabels.Hint)
                 .PageSize(15)
+                .WrapAround()
                 .MoreChoicesText("[grey](déplacez-vous vers le haut ou le bas pour en voir plus)[/]")
                 .AddChoices(choices));
 

@@ -1,3 +1,4 @@
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.VarCompare.Core.Comparison;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Presentation.Rendering;
@@ -24,7 +25,7 @@ public sealed class ComparisonSession
     private const string UseSideBySide = "Passer à la disposition en colonnes";
     private const string OpenVariable = "Ouvrir une variable";
     private const string Refresh = "Rafraîchir (relire les groupes)";
-    private const string Back = "Retour au menu";
+    private const string Back = NavigationLabels.Prefix + "Retour au menu";
 
     private readonly IAnsiConsole _console;
     private readonly ComparisonPresenter _presenter;
@@ -73,7 +74,8 @@ public sealed class ComparisonSession
 
             string choice = _console.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("Et maintenant ?")
+                    .Title("Et maintenant ?" + NavigationLabels.Hint)
+                    .WrapAround()
                     .AddChoices(BuildChoices(page)));
 
             if (string.Equals(choice, Back, StringComparison.Ordinal))
