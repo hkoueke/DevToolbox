@@ -57,6 +57,45 @@ public sealed class LayoutAndFilterTests
     }
 
     [Fact]
+    public void Measured_columns_keep_the_grid_where_a_reserved_width_would_have_stacked()
+    {
+        // La grille est la disposition que l'on veut : c'est la seule qui montre les groupes côte à côte.
+        // Réserver à chaque colonne la place du pire libellé la fait abandonner alors que l'écran avait
+        // la place ; mesurer ce qui sera réellement écrit la conserve.
+        VariableComparison comparison = ManyGroups(5);
+
+        LayoutSelector.Decide(ComparisonLayout.Auto, comparison, 120)
+            .Layout.Should().Be(ComparisonLayout.Stacked);
+
+        LayoutMetrics measured = new(NameColumn: 20, GroupColumns: [9, 9, 9, 9, 9]);
+
+        LayoutDecision decision = LayoutSelector.Decide(ComparisonLayout.Auto, comparison, 120, measured);
+
+        decision.Layout.Should().Be(ComparisonLayout.SideBySide);
+        decision.WarnBeforeRendering.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_group_name_wider_than_its_cells_widens_the_column_it_titles()
+    {
+        // L'en-tête porte le nom du groupe : une colonne mesurée sur ses seules cellules serait trop
+        // étroite, et le nom se ferait tronquer.
+        VariableComparison shortName = ComparisonBuilder.Build(
+            [Snapshot("dev", ("Api__Key", "a")), Snapshot("qa", ("Api__Key", "b"))]);
+
+        VariableComparison longName = ComparisonBuilder.Build(
+        [
+            Snapshot("dev", ("Api__Key", "a")),
+            Snapshot("integration-continue-du-service-de-paiement", ("Api__Key", "b")),
+        ]);
+
+        LayoutMetrics measured = new(NameColumn: 8, GroupColumns: [9, 9]);
+
+        LayoutSelector.RequiredWidth(longName, measured)
+            .Should().BeGreaterThan(LayoutSelector.RequiredWidth(shortName, measured));
+    }
+
+    [Fact]
     public void There_is_no_fixed_upper_limit_on_the_number_of_groups()
     {
         // Le seuil est mesuré, jamais un nombre de groupes codé en dur. Vingt groupes tiennent dans un

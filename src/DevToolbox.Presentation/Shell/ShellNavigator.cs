@@ -9,8 +9,8 @@ namespace DevToolbox.Presentation.Shell;
 /// </summary>
 public sealed class ShellNavigator
 {
-    private const string ExitLabel = "Quitter";
-    private const string BackLabel = "Retour";
+    private const string ExitLabel = NavigationLabels.Exit;
+    private const string BackLabel = NavigationLabels.Back;
 
     private readonly IAnsiConsole _console;
 
@@ -39,7 +39,8 @@ public sealed class ShellNavigator
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Choisissez une [bold]catégorie[/] :")
+                .Title("Choisissez une [bold]catégorie[/] :" + NavigationLabels.Hint)
+                .WrapAround()
                 .AddChoices(choices));
 
         return string.Equals(chosen, ExitLabel, StringComparison.Ordinal) ? null : chosen;
@@ -69,7 +70,8 @@ public sealed class ShellNavigator
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Choisissez un [bold]outil[/] :")
+                .Title("Choisissez un [bold]outil[/] :" + NavigationLabels.Hint)
+                .WrapAround()
                 .AddChoices(choices));
 
         return byLabel.TryGetValue(chosen, out ITool? selected) ? selected : null;
