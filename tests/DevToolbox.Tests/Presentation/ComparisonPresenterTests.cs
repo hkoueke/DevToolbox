@@ -99,6 +99,46 @@ public sealed class ComparisonPresenterTests
         console.Dispose();
     }
 
+    [Fact]
+    public void Five_groups_still_come_up_in_columns_on_an_ordinary_terminal()
+    {
+        // Cinq groupes dans cent vingt colonnes : c'est le cas courant, et il doit rester en colonnes.
+        // Le présentateur mesure ce qu'il va écrire ; une largeur supposée à chaque cellule aurait ici
+        // basculé vers l'empilement alors que la place était là.
+        using TestConsole console = new();
+        console.Profile.Width = 120;
+        console.Profile.Height = 50;
+
+        ComparisonPresenter presenter = new(console, new ConsoleCapabilities(console));
+        presenter.Render(FiveEnvironments(), ComparisonViewOptions.Default);
+
+        // Dans la grille, les noms de groupes titrent les colonnes : ils sont donc sur une même ligne.
+        // Dans la disposition empilée, ils ne se rencontrent jamais.
+        string[] lines = console.Output.Split('\n');
+
+        lines.Should().Contain(
+            line => line.Contains("dev", StringComparison.Ordinal)
+                && line.Contains("production", StringComparison.Ordinal),
+            "les groupes côte à côte sont ce qui rend une différence visible d'un coup d'œil");
+    }
+
+    private static VariableComparison FiveEnvironments()
+    {
+        string[] environments = ["dev", "integration", "recette", "preproduction", "production"];
+
+        return ComparisonBuilder.Build(
+        [
+            .. environments.Select(name => new VariableGroupSnapshot(
+                new VariableGroupSummary(name.Length, name, null, VariableGroupOrigin.Ordinary, false),
+                [
+                    new VariableEntry("Api__BaseUrl", "https://" + name, false, false),
+                    new VariableEntry("Api__Timeout", "30", false, false),
+                    new VariableEntry("Feature__X", "on", false, false),
+                ],
+                ReadAt)),
+        ]);
+    }
+
     private static (TestConsole Console, string Output) Render(ComparisonViewOptions options)
     {
         TestConsole console = new();

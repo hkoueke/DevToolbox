@@ -6,13 +6,25 @@ namespace DevToolbox.Tools.VarCompare.Core.Comparison;
 /// Décide si la grille en colonnes tient à l'écran, et avertit avant de basculer vers l'affichage empilé.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Le seuil est mesuré, pas deviné : la largeur réelle du terminal est comparée à celle dont les colonnes
 /// ont effectivement besoin. Il n'y a volontairement aucun nombre maximal de groupes écrit en dur, car
 /// savoir si cinq groupes tiennent dépend entièrement de la largeur du terminal et de la longueur des noms.
+/// </para>
+/// <para>
+/// La disposition en colonnes est celle que l'on veut : c'est la seule qui montre les groupes côte à côte,
+/// donc la seule où une différence se voit d'un coup d'œil. L'affichage empilé est un repli, et il ne doit
+/// se déclencher que lorsque les colonnes ne tiennent vraiment pas. C'est pourquoi la présentation
+/// transmet ses <see cref="LayoutMetrics"/> : avec une largeur de cellule supposée, on se rabattrait sur
+/// l'empilement alors que l'écran avait la place.
+/// </para>
 /// </remarks>
 public static class LayoutSelector
 {
-    /// <summary>La largeur nécessaire à une cellule d'état : symbole, mot et les deux marques facultatives.</summary>
+    /// <summary>
+    /// La largeur supposée d'une cellule d'état — symbole, mot et les deux marques facultatives — tant que
+    /// la présentation n'a pas mesuré la sienne.
+    /// </summary>
     public const int CellWidth = 20;
 
     /// <summary>La largeur minimale autorisée pour la colonne des noms de variables.</summary>
@@ -25,11 +37,16 @@ public static class LayoutSelector
     /// <param name="requested">Ce que le développeur a demandé. <c>Auto</c> mesure, les autres sont honorées.</param>
     /// <param name="comparison">La comparaison à afficher.</param>
     /// <param name="terminalWidth">La largeur utile du terminal.</param>
+    /// <param name="metrics">
+    /// Les largeurs mesurées par la présentation, ou <see langword="null"/> pour s'en tenir aux largeurs
+    /// supposées.
+    /// </param>
     /// <returns>La disposition retenue, et s'il faut avertir au préalable.</returns>
     public static LayoutDecision Decide(
         ComparisonLayout requested,
         VariableComparison comparison,
-        int terminalWidth)
+        int terminalWidth,
+        LayoutMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(comparison);
 
@@ -39,7 +56,7 @@ public static class LayoutSelector
             return new LayoutDecision(requested, WarnBeforeRendering: false, Reason: null);
         }
 
-        int required = RequiredWidth(comparison);
+        int required = RequiredWidth(comparison, metrics);
 
         if (required <= terminalWidth)
         {
@@ -57,8 +74,12 @@ public static class LayoutSelector
 
     /// <summary>La largeur dont la grille en colonnes a besoin pour s'afficher sans troncature.</summary>
     /// <param name="comparison">La comparaison à mesurer.</param>
+    /// <param name="metrics">
+    /// Les largeurs mesurées par la présentation, ou <see langword="null"/> pour s'en tenir aux largeurs
+    /// supposées.
+    /// </param>
     /// <returns>Une largeur en colonnes de terminal.</returns>
-    public static int RequiredWidth(VariableComparison comparison)
+    public static int RequiredWidth(VariableComparison comparison, LayoutMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(comparison);
 
@@ -66,9 +87,23 @@ public static class LayoutSelector
             ? MinimumNameColumnWidth
             : comparison.Rows.Max(row => row.DisplayName.Length);
 
-        int nameColumn = Math.Max(MinimumNameColumnWidth, longestName) + ColumnChrome;
+        int nameColumn =
+            Math.Max(MinimumNameColumnWidth, metrics?.NameColumn ?? longestName) + ColumnChrome;
 
-        return nameColumn + (comparison.Groups.Count * (CellWidth + ColumnChrome));
+        // Une colonne mesurée est prise telle quelle ; à défaut, chaque groupe se voit réserver la largeur
+        // supposée. Le nom du groupe compte aussi : c'est lui qui titre la colonne.
+        int groupColumns = 0;
+
+        for (int index = 0; index < comparison.Groups.Count; index++)
+        {
+            int measured = metrics is not null && index < metrics.GroupColumns.Count
+                ? metrics.GroupColumns[index]
+                : CellWidth;
+
+            groupColumns += Math.Max(measured, comparison.Groups[index].Name.Length) + ColumnChrome;
+        }
+
+        return nameColumn + groupColumns;
     }
 
     /// <summary>
@@ -77,6 +112,10 @@ public static class LayoutSelector
     /// <param name="layout">La disposition retenue.</param>
     /// <param name="comparison">La comparaison.</param>
     /// <param name="terminalWidth">La largeur utile du terminal.</param>
+    /// <param name="metrics">
+    /// Les largeurs mesurées par la présentation, ou <see langword="null"/> pour s'en tenir aux largeurs
+    /// supposées.
+    /// </param>
     /// <returns>
     /// <see langword="true"/> si tout tient. Dans le cas contraire, l'appelant doit le dire plutôt que
     /// d'afficher un résultat partiel.
@@ -84,7 +123,8 @@ public static class LayoutSelector
     public static bool CanShowEverything(
         ComparisonLayout layout,
         VariableComparison comparison,
-        int terminalWidth)
+        int terminalWidth,
+        LayoutMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(comparison);
 
@@ -92,6 +132,6 @@ public static class LayoutSelector
         // le nombre de groupes. Il n'échoue que sur un terminal trop étroit pour un seul état libellé.
         return layout == ComparisonLayout.Stacked
             ? terminalWidth >= MinimumNameColumnWidth
-            : RequiredWidth(comparison) <= terminalWidth;
+            : RequiredWidth(comparison, metrics) <= terminalWidth;
     }
 }

@@ -1,0 +1,244 @@
+# Chaîne CI/CD : un seul fichier, donc une seule vue dans GitHub. Les étapes d'intégration et
+# celles de livraison se lisent d'un coup d'œil, sur la même exécution.
+#
+# Sur `master`, sur `develop` et sur chaque demande de tirage : compile, teste, et vérifie que la
+# publication mono-fichier fonctionne, afin que le jour de la balise ne soit jamais la première
+# fois qu'on l'essaie.
+#
+# Sur une balise `v<semver>` : la même compilation, cette fois estampillée de la version, puis la
+# livraison.
+#
+#   git tag -a v1.0.0 -m "v1.0.0"
+#   git push origin v1.0.0
+#
+# Produit un exécutable Windows x64 autonome et mono-fichier, empaqueté avec son appsettings.json,
+# accompagné de son empreinte SHA-256, et attaché à une release GitHub.
+name: ci-cd
+
+on:
+  push:
+    branches: [master, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  # Une intégration s'annule quand la suivante arrive ; une livraison, jamais en cours de route.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  # Ce job s'appelle `build` parce que c'est le contrôle requis par la règle de branche de
+  # `master` : le renommer décrocherait silencieusement la protection.
+  build:
+    # L'outil s'authentifie avec la session Windows : il se construit et se teste sur Windows.
+    runs-on: windows-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+
+    steps:
+      - name: Extraire le dépôt
+        uses: actions/checkout@v5
+        with:
+          # Historique complet : le contrôle de balise a besoin de savoir où mène la balise.
+          fetch-depth: 0
+
+      - name: Vérifier que la balise est sur master
+        # Une version se coupe sur master, après le report de develop. Une balise posée sur une
+        # branche de travail ne produit pas de release : elle échoue ici, avant toute compilation.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $branches = git branch --remotes --contains $env:GITHUB_SHA
+          # -match sur un tableau retourne les lignes qui correspondent : un résultat vide est faux.
+          if (-not ($branches -match 'origin/master$')) {
+            throw "La balise '${{ github.ref_name }}' n'est pas contenue dans origin/master. Fusionnez develop dans master, puis reposez la balise."
+          }
+
+      - name: Déduire la version de la balise
+        id: version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $tag = '${{ github.ref_name }}'
+          # Refuser tôt une balise mal formée plutôt que de produire un artefact mal nommé.
+          if ($tag -notmatch '^v(?<v>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
+            throw "La balise '$tag' n'est pas de la forme v<major>.<minor>.<patch>[-prerelease]."
+          }
+          $version = $Matches['v']
+          # Une balise portant un suffixe est une préversion.
+          $prerelease = $version.Contains('-')
+          "version=$version"       >> $env:GITHUB_OUTPUT
+          "prerelease=$($prerelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "Version $version (préversion : $prerelease)" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Installer le SDK .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Mettre en cache les paquets NuGet
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restaurer
+        run: dotnet restore DevToolbox.slnx
+
+      - name: Compiler
+        # Les avertissements sont des erreurs : cette étape est le contrôle de qualité.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Hors balise, aucune version n'est imposée : les projets gardent la leur.
+          $arguments = @('--configuration', 'Release', '--no-restore')
+          if ($env:VERSION) { $arguments += "-p:Version=$env:VERSION" }
+          dotnet build DevToolbox.slnx @arguments
+
+      - name: Tester
+        # Une balise dont les tests échouent ne devient pas une release.
+        run: >
+          dotnet test DevToolbox.slnx
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=tests.trx"
+          --results-directory artifacts/test-results
+          --collect:"XPlat Code Coverage"
+
+      - name: Publier les résultats de tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results
+          retention-days: 14
+
+      - name: Publier en mono-fichier win-x64
+        # Hors balise, cette étape ne livre rien : elle prouve seulement que le mono-fichier
+        # autonome se construit, pour qu'une balise n'échoue pas sur une surprise.
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $arguments = @(
+            '--configuration', 'Release',
+            '--runtime', 'win-x64',
+            '--self-contained', 'true',
+            '-p:PublishSingleFile=true',
+            '-p:EnableCompressionInSingleFile=true',
+            '-p:DebugType=embedded',
+            '-p:PublishDocumentationFiles=false',
+            '--output', 'artifacts/publish'
+          )
+          if ($env:VERSION) { $arguments += "-p:Version=$env:VERSION" }
+          dotnet publish src/DevToolbox.Console @arguments
+
+      - name: Transmettre la publication à la livraison
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-win-x64
+          path: artifacts/publish
+          # Simple relais vers le job suivant : l'archive livrée, elle, est conservée plus longtemps.
+          retention-days: 1
+
+  # Livraison. Ne tourne que sur une balise, et seulement si le job précédent est vert.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+
+    permissions:
+      # Nécessaire pour créer la release et y téléverser les fichiers.
+      contents: write
+
+    steps:
+      - name: Récupérer la publication
+        uses: actions/download-artifact@v4
+        with:
+          name: publish-win-x64
+          path: artifacts/publish
+
+      - name: Empaqueter et calculer l'empreinte
+        id: package
+        run: |
+          $version = '${{ needs.build.outputs.version }}'
+          $name    = "DevToolbox-$version-win-x64"
+          New-Item -ItemType Directory -Path artifacts/release | Out-Null
+
+          $zip = "artifacts/release/$name.zip"
+          Compress-Archive -Path artifacts/publish/* -DestinationPath $zip
+
+          # Une empreinte à côté de l'archive : c'est ce qui permet à quelqu'un de vérifier
+          # que le fichier téléchargé est bien celui qui a été publié.
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $name.zip" | Set-Content "artifacts/release/$name.zip.sha256" -Encoding ascii
+
+          "name=$name" >> $env:GITHUB_OUTPUT
+          "| Fichier | SHA-256 |"      >> $env:GITHUB_STEP_SUMMARY
+          "|---------|---------|"     >> $env:GITHUB_STEP_SUMMARY
+          "| $name.zip | ``$hash`` |" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Conserver l'archive comme artefact de build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: artifacts/release
+          retention-days: 90
+
+      - name: Créer ou compléter la release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag   = '${{ github.ref_name }}'
+          $asset = '${{ steps.package.outputs.name }}'
+
+          @"
+          Exécutable Windows x64 autonome et mono-fichier. Le runtime .NET n'a pas à être installé.
+
+          **Installation.** Décompressez l'archive et lancez ``DevToolbox.exe``. Gardez
+          ``appsettings.json`` à côté de l'exécutable : il porte l'adresse de serveur proposée au
+          premier démarrage. Votre réponse est enregistrée dans ``%APPDATA%\DevToolbox\settings.json``.
+
+          **Vérification.** ``Get-FileHash .\$asset.zip -Algorithm SHA256`` doit donner l'empreinte
+          du fichier ``$asset.zip.sha256`` joint.
+          "@ | Set-Content notes.md -Encoding utf8
+
+          $assets = Get-ChildItem artifacts/release -File | ForEach-Object FullName
+
+          # Poser la balise depuis l'interface GitHub crée déjà la release : la livraison la
+          # complète alors, au lieu d'échouer sur « existe déjà ». On interroge la liste plutôt
+          # que la release elle-même, parce qu'une release absente ferait sortir `gh` en erreur.
+          $publiees = gh release list --limit 100 --json tagName --jq '.[].tagName'
+
+          if ($publiees -contains $tag) {
+            "La release ``$tag`` existait déjà : les fichiers y ont été ajoutés." >> $env:GITHUB_STEP_SUMMARY
+            gh release upload $tag @assets --clobber
+
+            # Une release créée à la main sans description reçoit la nôtre ; un texte écrit par
+            # quelqu'un n'est jamais écrasé.
+            $description = gh release view $tag --json body --jq '.body'
+            if ([string]::IsNullOrWhiteSpace($description)) {
+              gh release edit $tag --notes-file notes.md
+            }
+          }
+          else {
+            $flags = @('--title', $tag, '--notes-file', 'notes.md', '--generate-notes')
+            if ('${{ needs.build.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' }
+            gh release create $tag @assets @flags
+          }
