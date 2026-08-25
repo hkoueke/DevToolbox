@@ -204,6 +204,10 @@ jobs:
       - name: Créer ou compléter la release GitHub
         env:
           GH_TOKEN: ${{ github.token }}
+          # Ce job ne fait pas d'extraction : il n'a besoin que de l'archive du job précédent. Sans dépôt
+          # local, `gh` n'a aucun distant d'où déduire sur quel dépôt agir, et GITHUB_REPOSITORY ne lui
+          # sert pas tout seul. GH_REPO le lui dit, et coûte moins cher qu'une extraction inutile.
+          GH_REPO: ${{ github.repository }}
         run: |
           $tag   = '${{ github.ref_name }}'
           $asset = '${{ steps.package.outputs.name }}'
