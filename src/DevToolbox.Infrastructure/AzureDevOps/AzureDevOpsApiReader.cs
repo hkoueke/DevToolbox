@@ -4,6 +4,8 @@ using DevToolbox.Domain.Results;
 using DevToolbox.Infrastructure.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 namespace DevToolbox.Infrastructure.AzureDevOps;
 
@@ -11,6 +13,13 @@ namespace DevToolbox.Infrastructure.AzureDevOps;
 /// Lit l'API REST du serveur Azure DevOps. Chaque requête est un GET : aucun membre de cette classe ne peut
 /// exprimer une modification, ce qui rend la garantie de lecture seule structurelle et non disciplinaire.
 /// </summary>
+/// <remarks>
+/// Le pipeline de résilience ne signale pas tout par un <see cref="HttpRequestException"/> : un budget de
+/// temps épuisé lève <see cref="TimeoutRejectedException"/> et un disjoncteur ouvert
+/// <see cref="BrokenCircuitException"/>. Les attraper ici est ce qui garde la promesse de ce type, à savoir
+/// qu'il rend un <see cref="Result"/> plutôt que de laisser une exception traverser toutes les couches
+/// jusqu'à terminer le processus.
+/// </remarks>
 public sealed class AzureDevOpsApiReader
 {
     /// <summary>L'en-tête de réponse au moyen duquel Azure DevOps pagine.</summary>
@@ -82,9 +91,24 @@ public sealed class AzureDevOpsApiReader
                 ? Result.Fail<T>(FailureReason.ServiceUnavailable, "The server returned an empty response.")
                 : Result.Success(body);
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Le jeton de l'appelant n'a pas bougé : ce n'est donc pas le développeur qui a annulé, mais un
+            // délai d'attente qui a expiré. Le dire ainsi ouvre l'invite de reprise au lieu de terminer
+            // l'exécution en silence.
+            return Result.Fail<T>(AzureDevOpsFailures.TimedOut());
+        }
         catch (OperationCanceledException)
         {
             return Result.Fail<T>(AzureDevOpsFailures.Cancelled());
+        }
+        catch (TimeoutRejectedException)
+        {
+            return Result.Fail<T>(AzureDevOpsFailures.TimedOut());
+        }
+        catch (BrokenCircuitException)
+        {
+            return Result.Fail<T>(AzureDevOpsFailures.ServiceUnavailable());
         }
         catch (HttpRequestException exception)
         {
@@ -133,9 +157,21 @@ public sealed class AzureDevOpsApiReader
 
             return Result.Success(new PagedReadResult<T>(body?.Value ?? [], continuationToken));
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return Result.Fail<PagedReadResult<T>>(AzureDevOpsFailures.TimedOut());
+        }
         catch (OperationCanceledException)
         {
             return Result.Fail<PagedReadResult<T>>(AzureDevOpsFailures.Cancelled());
+        }
+        catch (TimeoutRejectedException)
+        {
+            return Result.Fail<PagedReadResult<T>>(AzureDevOpsFailures.TimedOut());
+        }
+        catch (BrokenCircuitException)
+        {
+            return Result.Fail<PagedReadResult<T>>(AzureDevOpsFailures.ServiceUnavailable());
         }
         catch (HttpRequestException exception)
         {

@@ -75,6 +75,20 @@ public static class AzureDevOpsFailures
         "Le serveur semble indisponible. L'outil a cessé de réessayer plutôt que de continuer à "
         + "l'appeler.");
 
+    /// <summary>
+    /// L'échec employé quand une requête dépasse son budget de temps.
+    /// </summary>
+    /// <remarks>
+    /// Volontairement distinct d'une annulation : personne n'a rien demandé, c'est le serveur qui a été trop
+    /// lent. La différence n'est pas cosmétique. Une exécution annulée s'arrête sans rien proposer, alors
+    /// qu'un échec ouvre l'invite de reprise, qui est bien ce qu'il faut offrir ici.
+    /// </remarks>
+    /// <returns>L'échec.</returns>
+    public static Failure TimedOut() => Failure.Of(
+        FailureReason.ServiceUnavailable,
+        "Le serveur n'a pas répondu dans le temps imparti. L'outil a cessé d'attendre plutôt que de rester "
+        + "suspendu indéfiniment.");
+
     /// <summary>L'échec employé quand le développeur annule.</summary>
     /// <returns>L'échec.</returns>
     public static Failure Cancelled() => Failure.Of(

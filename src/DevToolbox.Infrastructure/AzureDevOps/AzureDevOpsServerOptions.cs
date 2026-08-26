@@ -31,9 +31,14 @@ public sealed class AzureDevOpsServerOptions
     /// </summary>
     public bool AllowInsecureHttp { get; set; }
 
-    /// <summary>Le délai d'attente par requête, en secondes.</summary>
+    /// <summary>
+    /// Le délai d'attente par requête, en secondes. C'est le filet extérieur, et il doit rester
+    /// franchement au-dessus de <c>Resilience:TotalRequestTimeoutSeconds</c> : il couvre aussi les attentes
+    /// entre reprises, si bien que deux échéances trop proches courent l'une contre l'autre. Le validateur
+    /// le vérifie.
+    /// </summary>
     [Range(1, 600)]
-    public int HttpTimeoutSeconds { get; set; } = 30;
+    public int HttpTimeoutSeconds { get; set; } = 120;
 
     /// <summary>
     /// Combien de groupes peuvent être lus simultanément. Borné et configurable, jamais illimité.

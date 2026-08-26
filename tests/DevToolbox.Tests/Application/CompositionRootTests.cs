@@ -2,6 +2,7 @@ using DevToolbox.Application.Abstractions;
 using DevToolbox.Console;
 using DevToolbox.Infrastructure.Logging;
 using DevToolbox.Infrastructure.Platform;
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Core.Steps;
@@ -38,6 +39,18 @@ public sealed class CompositionRootTests
         provider.GetRequiredService<IRunCheckpointStore>().Should().NotBeNull();
         provider.GetRequiredService<IRunCheckpointFactory>().Should().NotBeNull();
         provider.GetRequiredService<ITargetAnnouncer>().Should().NotBeNull();
+        provider.GetRequiredService<IResumedSelectionReconciler>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void The_shell_announcer_wins_over_the_silent_observer_the_http_client_falls_back_to()
+    {
+        // L'enregistrement du client Azure DevOps pose un observateur muet, mais seulement si personne n'en
+        // a posé un. Inverser cet ordre rendrait les reprises de nouveau invisibles, sans rien casser
+        // d'autre : c'est exactement le genre de régression qu'aucun autre test ne verrait.
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetRequiredService<IRetryObserver>().Should().BeOfType<SpectreRetryAnnouncer>();
     }
 
     [Fact]

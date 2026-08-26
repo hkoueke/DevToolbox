@@ -15,10 +15,19 @@ namespace DevToolbox.Infrastructure.AzureDevOps;
 public sealed class AzureDevOpsServerOptionsValidator : IValidateOptions<AzureDevOpsServerOptions>
 {
     private readonly string _settingsPath;
+    private readonly int _totalRequestTimeoutSeconds;
 
     /// <summary>Crée le validateur.</summary>
     /// <param name="settingsPath">Le fichier de réglages à nommer dans les messages d'échec.</param>
-    public AzureDevOpsServerOptionsValidator(string settingsPath) => _settingsPath = settingsPath;
+    /// <param name="totalRequestTimeoutSeconds">
+    /// Le budget total d'une requête logique, tel que le pipeline de résilience l'applique. Le délai du
+    /// client HTTP doit rester au-dessus, sans quoi les deux échéances courent l'une contre l'autre.
+    /// </param>
+    public AzureDevOpsServerOptionsValidator(string settingsPath, int totalRequestTimeoutSeconds)
+    {
+        _settingsPath = settingsPath;
+        _totalRequestTimeoutSeconds = totalRequestTimeoutSeconds;
+    }
 
     /// <inheritdoc />
     public ValidateOptionsResult Validate(string? name, AzureDevOpsServerOptions options)
@@ -51,6 +60,18 @@ public sealed class AzureDevOpsServerOptionsValidator : IValidateOptions<AzureDe
         if (string.IsNullOrWhiteSpace(options.ApiVersion))
         {
             failures.Add(Missing(nameof(options.ApiVersion), "par exemple 7.1"));
+        }
+
+        if (options.HttpTimeoutSeconds <= _totalRequestTimeoutSeconds)
+        {
+            // Le délai du client HTTP couvre aussi les attentes entre reprises. S'il n'excède pas le budget
+            // du pipeline, les deux échéances expirent ensemble et laquelle l'emporte n'est pas décidable :
+            // tantôt un échec propre, tantôt une exception qui traverse tout.
+            failures.Add(
+                $"AzureDevOpsServer:HttpTimeoutSeconds vaut {options.HttpTimeoutSeconds} s, ce qui n'excède "
+                + $"pas Resilience:TotalRequestTimeoutSeconds ({_totalRequestTimeoutSeconds} s). Le délai du "
+                + "client doit rester le filet extérieur, franchement au-dessus du budget des reprises. "
+                + $"Corrigez {_settingsPath}.");
         }
 
         return failures.Count == 0

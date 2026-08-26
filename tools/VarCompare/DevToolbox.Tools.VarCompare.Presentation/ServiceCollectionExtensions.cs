@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<FailureRenderer>();
         services.AddSingleton<AbortSummaryRenderer>();
         services.AddSingleton<ResumeCoordinator>();
+        services.AddSingleton<IResumedSelectionReconciler>(p => p.GetRequiredService<ResumeCoordinator>());
         services.AddSingleton<ComparisonSession>();
 
         services.AddSingleton<IRunCheckpointFactory, VarCompareCheckpointFactory>();
