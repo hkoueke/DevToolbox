@@ -4,6 +4,17 @@ namespace DevToolbox.Tools.VarCompare.Core.Abstractions;
 /// Rend compte de l'avancement pendant la lecture des groupes, pour qu'une reprise ressemble à une reprise
 /// et non à un blocage. Implémenté dans la couche Spectre.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Ce port ne dit rien des reprises internes du client HTTP. Elles surviennent sous la passerelle, là où
+/// aucun groupe n'est identifiable, et c'est <c>IRetryObserver</c> qui les annonce — une fois pour tous les
+/// outils, plutôt qu'une fois par outil.
+/// </para>
+/// <para>
+/// Les implémentations sont appelées depuis plusieurs fils d'exécution, la lecture des groupes étant
+/// parallèle, et doivent donc sérialiser leurs écritures.
+/// </para>
+/// </remarks>
 public interface IRetrievalProgress
 {
     /// <summary>Commence à rendre compte.</summary>
@@ -23,16 +34,6 @@ public interface IRetrievalProgress
     /// <param name="groupName">Le nom du groupe.</param>
     /// <param name="reason">Un message déjà affichable tel quel.</param>
     void Failed(string groupName, string reason);
-
-    /// <summary>Signale qu'une tentative est rejouée, pour qu'un appel lent ne paraisse pas figé.</summary>
-    /// <param name="groupName">Le nom du groupe.</param>
-    /// <param name="attempt">De quelle tentative il s'agit, en comptant à partir de un.</param>
-    /// <param name="maxAttempts">Combien de tentatives le pipeline fera au total.</param>
-    void Retrying(string groupName, int attempt, int maxAttempts);
-
-    /// <summary>Signale que le service limite le débit et que l'outil patiente comme demandé.</summary>
-    /// <param name="retryAfter">Combien de temps le serveur a demandé d'attendre.</param>
-    void Throttled(TimeSpan retryAfter);
 
     /// <summary>Cesse de rendre compte.</summary>
     void Complete();

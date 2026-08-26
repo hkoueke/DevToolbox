@@ -2,6 +2,7 @@ using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.AzureDevOps;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Presentation.Shell;
+using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Core.Steps;
 using Spectre.Console;
@@ -23,8 +24,21 @@ namespace DevToolbox.Tools.VarCompare.Presentation;
 /// que de faire échouer la reprise.
 /// </para>
 /// </remarks>
-public sealed class ResumeCoordinator
+public sealed class ResumeCoordinator : IResumedSelectionReconciler
 {
+    /// <summary>
+    /// Les étapes qu'une reprise peut déclarer achevées sans les rejouer : celles, et celles seules, dont
+    /// <see cref="Seed"/> redépose lui-même le résultat dans le contexte.
+    /// </summary>
+    /// <remarks>
+    /// La règle tient en une phrase : marquer une étape achevée, c'est promettre que ce qu'elle produit est
+    /// déjà là. Or le contexte ne survit pas au processus et une étape sautée ne redépose rien. Toute étape
+    /// dont le résultat ne figure pas dans cette liste doit donc être rejouée, sans quoi une étape ultérieure
+    /// cherchera en vain ce que personne n'a déposé — et l'exécution reprise échouera immédiatement, faute
+    /// de sélection, là même où la reprise devait éviter de tout recommencer.
+    /// </remarks>
+    private static readonly string[] StepsSeedRestores = [IdentifyProjectStep.StepName];
+
     private readonly ResumePrompt _prompt;
     private readonly IRunCheckpointStore _store;
     private readonly IAnsiConsole _console;
@@ -78,13 +92,8 @@ public sealed class ResumeCoordinator
         return true;
     }
 
-    /// <summary>
-    /// Écarte les groupes mémorisés qui ne figurent plus dans le projet, en disant lesquels et pourquoi.
-    /// </summary>
-    /// <param name="remembered">Les groupes que l'exécution interrompue avait retenus.</param>
-    /// <param name="available">Les groupes lisibles dans le projet aujourd'hui.</param>
-    /// <returns>Les groupes encore comparables.</returns>
-    public IReadOnlyList<VariableGroupSummary> ReconcileSelection(
+    /// <inheritdoc />
+    public IReadOnlyList<VariableGroupSummary> Reconcile(
         IReadOnlyList<PersistedGroupSelection> remembered,
         IReadOnlyList<VariableGroupSummary> available)
     {
@@ -121,20 +130,17 @@ public sealed class ResumeCoordinator
     }
 
     /// <summary>
-    /// Restaure la sélection dans le contexte, en laissant la lecture en attente pour que les groupes soient
-    /// relus.
+    /// Restaure la sélection dans le contexte, en laissant tout le reste en attente pour que les groupes
+    /// soient réellement relus.
     /// </summary>
     private static void Seed(ToolRunContext context, PersistedRun run)
     {
         context.Set(VarCompareContextKeys.Project, new ProjectIdentifier(run.Project));
         context.Set(VarCompareContextKeys.ResumedSelection, run.SelectedGroups);
 
-        // Les étapes déjà achevées sont marquées pour ne pas être refaites, à l'exception de la lecture, qui
-        // doit être rejouée quoi que dise le point de reprise.
         foreach (string completed in run.CompletedSteps)
         {
-            if (string.Equals(completed, RetrieveGroupsStep.StepName, StringComparison.Ordinal)
-                || string.Equals(completed, BuildComparisonStep.StepName, StringComparison.Ordinal))
+            if (!StepsSeedRestores.Contains(completed, StringComparer.Ordinal))
             {
                 continue;
             }

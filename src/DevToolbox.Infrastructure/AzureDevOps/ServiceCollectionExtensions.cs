@@ -1,6 +1,10 @@
+using System.Net;
+using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.AzureDevOps;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 
 namespace DevToolbox.Infrastructure.AzureDevOps;
@@ -35,8 +39,11 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        ResilienceOptions resilience = new();
+        configuration.GetSection(ResilienceOptions.SectionName).Bind(resilience);
+
         services.AddSingleton<IValidateOptions<AzureDevOpsServerOptions>>(
-            new AzureDevOpsServerOptionsValidator(settingsPath));
+            new AzureDevOpsServerOptionsValidator(settingsPath, resilience.TotalRequestTimeoutSeconds));
 
         services
             .AddOptions<ResilienceOptions>()
@@ -44,37 +51,87 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        ResilienceOptions resilience = new();
-        configuration.GetSection(ResilienceOptions.SectionName).Bind(resilience);
+        // Là où rien n'écoute, le pipeline se construit quand même. Une couche de présentation qui veut
+        // annoncer les reprises s'enregistre AVANT cet appel, et c'est elle qui l'emporte.
+        services.TryAddSingleton<IRetryObserver, NullRetryObserver>();
 
         services
             .AddHttpClient<AzureDevOpsClient>(ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(IntegratedAuthHandlerFactory.Create)
-            .AddStandardResilienceHandler(options =>
-            {
-                // Déclaré une seule fois, à l'enregistrement, plutôt que dispersé sur les sites d'appel.
-                // Le gestionnaire standard applique déjà un recul exponentiel AVEC part d'aléa et respecte
-                // l'en-tête Retry-After : aucune stratégie sur mesure n'est nécessaire.
-                options.Retry.MaxRetryAttempts = resilience.MaxRetryAttempts;
-                options.Retry.Delay = TimeSpan.FromMilliseconds(resilience.RetryBaseDelayMilliseconds);
-
-                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(resilience.AttemptTimeoutSeconds);
-                options.TotalRequestTimeout.Timeout =
-                    TimeSpan.FromSeconds(resilience.TotalRequestTimeoutSeconds);
-
-                options.CircuitBreaker.SamplingDuration =
-                    TimeSpan.FromSeconds(resilience.CircuitBreakerSamplingDurationSeconds);
-                options.CircuitBreaker.FailureRatio = resilience.CircuitBreakerFailureRatio;
-                options.CircuitBreaker.MinimumThroughput = resilience.CircuitBreakerMinimumThroughput;
-
-                // Noter ce qui n'y figure PAS : DisableForUnsafeHttpMethods(). Chaque requête de cet outil
-                // est un GET, si bien que la sémantique complète de reprise est sûre par construction et
-                // non par configuration.
-            });
+            .AddStandardResilienceHandler()
+            .Configure((options, provider) => ConfigureResilience(options, resilience, provider));
 
         services.AddSingleton<AzureDevOpsApiReader>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Configure le pipeline. Déclaré une seule fois, à l'enregistrement, plutôt que dispersé sur les sites
+    /// d'appel. Le gestionnaire standard applique déjà un recul exponentiel AVEC part d'aléa et respecte
+    /// l'en-tête Retry-After : aucune stratégie sur mesure n'est nécessaire.
+    /// </summary>
+    /// <remarks>
+    /// Noter ce qui n'y figure PAS : <c>DisableForUnsafeHttpMethods()</c>. Chaque requête de cet outil est
+    /// un GET, si bien que la sémantique complète de reprise est sûre par construction et non par
+    /// configuration.
+    /// </remarks>
+    private static void ConfigureResilience(
+        HttpStandardResilienceOptions options,
+        ResilienceOptions resilience,
+        IServiceProvider provider)
+    {
+        options.Retry.MaxRetryAttempts = resilience.MaxRetryAttempts;
+        options.Retry.Delay = TimeSpan.FromMilliseconds(resilience.RetryBaseDelayMilliseconds);
+
+        // Explicite, bien que ce soit déjà la valeur par défaut : patienter le temps que le serveur demande
+        // est une promesse faite au développeur, pas un détail d'implémentation qu'une mise à jour de paquet
+        // pourrait retourner en silence.
+        options.Retry.ShouldRetryAfterHeader = true;
+
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(resilience.AttemptTimeoutSeconds);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(resilience.TotalRequestTimeoutSeconds);
+
+        options.CircuitBreaker.SamplingDuration =
+            TimeSpan.FromSeconds(resilience.CircuitBreakerSamplingDurationSeconds);
+        options.CircuitBreaker.FailureRatio = resilience.CircuitBreakerFailureRatio;
+        options.CircuitBreaker.MinimumThroughput = resilience.CircuitBreakerMinimumThroughput;
+
+        AnnounceRetries(options, resilience, provider.GetRequiredService<IRetryObserver>());
+    }
+
+    /// <summary>
+    /// Fait dire au pipeline qu'il rejoue. Sans cela, une reprise interne est indiscernable d'un blocage :
+    /// l'écran ne bouge plus pendant tout le budget de temps, et le développeur conclut à une panne.
+    /// </summary>
+    private static void AnnounceRetries(
+        HttpStandardResilienceOptions options,
+        ResilienceOptions resilience,
+        IRetryObserver observer)
+    {
+        options.Retry.OnRetry = arguments =>
+        {
+            HttpResponseMessage? response = arguments.Outcome.Result;
+
+            bool throttled = response is not null
+                && (response.Headers.RetryAfter is not null
+                    || response.StatusCode is HttpStatusCode.TooManyRequests
+                        or HttpStatusCode.ServiceUnavailable);
+
+            if (throttled)
+            {
+                observer.Throttled(arguments.RetryDelay);
+            }
+            else
+            {
+                // AttemptNumber compte les tentatives à partir de zéro ; le développeur compte les reprises
+                // à partir de un.
+                observer.Retrying(
+                    arguments.AttemptNumber + 1, resilience.MaxRetryAttempts, arguments.RetryDelay);
+            }
+
+            return default;
+        };
     }
 
     /// <summary>

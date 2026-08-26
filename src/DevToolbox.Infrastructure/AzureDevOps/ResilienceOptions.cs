@@ -6,7 +6,13 @@ namespace DevToolbox.Infrastructure.AzureDevOps;
 /// Les réglages du pipeline de résilience, liés à la section de configuration <c>Resilience</c>. Déclarés
 /// une seule fois par client au moment de l'enregistrement, plutôt que dispersés sur les sites d'appel.
 /// </summary>
-public sealed class ResilienceOptions
+/// <remarks>
+/// Les bornes ci-dessous ne suffisent pas. Le gestionnaire standard impose aussi des rapports entre
+/// réglages, et il ne les vérifie qu'à la première création du client typé, donc en pleine exécution. Ces
+/// règles sont donc réénoncées ici, afin que la validation au démarrage les attrape : une combinaison que ce
+/// type accepte doit être une combinaison que le pipeline accepte.
+/// </remarks>
+public sealed class ResilienceOptions : IValidatableObject
 {
     /// <summary>La section de configuration à laquelle ce type se lie.</summary>
     public const string SectionName = "Resilience";
@@ -19,8 +25,12 @@ public sealed class ResilienceOptions
     [Range(1, 600)]
     public int AttemptTimeoutSeconds { get; set; } = 10;
 
-    /// <summary>Combien de fois une tentative est rejouée avant que le pipeline renonce.</summary>
-    [Range(0, 10)]
+    /// <summary>
+    /// Combien de fois une tentative est rejouée avant que le pipeline renonce. Au moins une : le
+    /// gestionnaire standard refuse zéro, et l'accepter ici ne ferait que déplacer l'échec du démarrage vers
+    /// la première requête.
+    /// </summary>
+    [Range(1, 10)]
     public int MaxRetryAttempts { get; set; } = 3;
 
     /// <summary>
@@ -41,4 +51,32 @@ public sealed class ResilienceOptions
     /// <summary>Le nombre minimal d'appels dans la fenêtre avant que le disjoncteur puisse s'ouvrir.</summary>
     [Range(1, 1000)]
     public int CircuitBreakerMinimumThroughput { get; set; } = 5;
+
+    /// <summary>
+    /// Vérifie les rapports que le gestionnaire standard impose entre réglages, et qu'aucune borne prise
+    /// isolément ne saurait exprimer.
+    /// </summary>
+    /// <param name="validationContext">Le contexte de validation, dont ce type n'a pas l'usage.</param>
+    /// <returns>Les combinaisons refusées, chacune nommant le réglage à corriger.</returns>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (TotalRequestTimeoutSeconds < AttemptTimeoutSeconds)
+        {
+            yield return new ValidationResult(
+                $"Resilience:TotalRequestTimeoutSeconds ({TotalRequestTimeoutSeconds} s) doit valoir au "
+                + $"moins Resilience:AttemptTimeoutSeconds ({AttemptTimeoutSeconds} s) : un budget total "
+                + "plus court que celui d'une seule tentative n'en laisserait aboutir aucune.",
+                [nameof(TotalRequestTimeoutSeconds)]);
+        }
+
+        if (CircuitBreakerSamplingDurationSeconds < 2 * AttemptTimeoutSeconds)
+        {
+            yield return new ValidationResult(
+                "Resilience:CircuitBreakerSamplingDurationSeconds ("
+                + $"{CircuitBreakerSamplingDurationSeconds} s) doit valoir au moins le double de "
+                + $"Resilience:AttemptTimeoutSeconds ({AttemptTimeoutSeconds} s), faute de quoi le "
+                + "disjoncteur n'observe pas assez d'appels pour être utile.",
+                [nameof(CircuitBreakerSamplingDurationSeconds)]);
+        }
+    }
 }
