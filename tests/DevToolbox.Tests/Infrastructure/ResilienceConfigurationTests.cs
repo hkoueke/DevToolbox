@@ -80,6 +80,50 @@ public sealed class ResilienceConfigurationTests
     }
 
     [Fact]
+    public void A_total_budget_equal_to_one_attempt_is_accepted_because_the_pipeline_accepts_it()
+    {
+        // La frontière a été mesurée contre le pipeline réel, et non déduite de son message d'erreur, qui
+        // annonce « greater » : total 9 / tentative 10 est refusé, total 10 / tentative 10 est accepté.
+        // Resserrer ce test en « strictement supérieur » rendrait DevToolbox plus sévère que ce qu'il
+        // enveloppe, et refuserait une configuration qui fonctionne.
+        using ServiceProvider provider = BuildProvider(
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Resilience:AttemptTimeoutSeconds"] = "10",
+                ["Resilience:TotalRequestTimeoutSeconds"] = "10",
+                ["Resilience:CircuitBreakerSamplingDurationSeconds"] = "20",
+            });
+
+        Action act = () =>
+        {
+            _ = provider.GetRequiredService<IOptions<ResilienceOptions>>().Value;
+            _ = provider.GetRequiredService<AzureDevOpsClient>();
+        };
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void A_sampling_window_of_exactly_twice_the_attempt_timeout_is_accepted()
+    {
+        // Même méthode : le pipeline refuse 19 s pour une tentative de 10 s et accepte 20 s.
+        using ServiceProvider provider = BuildProvider(
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Resilience:AttemptTimeoutSeconds"] = "10",
+                ["Resilience:CircuitBreakerSamplingDurationSeconds"] = "20",
+            });
+
+        Action act = () =>
+        {
+            _ = provider.GetRequiredService<IOptions<ResilienceOptions>>().Value;
+            _ = provider.GetRequiredService<AzureDevOpsClient>();
+        };
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
     public void A_client_timeout_that_does_not_exceed_the_pipeline_budget_is_refused()
     {
         // Les deux échéances expireraient ensemble, et laquelle l'emporte cesserait d'être décidable :

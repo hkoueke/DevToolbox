@@ -113,10 +113,13 @@ public static class ServiceCollectionExtensions
         {
             HttpResponseMessage? response = arguments.Outcome.Result;
 
+            // Un 503 tout seul ne dit pas que le débit est limité : il couvre aussi bien une surcharge, un
+            // arrière-plan indisponible ou une maintenance. Annoncer une limitation de débit dans ce cas
+            // enverrait le développeur patienter là où il devrait aller voir la santé du service. Seuls un
+            // Retry-After explicite ou un 429, qui est une limitation par définition, la constatent.
             bool throttled = response is not null
                 && (response.Headers.RetryAfter is not null
-                    || response.StatusCode is HttpStatusCode.TooManyRequests
-                        or HttpStatusCode.ServiceUnavailable);
+                    || response.StatusCode is HttpStatusCode.TooManyRequests);
 
             if (throttled)
             {

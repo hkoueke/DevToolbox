@@ -40,9 +40,11 @@ public sealed class SpectreRetryAnnouncer : IRetryObserver
     {
         lock (_gate)
         {
+            // « avant un nouvel essai » et non « comme demandé » : le serveur ne joint pas toujours de
+            // Retry-After, et affirmer qu'il a fixé cette attente serait lui prêter des propos.
             _console.MarkupLine(
-                $"[yellow]Le service limite le débit. Attente de {retryAfter.TotalSeconds:F0} s comme "
-                + "demandé, plutôt que de le solliciter sans relâche.[/]");
+                $"[yellow]Le service limite le débit. Attente de {retryAfter.TotalSeconds:F0} s avant un "
+                + "nouvel essai, plutôt que de le solliciter sans relâche.[/]");
         }
     }
 }

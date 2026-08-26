@@ -153,6 +153,28 @@ public sealed class ResilienceEscapeTests
         observer.DidNotReceive().Retrying(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<TimeSpan>());
     }
 
+    [Fact]
+    public async Task An_unavailable_service_is_not_announced_as_a_rate_limit()
+    {
+        // Un 503 sans Retry-After ne constate aucune limitation de débit : il couvre tout aussi bien une
+        // surcharge ou une maintenance. L'annoncer comme du throttling enverrait le développeur patienter
+        // là où il devrait aller voir la santé du service.
+        using FakeHttpMessageHandler handler = new();
+        handler
+            .Enqueue(HttpStatusCode.ServiceUnavailable)
+            .Enqueue(HttpStatusCode.OK, "{\"count\":0,\"value\":[]}");
+
+        IRetryObserver observer = Substitute.For<IRetryObserver>();
+
+        using ServiceProvider provider = BuildProvider(handler, observer: observer);
+        AzureDevOpsApiReader reader = provider.GetRequiredService<AzureDevOpsApiReader>();
+
+        await reader.GetAsync<ListResponse<ProjectStub>>("x/_apis/projects", CancellationToken.None);
+
+        observer.Received(1).Retrying(1, Arg.Any<int>(), Arg.Any<TimeSpan>());
+        observer.DidNotReceive().Throttled(Arg.Any<TimeSpan>());
+    }
+
     private static ServiceProvider BuildProvider(
         HttpMessageHandler handler,
         int attemptTimeoutSeconds = 10,
