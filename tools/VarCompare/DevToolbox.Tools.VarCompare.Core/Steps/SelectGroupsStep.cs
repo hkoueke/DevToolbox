@@ -14,13 +14,20 @@ public sealed class SelectGroupsStep : IToolStep
     public const string StepName = "SelectGroups";
 
     private readonly IGroupChooser _chooser;
+    private readonly IResumedSelectionReconciler _reconciler;
 
     /// <summary>Crée l'étape.</summary>
     /// <param name="chooser">Demande au développeur quels groupes comparer.</param>
-    public SelectGroupsStep(IGroupChooser chooser)
+    /// <param name="reconciler">
+    /// Rapproche une sélection reprise de ce qui est lisible aujourd'hui, en disant ce qui a été écarté.
+    /// </param>
+    public SelectGroupsStep(IGroupChooser chooser, IResumedSelectionReconciler reconciler)
     {
         ArgumentNullException.ThrowIfNull(chooser);
+        ArgumentNullException.ThrowIfNull(reconciler);
+
         _chooser = chooser;
+        _reconciler = reconciler;
     }
 
     /// <inheritdoc />
@@ -83,14 +90,14 @@ public sealed class SelectGroupsStep : IToolStep
     /// Les groupes à comparer, ou <see langword="null"/> s'il ne s'agit pas d'une reprise ou s'il reste trop
     /// peu de groupes mémorisés pour que la comparaison ait un sens.
     /// </returns>
-    private static IReadOnlyList<VariableGroupSummary>? ResolveResumedSelection(
+    private IReadOnlyList<VariableGroupSummary>? ResolveResumedSelection(
         ToolRunContext context,
         IReadOnlyList<VariableGroupSummary> available)
     {
         IReadOnlyList<PersistedGroupSelection>? remembered =
             context.Get<IReadOnlyList<PersistedGroupSelection>>(VarCompareContextKeys.ResumedSelection);
 
-        if (remembered is null)
+        if (remembered is null || remembered.Count == 0)
         {
             return null;
         }
@@ -99,14 +106,9 @@ public sealed class SelectGroupsStep : IToolStep
         // silence une ancienne sélection.
         context.Set(VarCompareContextKeys.ResumedSelection, Array.Empty<PersistedGroupSelection>());
 
-        Dictionary<int, VariableGroupSummary> byId = available.ToDictionary(group => group.Id);
-
-        IReadOnlyList<VariableGroupSummary> kept =
-        [
-            .. remembered
-                .Where(selection => byId.ContainsKey(selection.Id))
-                .Select(selection => byId[selection.Id]),
-        ];
+        // Le rapprochement est délégué, parce qu'écarter un groupe doit se dire et que dire est l'affaire de
+        // la présentation.
+        IReadOnlyList<VariableGroupSummary> kept = _reconciler.Reconcile(remembered, available);
 
         return kept.Count >= VariableComparison.MinimumGroups ? kept : null;
     }

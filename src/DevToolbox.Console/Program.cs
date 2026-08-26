@@ -178,6 +178,10 @@ internal static class Program
         services.AddSingleton(redaction);
         services.AddSingleton(console);
 
+        // Enregistré AVANT le client Azure DevOps : celui-ci ne pose un observateur muet que si personne
+        // n'en a déjà posé un.
+        services.AddSingleton<IRetryObserver, SpectreRetryAnnouncer>();
+
         services.AddInfrastructureServices();
         services.AddAzureDevOps(configuration, SettingsFileName);
 

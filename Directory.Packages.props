@@ -18,6 +18,8 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
     <!-- 10.9.0 : la version reprise du dépôt de référence, confirmée à jour lors de la restauration. -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
+    <!-- Référencé explicitement : le lecteur d'API attrape les exceptions que le pipeline lève lui-même. -->
+    <PackageVersion Include="Polly.Core" Version="8.4.2" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.11" />
