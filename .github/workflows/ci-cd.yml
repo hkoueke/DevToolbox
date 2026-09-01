@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Extraire le dépôt
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Historique complet : le contrôle de balise a besoin de savoir où mène la balise.
           fetch-depth: 0
