@@ -5,7 +5,7 @@
   </PropertyGroup>
   <!-- Analyseurs. Référencés une seule fois pour tous les projets depuis Directory.Build.props. -->
   <ItemGroup Label="Analyzers">
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.173" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.200" />
     <PackageVersion Include="AsyncFixer" Version="2.1.0" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.32.0.713" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
