@@ -92,7 +92,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Mettre en cache les paquets NuGet
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
