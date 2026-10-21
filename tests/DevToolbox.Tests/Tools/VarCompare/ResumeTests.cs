@@ -1,3 +1,4 @@
+using System.Globalization;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Application.Runs;
 using DevToolbox.Domain.AzureDevOps;
@@ -83,9 +84,9 @@ public sealed class ResumeTests
         Harness harness = new();
         ToolRunContext context = await harness.ResumeAsync(
         [
-            new PersistedGroupSelection(1, "alpha"),
-            new PersistedGroupSelection(2, "beta"),
-            new PersistedGroupSelection(99, "disparu"),
+            new RememberedGroup(1, "alpha"),
+            new RememberedGroup(2, "beta"),
+            new RememberedGroup(99, "disparu"),
         ]);
 
         ToolRun run = await harness.RunAsync(context);
@@ -102,7 +103,7 @@ public sealed class ResumeTests
     {
         Harness harness = new();
         ToolRunContext context = await harness.ResumeAsync(
-            [new PersistedGroupSelection(1, "alpha"), new PersistedGroupSelection(99, "disparu")]);
+            [new RememberedGroup(1, "alpha"), new RememberedGroup(99, "disparu")]);
 
         await harness.RunAsync(context);
 
@@ -118,6 +119,22 @@ public sealed class ResumeTests
     private sealed class Harness
     {
         private static readonly ProjectIdentifier Project = new("Contoso");
+
+        /// <summary>
+        /// Projette des groupes mémorisés en éléments de sélection, exactement comme la fabrique de
+        /// points de reprise de varcompare le fait en production : la reprise est éprouvée par le même
+        /// chemin que celui qu'elle emprunte réellement.
+        /// </summary>
+        private static IReadOnlyList<PersistedSelectionEntry> Selection(
+            IReadOnlyList<RememberedGroup> groups) =>
+        [
+            new(VarCompareSelectionKinds.Collection, "DefaultCollection", "DefaultCollection"),
+            new(VarCompareSelectionKinds.Project, Project.Name, Project.Name),
+            .. groups.Select(group => new PersistedSelectionEntry(
+                VarCompareSelectionKinds.Group,
+                group.Id.ToString(CultureInfo.InvariantCulture),
+                group.Name)),
+        ];
 
         private static VariableGroupSummary Group(int id, string name) =>
             new(id, name, Description: null, VariableGroupOrigin.Ordinary, IsShared: false);
@@ -173,7 +190,7 @@ public sealed class ResumeTests
         /// demande, le coordinateur amorce.
         /// </summary>
         internal async Task<ToolRunContext> ResumeAsync(
-            IReadOnlyList<PersistedGroupSelection>? remembered = null)
+            IReadOnlyList<RememberedGroup>? remembered = null)
         {
             ToolRun run = new(Guid.NewGuid(), "varcompare", DateTimeOffset.UnixEpoch, StepNames);
             ToolRunContext context = new(run);
@@ -181,10 +198,7 @@ public sealed class ResumeTests
             PersistedRun persisted = new(
                 run.RunId,
                 "varcompare",
-                "DefaultCollection",
-                Project.Name,
-                remembered ??
-                    [new PersistedGroupSelection(1, "alpha"), new PersistedGroupSelection(2, "beta")],
+                Selection(remembered ?? [new RememberedGroup(1, "alpha"), new RememberedGroup(2, "beta")]),
                 // Le cas qui échouait : le point de reprise est écrit après chaque étape réussie, donc
                 // aussi après la sélection.
                 [IdentifyProjectStep.StepName, ListGroupsStep.StepName, SelectGroupsStep.StepName],
@@ -219,12 +233,24 @@ public sealed class ResumeTests
             return prompt;
         }
 
+        /// <summary>
+        /// Une fabrique de points de reprise qui se déclare être celle de varcompare : le moteur choisit
+        /// la fabrique par l'identifiant de l'outil, et une fabrique anonyme ne serait jamais choisie.
+        /// </summary>
+        private static IRunCheckpointFactory CheckpointFactory()
+        {
+            IRunCheckpointFactory factory = Substitute.For<IRunCheckpointFactory>();
+            factory.ToolId.Returns("varcompare");
+
+            return factory;
+        }
+
         internal Task<ToolRun> RunAsync(ToolRunContext context)
         {
             SequentialStepRunner runner = new(
                 _clock,
                 _store,
-                Substitute.For<IRunCheckpointFactory>(),
+                [CheckpointFactory()],
                 AbortingPrompt(),
                 NullLogger<SequentialStepRunner>.Instance);
 

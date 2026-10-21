@@ -1,3 +1,4 @@
+using System.Globalization;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.AzureDevOps;
 using DevToolbox.Domain.Runs;
@@ -33,6 +34,9 @@ public sealed class VarCompareCheckpointFactory : IRunCheckpointFactory
     }
 
     /// <inheritdoc />
+    public string ToolId => "varcompare";
+
+    /// <inheritdoc />
     public PersistedRun? TryCreate(ToolRunContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -48,12 +52,23 @@ public sealed class VarCompareCheckpointFactory : IRunCheckpointFactory
         IReadOnlyList<VariableGroupSummary> selected =
             context.Get<IReadOnlyList<VariableGroupSummary>>(VarCompareContextKeys.SelectedGroups) ?? [];
 
+        // La sélection devient trois chaînes par élément : de quelle sorte, de quoi le retrouver, de quoi
+        // le nommer. L'identifiant du groupe est la clé, parce que c'est par lui que la reprise le relira.
+        List<PersistedSelectionEntry> selection =
+        [
+            new(VarCompareSelectionKinds.Collection, _target.Collection, _target.Collection),
+            new(VarCompareSelectionKinds.Project, project.Name, project.Name),
+        ];
+
+        selection.AddRange(selected.Select(group => new PersistedSelectionEntry(
+            VarCompareSelectionKinds.Group,
+            group.Id.ToString(CultureInfo.InvariantCulture),
+            group.Name)));
+
         return new PersistedRun(
             context.Run.RunId,
             context.Run.ToolId,
-            _target.Collection,
-            project.Name,
-            [.. selected.Select(group => new PersistedGroupSelection(group.Id, group.Name))],
+            selection,
             context.Run.GetCompletedStepNames(),
             context.Run.StartedAt,
             _clock.UtcNow);

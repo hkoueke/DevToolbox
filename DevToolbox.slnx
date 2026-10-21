@@ -10,6 +10,11 @@
     <Project Path="tests/DevToolbox.Tests/DevToolbox.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/" />
+  <Folder Name="/tools/ApiDelta/">
+    <Project Path="tools/ApiDelta/DevToolbox.Tools.ApiDelta.Core/DevToolbox.Tools.ApiDelta.Core.csproj" />
+    <Project Path="tools/ApiDelta/DevToolbox.Tools.ApiDelta.Infrastructure/DevToolbox.Tools.ApiDelta.Infrastructure.csproj" />
+    <Project Path="tools/ApiDelta/DevToolbox.Tools.ApiDelta.Presentation/DevToolbox.Tools.ApiDelta.Presentation.csproj" />
+  </Folder>
   <Folder Name="/tools/VarCompare/">
     <Project Path="tools/VarCompare/DevToolbox.Tools.VarCompare.Core/DevToolbox.Tools.VarCompare.Core.csproj" />
     <Project Path="tools/VarCompare/DevToolbox.Tools.VarCompare.Infrastructure/DevToolbox.Tools.VarCompare.Infrastructure.csproj" />

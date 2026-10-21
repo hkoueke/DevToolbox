@@ -60,24 +60,115 @@ public sealed class AppPaths
     }
 
     /// <summary>
-    /// Combine un nom de fichier avec une racine et vérifie que le résultat ne s'en échappe pas.
+    /// Combine un chemin relatif avec une racine et vérifie que le résultat ne s'en échappe pas.
     /// </summary>
-    /// <param name="root">Le dossier sous lequel le fichier doit se trouver.</param>
-    /// <param name="fileName">Le nom de fichier à ajouter.</param>
-    /// <returns>Le chemin complet.</returns>
-    /// <exception cref="ArgumentException">Le chemin obtenu s'échappe de <paramref name="root"/>.</exception>
-    public static string CombineConfined(string root, string fileName)
+    /// <param name="root">Le dossier sous lequel le résultat doit se trouver.</param>
+    /// <param name="relativePath">Le chemin à ajouter, relatif à <paramref name="root"/>.</param>
+    /// <returns>Le chemin complet, canonique.</returns>
+    /// <exception cref="ArgumentException">
+    /// Le chemin obtenu sort de <paramref name="root"/>, directement ou en traversant un lien.
+    /// </exception>
+    /// <remarks>
+    /// La comparaison passe par <see cref="Path.GetRelativePath(string, string)"/> et non par un préfixe
+    /// de chaîne : la racine <c>C:\out</c> a pour voisin <c>C:\outside</c>, dont le chemin commence par
+    /// elle sans lui appartenir. Le contrôle porte ensuite sur la cible réelle des liens rencontrés, car
+    /// un lien déplace la destination sans changer le texte du chemin. Les noms réservés de Windows sont
+    /// écartés par là même : <c>NUL</c> se résout en chemin de périphérique, qui ne tombe sous aucune
+    /// racine.
+    /// </remarks>
+    public static string CombineConfined(string root, string relativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
-        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
 
-        string fullRoot = Path.GetFullPath(root);
-        string candidate = Path.GetFullPath(Path.Combine(fullRoot, fileName));
+        string fullRoot = ResolveLinks(Path.GetFullPath(root));
+        string candidate = Path.GetFullPath(Path.Combine(fullRoot, relativePath));
 
-        if (!candidate.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        if (!IsConfinedTo(fullRoot, candidate)
+            || !IsConfinedTo(fullRoot, ResolveNearestExisting(candidate)))
         {
             throw new ArgumentException(
-                "The resolved path escapes the DevToolbox directory.", nameof(fileName));
+                "Le chemin obtenu sort du dossier attendu.", nameof(relativePath));
+        }
+
+        return candidate;
+    }
+
+    private static bool IsConfinedTo(string root, string candidate)
+    {
+        if (string.Equals(root, candidate, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string relative = Path.GetRelativePath(root, candidate);
+
+        if (relative.Length == 0 || Path.IsPathRooted(relative))
+        {
+            // Enraciné : les deux chemins n'ont pas de racine commune, donc le candidat est ailleurs.
+            return false;
+        }
+
+        return !string.Equals(relative, "..", StringComparison.Ordinal)
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && !relative.StartsWith("../", StringComparison.Ordinal);
+    }
+
+    private static string ResolveLinks(string path)
+    {
+        FileSystemInfo? info = null;
+
+        if (Directory.Exists(path))
+        {
+            info = new DirectoryInfo(path);
+        }
+        else if (File.Exists(path))
+        {
+            info = new FileInfo(path);
+        }
+
+        if (info is null)
+        {
+            return path;
+        }
+
+        return info.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? info.FullName;
+    }
+
+    /// <summary>
+    /// Résout les liens du plus proche ancêtre existant, puis réapplique le reste du chemin.
+    /// </summary>
+    /// <param name="candidate">Le chemin à examiner, qui n'existe pas forcément encore.</param>
+    /// <returns>Le chemin tel qu'il se résoudra réellement.</returns>
+    /// <remarks>
+    /// Un artefact à écrire n'existe pas encore : il n'y a donc rien à résoudre sur lui, mais le dossier
+    /// qui l'accueillera peut être un lien, et c'est lui qui décide où l'écriture atterrit.
+    /// </remarks>
+    private static string ResolveNearestExisting(string candidate)
+    {
+        string current = candidate;
+        string remainder = string.Empty;
+
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (Directory.Exists(current) || File.Exists(current))
+            {
+                string resolved = ResolveLinks(current);
+
+                return remainder.Length == 0
+                    ? resolved
+                    : Path.GetFullPath(Path.Combine(resolved, remainder));
+            }
+
+            string? parent = Path.GetDirectoryName(current);
+
+            if (parent is null)
+            {
+                break;
+            }
+
+            remainder = Path.Combine(Path.GetFileName(current), remainder);
+            current = parent;
         }
 
         return candidate;

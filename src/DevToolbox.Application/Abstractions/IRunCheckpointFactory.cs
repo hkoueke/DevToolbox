@@ -9,6 +9,15 @@ namespace DevToolbox.Application.Abstractions;
 /// </summary>
 public interface IRunCheckpointFactory
 {
+    /// <summary>L'outil dont cette fabrique sait conserver les exécutions.</summary>
+    /// <remarks>
+    /// Déclaré parce que le moteur d'étapes est partagé tandis que les fabriques sont propres à chaque
+    /// outil : il faut donc pouvoir choisir la bonne. Sans cela, la dernière enregistrée l'emporterait, et
+    /// comme une fabrique rend <see langword="null"/> pour un contexte qu'elle ne reconnaît pas, la reprise
+    /// du second outil cesserait de fonctionner sans que rien ne le dise.
+    /// </remarks>
+    string ToolId { get; }
+
     /// <summary>Construit le point de reprise correspondant à l'état courant d'une exécution.</summary>
     /// <param name="context">Le contexte d'exécution.</param>
     /// <returns>

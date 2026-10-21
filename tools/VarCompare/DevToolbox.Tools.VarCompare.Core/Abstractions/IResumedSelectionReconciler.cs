@@ -1,4 +1,3 @@
-using DevToolbox.Application.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 
 namespace DevToolbox.Tools.VarCompare.Core.Abstractions;
@@ -19,6 +18,6 @@ public interface IResumedSelectionReconciler
     /// <param name="available">Les groupes lisibles dans le projet aujourd'hui.</param>
     /// <returns>Les groupes encore comparables, dans l'ordre où ils avaient été retenus.</returns>
     IReadOnlyList<VariableGroupSummary> Reconcile(
-        IReadOnlyList<PersistedGroupSelection> remembered,
+        IReadOnlyList<RememberedGroup> remembered,
         IReadOnlyList<VariableGroupSummary> available);
 }

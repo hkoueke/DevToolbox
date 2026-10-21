@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    L'outil tel que la coquille le voit : son implémentation d'ITool, sa session, ses invites et son
+    rendu. Il ne référence pas l'infrastructure de l'outil, et c'est délibéré : seule la racine de
+    composition connaît les deux.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevToolbox.Tools.ApiDelta.Core\DevToolbox.Tools.ApiDelta.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Presentation\DevToolbox.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DevToolbox.Tests" />
+  </ItemGroup>
+
+</Project>

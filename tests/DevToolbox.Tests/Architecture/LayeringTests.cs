@@ -24,6 +24,17 @@ public sealed class LayeringTests
     private static readonly Assembly InfrastructureAssembly = typeof(AzureDevOpsClient).Assembly;
     private static readonly Assembly PresentationAssembly = typeof(ShellLayout).Assembly;
 
+    // Chargés par nom plutôt que par un type témoin : la règle doit valoir dès que l'assemblage existe,
+    // sans qu'un type particulier ait à être choisi pour l'ancrer.
+    private static readonly Assembly ApiDeltaCoreAssembly =
+        Assembly.Load("DevToolbox.Tools.ApiDelta.Core");
+
+    private static readonly Assembly ApiDeltaInfrastructureAssembly =
+        Assembly.Load("DevToolbox.Tools.ApiDelta.Infrastructure");
+
+    private static readonly Assembly ApiDeltaPresentationAssembly =
+        Assembly.Load("DevToolbox.Tools.ApiDelta.Presentation");
+
     [Fact]
     public void Domain_has_no_package_references()
     {
@@ -96,6 +107,88 @@ public sealed class LayeringTests
     public void HttpClient_is_confined_to_Infrastructure()
     {
         foreach (Assembly assembly in new[] { DomainAssembly, ApplicationAssembly, PresentationAssembly })
+        {
+            TestResult result = Types.InAssembly(assembly)
+                .ShouldNot()
+                .HaveDependencyOn("System.Net.Http")
+                .GetResult();
+
+            AssertSatisfied(result);
+        }
+    }
+
+    [Fact]
+    public void ApiDelta_core_carries_neither_of_the_tool_packages()
+    {
+        // C'est l'assertion qui tient la décision de conception : la couche sémantique est un adaptateur,
+        // et rien de ce que l'outil publie ne peut donc être sérialisé depuis le modèle d'une bibliothèque.
+        // Si YamlDotNet ou Microsoft.OpenApi apparaît ici un jour, la garantie de fidélité est perdue.
+        IEnumerable<string> referenced = ApiDeltaCoreAssembly
+            .GetReferencedAssemblies()
+            .Select(reference => reference.Name!);
+
+        referenced.Should().NotContain(
+            ["YamlDotNet", "Microsoft.OpenApi", "Spectre.Console", "System.Net.Http"],
+            "le cœur d'apidelta n'analyse pas, ne valide pas, ne rend pas et n'appelle rien");
+    }
+
+    [Fact]
+    public void ApiDelta_core_does_not_depend_on_outer_layers()
+    {
+        TestResult result = Types.InAssembly(ApiDeltaCoreAssembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "DevToolbox.Infrastructure",
+                "DevToolbox.Presentation",
+                "DevToolbox.Tools.ApiDelta.Infrastructure",
+                "DevToolbox.Tools.ApiDelta.Presentation",
+                "Spectre.Console",
+                "System.Net.Http",
+                "YamlDotNet",
+                "Microsoft.OpenApi")
+            .GetResult();
+
+        AssertSatisfied(result);
+    }
+
+    [Fact]
+    public void ApiDelta_presentation_does_not_depend_on_its_infrastructure()
+    {
+        TestResult result = Types.InAssembly(ApiDeltaPresentationAssembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "DevToolbox.Infrastructure",
+                "DevToolbox.Tools.ApiDelta.Infrastructure",
+                "YamlDotNet",
+                "Microsoft.OpenApi")
+            .GetResult();
+
+        AssertSatisfied(result);
+    }
+
+    [Fact]
+    public void ApiDelta_infrastructure_does_not_depend_on_presentation()
+    {
+        TestResult result = Types.InAssembly(ApiDeltaInfrastructureAssembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "DevToolbox.Presentation",
+                "DevToolbox.Tools.ApiDelta.Presentation",
+                "Spectre.Console")
+            .GetResult();
+
+        AssertSatisfied(result);
+    }
+
+    [Fact]
+    public void ApiDelta_makes_no_outbound_call()
+    {
+        // apidelta lit deux fichiers locaux. L'absence de client HTTP dans ses trois assemblages est la
+        // forme structurelle de cette promesse : il n'y a pas de discipline à tenir.
+        foreach (Assembly assembly in new[]
+        {
+            ApiDeltaCoreAssembly, ApiDeltaInfrastructureAssembly, ApiDeltaPresentationAssembly,
+        })
         {
             TestResult result = Types.InAssembly(assembly)
                 .ShouldNot()

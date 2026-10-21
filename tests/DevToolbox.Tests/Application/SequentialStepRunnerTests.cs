@@ -107,18 +107,17 @@ public sealed class SequentialStepRunnerTests
         store = Substitute.For<IRunCheckpointStore>();
 
         factory = Substitute.For<IRunCheckpointFactory>();
+        factory.ToolId.Returns("test");
         factory.TryCreate(Arg.Any<ToolRunContext>()).Returns(new PersistedRun(
             Guid.NewGuid(),
             "test",
-            "DefaultCollection",
-            "Project",
             [],
             [],
             DateTimeOffset.UnixEpoch,
             DateTimeOffset.UnixEpoch));
 
         return new SequentialStepRunner(
-            clock, store, factory, recovery, NullLogger<SequentialStepRunner>.Instance);
+            clock, store, [factory], recovery, NullLogger<SequentialStepRunner>.Instance);
     }
 
     private static ToolRunContext CreateContext() =>

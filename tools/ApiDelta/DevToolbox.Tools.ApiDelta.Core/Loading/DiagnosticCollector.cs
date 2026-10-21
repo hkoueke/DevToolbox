@@ -1,0 +1,63 @@
+using DevToolbox.Domain.Runs;
+using DevToolbox.Tools.ApiDelta.Core.Steps;
+
+namespace DevToolbox.Tools.ApiDelta.Core.Loading;
+
+/// <summary>Rassemble dans le contexte ce que la lecture et la validation ont trouvé à dire.</summary>
+/// <remarks>
+/// Tout y est consigné, y compris les avertissements d'une lecture réussie : le rapport les porte, et un
+/// scalaire ambigu signalé pendant la lecture puis oublié avant l'écriture ne servirait à personne.
+/// </remarks>
+public static class DiagnosticCollector
+{
+    /// <summary>Ajoute des diagnostics à ceux de l'exécution.</summary>
+    /// <param name="context">Le contexte de l'exécution.</param>
+    /// <param name="diagnostics">Ce qu'il y a à ajouter.</param>
+    public static void Add(ToolRunContext context, IEnumerable<Diagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        List<Diagnostic> all =
+            context.Get<List<Diagnostic>>(ApiDeltaContextKeys.Diagnostics) ?? [];
+
+        all.AddRange(diagnostics);
+
+        context.Set(ApiDeltaContextKeys.Diagnostics, all);
+    }
+
+    /// <summary>Tout ce qui a été consigné pour cette exécution.</summary>
+    /// <param name="context">Le contexte de l'exécution.</param>
+    /// <returns>Les diagnostics, dans l'ordre où ils sont venus.</returns>
+    public static IReadOnlyList<Diagnostic> Of(ToolRunContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        return context.Get<List<Diagnostic>>(ApiDeltaContextKeys.Diagnostics) ?? [];
+    }
+
+    /// <summary>
+    /// Résume des diagnostics en une phrase affichable, pour le message d'échec d'une étape.
+    /// </summary>
+    /// <param name="diagnostics">Ce qu'il faut résumer.</param>
+    /// <returns>Le premier message, et le compte de ceux qui suivent.</returns>
+    /// <remarks>
+    /// Le premier message et un compte, plutôt que tout : l'invite de reprise tient sur quelques lignes, et
+    /// la liste complète a sa place dans la vue des diagnostics et dans le rapport.
+    /// </remarks>
+    public static string Summarise(IEnumerable<Diagnostic> diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        IReadOnlyList<Diagnostic> all = [.. diagnostics];
+
+        if (all.Count == 0)
+        {
+            return "aucun détail n'a été rapporté.";
+        }
+
+        string first = all[0].Message;
+
+        return all.Count == 1 ? first : first + $" (et {all.Count - 1} autre(s))";
+    }
+}

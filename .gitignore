@@ -38,8 +38,8 @@ appsettings.Local.json
 .DS_Store
 Thumbs.db
 
-# Outillage d'assistance et artefacts de spécification
+# Outillage d'assistance. Les spécifications, elles, sont suivies : deux essais de catalogue les
+# lisent pour vérifier que le code dit la même chose, et un clone qui ne les aurait pas échouerait.
 .claude/
 .specify/
-specs/
 CLAUDE.md

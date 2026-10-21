@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    L'arbre de syntaxe, le métamodèle OpenAPI, la comparaison, les règles et les ports que cet outil
+    possède. Ni HttpClient, ni Spectre.Console, ni système de fichiers, et aucune référence de paquet : ni
+    YamlDotNet ni Microsoft.OpenApi n'entrent ici. C'est cette absence qui garantit que rien de ce que
+    l'outil publie ne peut être sérialisé depuis un modèle sémantique. Le test d'architecture le vérifie.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\DevToolbox.Application\DevToolbox.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Domain\DevToolbox.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- Les rouages internes du lecteur et des règles sont éprouvés directement par le projet de tests. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DevToolbox.Tests" />
+  </ItemGroup>
+
+</Project>

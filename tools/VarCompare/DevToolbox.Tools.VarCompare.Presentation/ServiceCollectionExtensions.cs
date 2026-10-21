@@ -42,17 +42,38 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRunCheckpointFactory, VarCompareCheckpointFactory>();
 
-        // Les cinq étapes nommées, dans l'ordre d'exécution.
-        services.AddSingleton<IToolStep, IdentifyProjectStep>();
-        services.AddSingleton<IToolStep, ListGroupsStep>();
-        services.AddSingleton<IToolStep, SelectGroupsStep>();
-        services.AddSingleton<IToolStep>(CreateRetrieveGroupsStep);
-        services.AddSingleton<IToolStep, BuildComparisonStep>();
+        // Les cinq étapes nommées, enregistrées par leur type concret et assemblées dans l'ordre pour cet
+        // outil seul. Les enregistrer sous IToolStep les mettrait dans une collection commune à toute la
+        // boîte à outils, où le second outil recevrait les étapes du premier.
+        services.AddSingleton<IdentifyProjectStep>();
+        services.AddSingleton<ListGroupsStep>();
+        services.AddSingleton<SelectGroupsStep>();
+        services.AddSingleton(CreateRetrieveGroupsStep);
+        services.AddSingleton<BuildComparisonStep>();
 
-        services.AddSingleton<ITool, VarCompareTool>();
+        services.AddSingleton<ITool>(CreateTool);
 
         return services;
     }
+
+    /// <summary>Assemble l'outil avec ses cinq étapes, dans l'ordre d'exécution.</summary>
+    private static VarCompareTool CreateTool(IServiceProvider provider) =>
+        new(
+            provider.GetRequiredService<IStepRunner>(),
+            [
+                provider.GetRequiredService<IdentifyProjectStep>(),
+                provider.GetRequiredService<ListGroupsStep>(),
+                provider.GetRequiredService<SelectGroupsStep>(),
+                provider.GetRequiredService<RetrieveGroupsStep>(),
+                provider.GetRequiredService<BuildComparisonStep>(),
+            ],
+            provider.GetRequiredService<ComparisonSession>(),
+            provider.GetRequiredService<ITargetAnnouncer>(),
+            provider.GetRequiredService<DevToolbox.Domain.AzureDevOps.ServerTarget>(),
+            provider.GetRequiredService<IClock>(),
+            provider.GetRequiredService<ResumeCoordinator>(),
+            provider.GetRequiredService<Rendering.AbortSummaryRenderer>(),
+            provider.GetRequiredService<Spectre.Console.IAnsiConsole>());
 
     private static RetrieveGroupsStep CreateRetrieveGroupsStep(IServiceProvider provider) =>
         new(

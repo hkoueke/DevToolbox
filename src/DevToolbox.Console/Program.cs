@@ -6,6 +6,9 @@ using DevToolbox.Infrastructure.AzureDevOps;
 using DevToolbox.Infrastructure.Logging;
 using DevToolbox.Infrastructure.Platform;
 using DevToolbox.Presentation.Shell;
+using DevToolbox.Tools.ApiDelta.Core;
+using DevToolbox.Tools.ApiDelta.Infrastructure;
+using DevToolbox.Tools.ApiDelta.Presentation;
 using DevToolbox.Tools.VarCompare.Core;
 using DevToolbox.Tools.VarCompare.Infrastructure;
 using DevToolbox.Tools.VarCompare.Presentation;
@@ -47,8 +50,7 @@ internal static class Program
 
         try
         {
-            using IHost host = await BuildHostAsync(args, console, cancellation.Token);
-            return await RunAsync(host, console, cancellation.Token);
+            return await RunToolboxAsync(args, console, cancellation.Token);
         }
         catch (FileNotFoundException)
         {
@@ -67,10 +69,49 @@ internal static class Program
         }
     }
 
-    private static async Task<IHost> BuildHostAsync(
+    /// <summary>
+    /// Construit l'hôte, lance la coquille, et recommence si l'adresse du serveur vient d'être confirmée.
+    /// </summary>
+    /// <remarks>
+    /// La boucle ne tourne une seconde fois que dans un cas : un outil adressé au serveur a été choisi
+    /// alors qu'aucune adresse n'était enregistrée. L'adresse vient d'être confirmée, et les options d'un
+    /// hôte construit étant déjà liées, c'est un hôte neuf qui la portera.
+    /// </remarks>
+    private static async Task<int> RunToolboxAsync(
         string[] args,
         IAnsiConsole console,
         CancellationToken cancellationToken)
+    {
+        AppPaths paths = new();
+        paths.EnsureCreated();
+
+        ServerConfigurationResolver resolver = new(paths, console);
+        string? toolToRun = null;
+
+        while (true)
+        {
+            IReadOnlyDictionary<string, string?>? stored =
+                await resolver.TryLoadStoredOverridesAsync(cancellationToken);
+
+            using IHost host = BuildHost(args, console, paths, stored);
+
+            ShellResult result = await RunAsync(
+                host, console, resolver, stored is not null, toolToRun, cancellationToken);
+
+            if (result.ToolToRunAfterRestart is null)
+            {
+                return result.ExitCode;
+            }
+
+            toolToRun = result.ToolToRunAfterRestart;
+        }
+    }
+
+    private static IHost BuildHost(
+        string[] args,
+        IAnsiConsole console,
+        AppPaths paths,
+        IReadOnlyDictionary<string, string?>? serverOverrides)
     {
         // La racine de contenu est le dossier du binaire, pas le répertoire courant de l'appelant. Un outil
         // console se lance depuis n'importe où, et ses réglages l'accompagnent.
@@ -84,16 +125,14 @@ internal static class Program
         // CreateApplicationBuilder ajoute déjà les trois dernières.
         builder.Configuration.AddJsonFile(SettingsFileName, optional: false, reloadOnChange: false);
 
-        AppPaths paths = new();
-        paths.EnsureCreated();
-
-        // L'adresse du serveur provient de ce que le développeur a confirmé au premier démarrage, et non du
-        // fichier livré. Elle est donc résolue et superposée avant que quoi que ce soit ne s'y lie.
-        ServerConfigurationResolver resolver = new(paths, console);
-        IReadOnlyDictionary<string, string?> serverOverrides =
-            await resolver.ResolveAsync(builder.Configuration, cancellationToken);
-
-        builder.Configuration.AddInMemoryCollection(serverOverrides);
+        // L'adresse du serveur provient de ce que le développeur a confirmé, et non du fichier livré. Elle
+        // est superposée avant que quoi que ce soit ne s'y lie — mais elle n'est pas demandée ici : tant
+        // qu'aucun outil n'en a besoin, il n'y a pas de question à poser, et un outil hors ligne doit
+        // pouvoir servir sur un poste qui n'a jamais vu de serveur.
+        if (serverOverrides is not null)
+        {
+            builder.Configuration.AddInMemoryCollection(serverOverrides);
+        }
 
         RedactionRegistry redaction = new();
 
@@ -103,25 +142,26 @@ internal static class Program
         return builder.Build();
     }
 
-    private static async Task<int> RunAsync(
+    private static async Task<ShellResult> RunAsync(
         IHost host,
         IAnsiConsole console,
+        ServerConfigurationResolver resolver,
+        bool serverConfigured,
+        string? toolToRun,
         CancellationToken cancellationToken)
     {
         try
         {
-            AzureDevOpsServerOptions options = host.Services
-                .GetRequiredService<IOptions<AzureDevOpsServerOptions>>().Value;
-
             // Les exécutions interrompues périmées sont nettoyées au démarrage, avant toute proposition.
             IRunCheckpointStore checkpoints = host.Services.GetRequiredService<IRunCheckpointStore>();
             await checkpoints.SweepExpiredAsync(RunRetention, cancellationToken);
 
-            return await RunShellAsync(host.Services, console, options, cancellationToken);
+            return await RunShellAsync(
+                host, console, resolver, serverConfigured, toolToRun, cancellationToken);
         }
         catch (OptionsValidationException exception)
         {
-            return ReportInvalidConfiguration(console, exception);
+            return new ShellResult(ReportInvalidConfiguration(console, exception), null);
         }
     }
 
@@ -199,36 +239,55 @@ internal static class Program
         services.AddSingleton(BuildServerTarget(configuration));
         services.AddSingleton(BuildVarCompareOptions(configuration));
 
-        // Chaque outil s'enregistre par ses propres extensions AddXxx(). Ajouter le second outil revient à
-        // ajouter deux lignes ici, sans toucher à aucun outil existant.
+        // Chaque outil s'enregistre par ses propres extensions AddXxx().
         services.AddVarCompareInfrastructure();
         services.AddVarCompare();
         DevToolbox.Tools.VarCompare.Infrastructure.ServiceCollectionExtensions
             .RegisterRedactedTypes(redaction);
+
+        services.AddSingleton(ApiDeltaOptions.Default);
+        services.AddApiDeltaInfrastructure();
+        services.AddApiDelta();
+        DevToolbox.Tools.ApiDelta.Infrastructure.ServiceCollectionExtensions
+            .RegisterRedactedTypes(redaction);
     }
 
-    private static async Task<int> RunShellAsync(
-        IServiceProvider services,
+    private static async Task<ShellResult> RunShellAsync(
+        IHost host,
         IAnsiConsole console,
-        AzureDevOpsServerOptions options,
+        ServerConfigurationResolver resolver,
+        bool serverConfigured,
+        string? toolToRun,
         CancellationToken cancellationToken)
     {
+        IServiceProvider services = host.Services;
         ShellLayout layout = services.GetRequiredService<ShellLayout>();
         ShellNavigator navigator = services.GetRequiredService<ShellNavigator>();
 
         IReadOnlyList<ITool> tools = [.. services.GetServices<ITool>()];
-        string serverHost = ServerHostOf(options);
+
+        // Au retour d'une reconstruction : l'outil choisi juste avant que l'adresse ne soit demandée.
+        if (toolToRun is not null)
+        {
+            ITool? pending = tools.FirstOrDefault(
+                tool => string.Equals(tool.Id, toolToRun, StringComparison.Ordinal));
+
+            if (pending is not null)
+            {
+                await pending.RunAsync(cancellationToken);
+            }
+        }
 
         while (!cancellationToken.IsCancellationRequested)
         {
             console.Clear();
-            layout.RenderHeader(tools, activeTab: null, serverHost, options.Collection);
+            layout.RenderHeader(tools, activeTab: null, ServerLabel(services, serverConfigured));
 
             string? tab = navigator.SelectTab(ShellLayout.DistinctTabs(tools));
 
             if (tab is null)
             {
-                return ExitCodes.Success;
+                return new ShellResult(ExitCodes.Success, null);
             }
 
             IReadOnlyList<ITool> inTab =
@@ -236,13 +295,37 @@ internal static class Program
 
             ITool? chosen = navigator.SelectTool(inTab);
 
-            if (chosen is not null)
+            if (chosen is null)
             {
-                await chosen.RunAsync(cancellationToken);
+                continue;
             }
+
+            if (chosen.RequiresServer && !serverConfigured)
+            {
+                await resolver.PromptAndStoreAsync(
+                    services.GetRequiredService<IConfiguration>(), cancellationToken);
+
+                return new ShellResult(ExitCodes.Success, chosen.Id);
+            }
+
+            await chosen.RunAsync(cancellationToken);
         }
 
-        return ExitCodes.Cancelled;
+        return new ShellResult(ExitCodes.Cancelled, null);
+    }
+
+    /// <summary>La cible à afficher en en-tête, ou <see langword="null"/> quand il n'y en a pas.</summary>
+    private static string? ServerLabel(IServiceProvider services, bool serverConfigured)
+    {
+        if (!serverConfigured)
+        {
+            return null;
+        }
+
+        AzureDevOpsServerOptions options = services
+            .GetRequiredService<IOptions<AzureDevOpsServerOptions>>().Value;
+
+        return ServerHostOf(options) + " ▸ " + options.Collection;
     }
 
     private static ServerTarget BuildServerTarget(ConfigurationManager configuration)

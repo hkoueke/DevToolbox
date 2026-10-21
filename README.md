@@ -1,7 +1,7 @@
 # DevToolbox
 
-Une boîte à outils console pour le travail quotidien avec Azure DevOps Server. Elle embarque aujourd'hui un
-seul outil.
+Une boîte à outils console pour le travail quotidien d'une équipe. Elle embarque aujourd'hui deux outils :
+l'un lit Azure DevOps, l'autre lit deux fichiers sur votre disque et n'émet aucune requête.
 
 ## varcompare
 
@@ -14,14 +14,43 @@ convention, mais par construction : aucun verbe HTTP modifiant l'état n'existe 
 compilation échoue si l'on en introduit un. Là où une différence apparaît, l'outil indique où aller la
 corriger soi-même.
 
+## apidelta
+
+Compare deux fichiers OpenAPI (Swagger), dit ce qui casse pour les applications qui appellent, puis **vous
+rend le fichier de production avec les routes que vous choisissez déjà dedans**. Il examine aussi celui qui
+est en service, chiffre ce qu'un nettoyage rapporterait, et sort une route dans une description autonome.
+
+Ce qu'il promet, et ce qu'il refuse :
+
+- **Il ne modifie jamais le fichier en service**, sauf demande explicite *et* confirmation nommant le
+  fichier — la seule action de la boîte qui ne se défait pas en supprimant un rapport. La production
+  corrigée, elle, est écrite à côté : aucun drapeau ne la fait écrire par-dessus l'original.
+- **Hors des endroits que vous avez choisis, la production corrigée est la production, octet pour octet.**
+  Commentaires, indentation, ordre des clés y survivent, parce que l'outil recopie les octets d'origine au
+  lieu de réécrire le fichier. Le diff que vous relisez est la sélection que vous avez faite, et rien
+  d'autre n'est arrivé à côté.
+- **Il dit ce qu'il va insérer avant de l'insérer**, élément par élément, avec l'effet et la confiance que
+  la comparaison a établis. Un changement cassant est annoncé comme tel : vous pouvez le vouloir, pas
+  l'emporter sans le savoir.
+- **Il prouve son propre travail avant de publier.** Une production corrigée n'existe sur le disque que si
+  l'outil l'a relue, revalidée, a résolu chaque référence, et a établi que ce que vous n'avez pas choisi
+  est identique à l'octet et que ce que vous avez choisi ne diffère que comme demandé. Faute de quoi rien
+  n'est écrit, et le rapport dit pourquoi.
+
+Onglet **OpenAPI** → **apidelta**. Aucun serveur, aucun identifiant, aucun réseau.
+
 ## Prérequis
 
-| Besoin | Vérification |
-|--------|--------------|
-| SDK .NET 10 | `dotnet --version` → `10.*` |
-| Windows, poste joint au domaine | l'outil s'authentifie avec votre session Windows |
-| Réseau d'entreprise ou VPN | l'hôte du serveur se résout et répond |
-| Accès en lecture à la collection | vous pouvez ouvrir la page Library dans un navigateur |
+| Besoin | Pour quoi | Vérification |
+|--------|-----------|--------------|
+| SDK .NET 10 | toute la boîte | `dotnet --version` → `10.*` |
+| Windows, poste joint au domaine | les outils Azure DevOps | l'outil s'authentifie avec votre session Windows |
+| Réseau d'entreprise ou VPN | les outils Azure DevOps | l'hôte du serveur se résout et répond |
+| Accès en lecture à la collection | les outils Azure DevOps | vous pouvez ouvrir la page Library dans un navigateur |
+
+Les trois dernières lignes sont les prérequis de **varcompare**, non ceux de la boîte. `apidelta` lit deux
+fichiers sur votre disque : il fonctionne sur un poste qui n'a jamais vu de serveur Azure DevOps, et son
+onglet est atteignable sans qu'aucune adresse de serveur ait été saisie.
 
 **Aucun mot de passe, jeton ni nom d'utilisateur ne vous sera jamais demandé.** L'authentification est
 l'authentification Windows intégrée, avec les identifiants du processus en cours. Il n'existe aucune invite
@@ -91,7 +120,8 @@ src/
   DevToolbox.Infrastructure/   client Azure DevOps, stockage, journalisation
   DevToolbox.Presentation/     coquille Spectre.Console
   DevToolbox.Console/          racine de composition
-tools/VarCompare/              l'outil : Core / Infrastructure / Presentation
+tools/VarCompare/              un outil : Core / Infrastructure / Presentation
+tools/ApiDelta/                l'autre, même découpage, aucune requête réseau
 tests/DevToolbox.Tests/        un seul projet de tests, un dossier par domaine
 ```
 

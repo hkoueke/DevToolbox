@@ -35,6 +35,17 @@ public enum FailureReason
     /// <summary>La configuration est absente ou invalide ; l'exécution ne peut pas démarrer.</summary>
     InvalidConfiguration,
 
+    /// <summary>
+    /// Une entrée désignée par le développeur est inutilisable : fichier absent, illisible, trop volumineux,
+    /// ou sélection vide là où il en faut une.
+    /// </summary>
+    /// <remarks>
+    /// Distinguée de <see cref="InvalidConfiguration"/> : celle-ci porte sur les réglages de la boîte à
+    /// outils, celle-là sur ce que le développeur vient de désigner. Les deux se corrigent à des endroits
+    /// différents, et le message doit pouvoir le dire.
+    /// </remarks>
+    InvalidInput,
+
     /// <summary>L'appelant a annulé l'opération.</summary>
     Cancelled,
 }
