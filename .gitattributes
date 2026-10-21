@@ -1,0 +1,16 @@
+# Normalisation des fins de ligne.
+#
+# Le corpus d'essai est muté par remplacement de texte, avec des chaînes écrites en LF. Laisser
+# core.autocrlf décider de ses fins de ligne rend la suite d'essais dépendante de la machine qui a
+# cloné : elle passe chez qui a écrit les fichiers et échoue sur un clone neuf. Les fixtures sont donc
+# figées en LF, et le code également, pour que ce qui est lu soit ce qui a été écrit.
+* text=auto eol=lf
+
+*.sln  text eol=crlf
+*.slnx text eol=lf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary

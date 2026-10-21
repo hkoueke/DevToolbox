@@ -13,7 +13,22 @@ internal static class CorpusLoader
 
     private static readonly Assembly Assembly = typeof(CorpusLoader).Assembly;
 
-    /// <summary>Lit un document du corpus tel qu'il est écrit.</summary>
+    /// <summary>
+    /// Lit un document du corpus, fins de ligne ramenées à LF.
+    /// </summary>
+    /// <remarks>
+    /// Normalisé ici, et c'est délibéré. Un dépôt ne conserve pas les fins de ligne de façon fiable :
+    /// avec <c>core.autocrlf</c> à vrai, ce qui a été écrit en LF ressort en CRLF à la sortie suivante.
+    /// Les essais qui mutent le corpus par remplacement de texte portent des chaînes écrites en LF ; sans
+    /// cette normalisation, ils ne trouvent plus rien à remplacer et échouent sur un clone neuf tout en
+    /// passant chez qui a écrit les fichiers. C'est exactement ce qui est arrivé, et la version 1.2.0 a
+    /// failli l'emporter.
+    /// <para>
+    /// L'essai qui éprouve réellement l'insensibilité aux fins de ligne emploie
+    /// <see cref="ReadWithCrLf"/>, qui convertit explicitement : son sujet est la conversion, pas le
+    /// hasard de la sortie de dépôt.
+    /// </para>
+    /// </remarks>
     internal static string Read(string fileName)
     {
         using Stream? stream = Assembly.GetManifestResourceStream(Prefix + fileName)
@@ -22,7 +37,8 @@ internal static class CorpusLoader
                 + string.Join(", ", Names()));
 
         using StreamReader reader = new(stream, Encoding.UTF8);
-        return reader.ReadToEnd();
+
+        return reader.ReadToEnd().ReplaceLineEndings("\n");
     }
 
     /// <summary>
