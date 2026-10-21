@@ -1,0 +1,482 @@
+# Sujet de l audit. Contient volontairement : un parametre d en-tete identique repete dans 14 operations,
+# une reponse d erreur identique repetee, deux schemas de meme forme sous des noms differents, des
+# composants inaccessibles, une operation decrite comme obsolete sans le drapeau, un corps de requete
+# dont la necessite n est pas declaree, des codes de reponse quotes de deux facons, deux casses pour le
+# meme en-tete, et une documentation externe vide.
+openapi: 3.0.3
+info:
+  title: Description accumulee
+  version: 7.12.0
+externalDocs:
+  url: ''
+  description: A completer
+security:
+  - bearerAuth: []
+tags:
+  - name: Documents
+    description: Depot et lecture.
+  - name: Jamais
+    description: Etiquette que nulle operation ne porte.
+paths:
+  /ressource1:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 1
+      operationId: lireRessource1
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource2:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 2
+      operationId: lireRessource2
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource3:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 3
+      operationId: lireRessource3
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource4:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 4
+      operationId: lireRessource4
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource5:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 5
+      operationId: lireRessource5
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource6:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 6
+      operationId: lireRessource6
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource7:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 7
+      operationId: lireRessource7
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        '400':
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource8:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 8
+      operationId: lireRessource8
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource9:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 9
+      operationId: lireRessource9
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource10:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 10
+      operationId: lireRessource10
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource11:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 11
+      operationId: lireRessource11
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource12:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 12
+      operationId: lireRessource12
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource13:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 13
+      operationId: lireRessource13
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /ressource14:
+    get:
+      tags: [Documents]
+      summary: Lit la ressource 14
+      operationId: lireRessource14
+      parameters:
+        - name: X-serviceEmetteur
+          in: header
+          required: true
+          description: Le service appelant.
+          schema:
+            type: string
+            maxLength: 32
+      responses:
+        '200':
+          description: La ressource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ressource'
+        400:
+          description: La requete est invalide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /initialiserDossiersPiecesEtDocuments:
+    post:
+      tags: [Documents]
+      summary: Initialise les dossiers
+      description: >-
+        Endpoint obsolète : utiliser /ressource1 desormais. Conserve pour les appelants historiques.
+      operationId: initialiserDossiers
+      parameters:
+        - name: X-MARCHE
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ressource'
+      responses:
+        '202':
+          description: La demande est prise en compte.
+  /ajouterDocument:
+    post:
+      tags: [Documents]
+      summary: Ajoute un document
+      operationId: ajouterDocument
+      parameters:
+        - name: X-Marche
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ressource'
+      responses:
+        '201':
+          description: Le document est ajoute.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    jamaisUtilise:
+      type: apiKey
+      in: header
+      name: X-cle
+  schemas:
+    Ressource:
+      type: object
+      required: [id, libelle]
+      properties:
+        id:
+          type: string
+          format: uuid
+        libelle:
+          type: string
+          maxLength: 128
+        creeLe:
+          type: string
+    Erreur:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    RessourceBis:
+      type: object
+      required: [id, libelle]
+      properties:
+        id:
+          type: string
+          format: uuid
+        libelle:
+          type: string
+          maxLength: 128
+        creeLe:
+          type: string
+    Inaccessible:
+      type: object
+      properties:
+        champ:
+          type: string
+    InaccessibleAussi:
+      type: array
+      items:
+        $ref: '#/components/schemas/Inaccessible'
+  parameters:
+    JamaisReference:
+      name: X-inutilise
+      in: header
+      required: false
+      schema:
+        type: string

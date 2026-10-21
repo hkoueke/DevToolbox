@@ -1,0 +1,65 @@
+openapi: 3.1.0
+info:
+  title: Catalogue documentaire
+  description: "Variante 3.1 : la nullabilite s exprime par une union avec null."
+  version: 2.4.1
+servers:
+  - url: https://$(catalog.host)/documentaire/v3
+security:
+  - bearerAuth: []
+tags:
+  - name: Documents
+    description: Depot et lecture des documents.
+paths:
+  /documents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/XServiceEmetteur'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Documents]
+      summary: Lit un document
+      operationId: lireDocument
+      responses:
+        '200':
+          description: Le document demande.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          description: La ressource est introuvable.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    XServiceEmetteur:
+      name: X-serviceEmetteur
+      in: header
+      required: true
+      description: Le service appelant.
+      schema:
+        type: string
+        maxLength: 32
+  schemas:
+    Document:
+      type: object
+      required: [id, titre]
+      properties:
+        id:
+          type: string
+          format: uuid
+        titre:
+          type: string
+          maxLength: 256
+        commentaire:
+          type: [string, 'null']
+        inconnu:
+          type: string
+          x-sg-format: interne

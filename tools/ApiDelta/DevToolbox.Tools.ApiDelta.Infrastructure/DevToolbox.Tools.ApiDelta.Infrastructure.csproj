@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Les adaptateurs : lecture YAML et JSON vers l'arbre de syntaxe, projection vers JSON pour la couche
+    sémantique, validation et résolution des références, émission et écriture des artefacts. Les deux
+    paquets de l'outil ne sont référencés qu'ici.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\DevToolbox.Tools.ApiDelta.Core\DevToolbox.Tools.ApiDelta.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\DevToolbox.Infrastructure\DevToolbox.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+    <PackageReference Include="Microsoft.OpenApi" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DevToolbox.Tests" />
+  </ItemGroup>
+
+</Project>

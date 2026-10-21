@@ -1,0 +1,33 @@
+openapi: 3.0.3
+info:
+  title: Cycles legaux entre schemas
+  version: 1.0.0
+paths:
+  /dossiers:
+    get:
+      operationId: listerDossiers
+      responses:
+        '200':
+          description: Les dossiers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dossier'
+components:
+  schemas:
+    Dossier:
+      type: object
+      properties:
+        parent:
+          $ref: '#/components/schemas/Dossier'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+    Document:
+      type: object
+      properties:
+        dossier:
+          $ref: '#/components/schemas/Dossier'
+        precedent:
+          $ref: '#/components/schemas/Document'

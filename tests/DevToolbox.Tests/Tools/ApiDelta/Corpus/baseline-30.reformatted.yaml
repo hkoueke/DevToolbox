@@ -1,0 +1,234 @@
+# Même description que baseline-30.yaml, écrite autrement : indentation de quatre espaces, clés de premier
+# niveau dans un autre ordre, codes de réponse non quotés, ensembles « required » réordonnés, et des
+# commentaires que l'original n'a pas. Aucune de ces différences n'est une différence d'API.
+paths:
+    /documents:
+        parameters:
+            - $ref: "#/components/parameters/XServiceEmetteur"
+        post:
+            summary: Dépose un document
+            tags: [Documents]
+            operationId: deposerDocument
+            responses:
+                201:
+                    description: Le document déposé.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Document"
+                400:
+                    $ref: "#/components/responses/RequeteInvalide"
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/DocumentCreation"
+        get:
+            summary: Liste les documents
+            operationId: listerDocuments
+            tags: [Documents]
+            parameters:
+                - in: query
+                  name: etat
+                  required: false
+                  schema:
+                      enum: [brouillon, publie, archive]
+                      type: string
+            responses:
+                200:
+                    description: La liste des documents.
+                    content:
+                        application/json:
+                            schema:
+                                items:
+                                    $ref: "#/components/schemas/Document"
+                                type: array
+                401:
+                    $ref: "#/components/responses/NonAutorise"
+    /documents/{id}:
+        parameters:
+            - $ref: "#/components/parameters/XServiceEmetteur"
+            - name: id
+              in: path
+              required: true
+              schema:
+                  format: uuid
+                  type: string
+        get:
+            summary: Lit un document
+            tags: [Documents]
+            operationId: lireDocument
+            responses:
+                200:
+                    description: Le document demandé.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Document"
+                404:
+                    $ref: "#/components/responses/Introuvable"
+        put:
+            summary: Remplace un document
+            tags: [Documents]
+            operationId: remplacerDocument
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/DocumentCreation"
+            responses:
+                200:
+                    description: Le document remplacé.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Document"
+                404:
+                    $ref: "#/components/responses/Introuvable"
+        patch:
+            summary: Modifie un document
+            tags: [Documents]
+            operationId: modifierDocument
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/DocumentCreation"
+            responses:
+                200:
+                    description: Le document modifié.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Document"
+        delete:
+            summary: Supprime un document
+            tags: [Documents]
+            operationId: supprimerDocument
+            x-sg-gateway:
+                catalog: documentaire
+            responses:
+                204:
+                    description: Le document est supprimé.
+                404:
+                    $ref: "#/components/responses/Introuvable"
+    /dossiers:
+        get:
+            summary: Liste les dossiers
+            tags: [Dossiers]
+            operationId: listerDossiers
+            security: []
+            responses:
+                200:
+                    description: La liste des dossiers.
+                    content:
+                        application/json:
+                            schema:
+                                items:
+                                    $ref: "#/components/schemas/Dossier"
+                                type: array
+components:
+    schemas:
+        Document:
+            type: object
+            required: [etat, id, titre]
+            properties:
+                depotLe:
+                    type: string
+                    format: date-time
+                dossier:
+                    $ref: "#/components/schemas/Dossier"
+                etat:
+                    type: string
+                    enum: [brouillon, publie, archive]
+                id:
+                    type: string
+                    format: uuid
+                titre:
+                    type: string
+                    maxLength: 256
+        DocumentCreation:
+            type: object
+            required: [titre]
+            properties:
+                dossierId:
+                    type: string
+                    format: uuid
+                titre:
+                    type: string
+                    maxLength: 256
+        Dossier:
+            type: object
+            required: [libelle, id]
+            properties:
+                id:
+                    type: string
+                    format: uuid
+                libelle:
+                    type: string
+                    maxLength: 128
+                parent:
+                    $ref: "#/components/schemas/Dossier"
+        Erreur:
+            type: object
+            required: [message, code]
+            properties:
+                code:
+                    type: string
+                message:
+                    type: string
+    parameters:
+        XServiceEmetteur:
+            name: X-serviceEmetteur
+            in: header
+            description: Le service appelant.
+            required: true
+            schema:
+                maxLength: 32
+                type: string
+    responses:
+        Introuvable:
+            description: La ressource est introuvable.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/Erreur"
+        NonAutorise:
+            description: L'appelant n'est pas autorisé.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/Erreur"
+        RequeteInvalide:
+            description: La requête est invalide.
+            content:
+                application/json:
+                    schema:
+                        $ref: "#/components/schemas/Erreur"
+    securitySchemes:
+        bearerAuth:
+            scheme: bearer
+            type: http
+tags:
+    - name: Documents
+      description: Dépôt et lecture des documents.
+    - name: Dossiers
+      description: Regroupement de documents.
+security:
+    - bearerAuth: []
+servers:
+    - url: https://$(catalog.host)/documentaire/v2
+      description: Production
+info:
+    title: Catalogue documentaire
+    description: Description de référence du corpus d'essai.
+    version: 2.4.1
+    contact:
+        name: Equipe Documents
+        email: documents@entreprise.local
+openapi: 3.0.3
+x-sg-catalog:
+    nom: documentaire
+    hote: $(catalog.host)

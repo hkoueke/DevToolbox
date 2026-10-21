@@ -1,0 +1,229 @@
+openapi: 3.0.3
+info:
+  title: Catalogue documentaire
+  description: Description de référence du corpus d'essai.
+  version: 2.4.1
+  contact:
+    name: Equipe Documents
+    email: documents@entreprise.local
+servers:
+  - url: https://$(catalog.host)/documentaire/v2
+    description: Production
+security:
+  - bearerAuth: []
+tags:
+  - name: Documents
+    description: Dépôt et lecture des documents.
+  - name: Dossiers
+    description: Regroupement de documents.
+paths:
+  /documents:
+    parameters:
+      - $ref: '#/components/parameters/XServiceEmetteur'
+    get:
+      tags: [Documents]
+      summary: Liste les documents
+      operationId: listerDocuments
+      parameters:
+        - name: etat
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [brouillon, publie]
+      responses:
+        '200':
+          description: La liste des documents.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/NonAutorise'
+    post:
+      tags: [Documents]
+      summary: Dépose un document
+      operationId: deposerDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentCreation'
+      responses:
+        '201':
+          description: Le document déposé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /documents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/XServiceEmetteur'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Documents]
+      summary: Lit un document
+      operationId: lireDocument
+      responses:
+        '200':
+          description: Le document demandé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+    put:
+      tags: [Documents]
+      summary: Remplace un document
+      operationId: remplacerDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentCreation'
+      responses:
+        '200':
+          description: Le document remplacé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    patch:
+      tags: [Documents]
+      summary: Modifie un document
+      operationId: modifierDocument
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentCreation'
+      responses:
+        '200':
+          description: Le document modifié.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+    delete:
+      tags: [Documents]
+      summary: Supprime un document
+      operationId: supprimerDocument
+      x-sg-gateway:
+        catalog: documentaire
+      responses:
+        '204':
+          description: Le document est supprimé.
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /dossiers:
+    get:
+      tags: [Dossiers]
+      summary: Liste les dossiers
+      operationId: listerDossiers
+      security: []
+      responses:
+        '200':
+          description: La liste des dossiers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dossier'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    XServiceEmetteur:
+      name: X-serviceEmetteur
+      in: header
+      required: true
+      description: Le service appelant.
+      schema:
+        type: string
+        maxLength: 32
+  responses:
+    RequeteInvalide:
+      description: La requête est invalide.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+    NonAutorise:
+      description: L'appelant n'est pas autorisé.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+    Introuvable:
+      description: La ressource est introuvable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+  schemas:
+    Document:
+      type: object
+      required: [id, titre, etat]
+      properties:
+        id:
+          type: string
+          format: uuid
+        titre:
+          type: string
+          maxLength: 128
+        etat:
+          type: string
+          enum: [brouillon, publie]
+        dossier:
+          $ref: '#/components/schemas/Dossier'
+        depotLe:
+          type: string
+          format: date-time
+    DocumentCreation:
+      type: object
+      required: [titre]
+      properties:
+        titre:
+          type: string
+          maxLength: 128
+        dossierId:
+          type: string
+          format: uuid
+    Dossier:
+      type: object
+      required: [id, libelle]
+      properties:
+        id:
+          type: string
+          format: uuid
+        libelle:
+          type: string
+          maxLength: 128
+        parent:
+          $ref: '#/components/schemas/Dossier'
+    Erreur:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+x-sg-catalog:
+  nom: documentaire
+  hote: $(catalog.host)

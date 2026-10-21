@@ -27,6 +27,18 @@
     <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Core\DevToolbox.Tools.VarCompare.Core.csproj" />
     <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Infrastructure\DevToolbox.Tools.VarCompare.Infrastructure.csproj" />
     <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Presentation\DevToolbox.Tools.VarCompare.Presentation.csproj" />
+    <ProjectReference Include="..\..\tools\ApiDelta\DevToolbox.Tools.ApiDelta.Core\DevToolbox.Tools.ApiDelta.Core.csproj" />
+    <ProjectReference Include="..\..\tools\ApiDelta\DevToolbox.Tools.ApiDelta.Infrastructure\DevToolbox.Tools.ApiDelta.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\tools\ApiDelta\DevToolbox.Tools.ApiDelta.Presentation\DevToolbox.Tools.ApiDelta.Presentation.csproj" />
+  </ItemGroup>
+
+  <!--
+    Le corpus d'apidelta voyage dans l'assemblage de tests plutôt que sur le disque : un test qui lit un
+    fichier relatif au répertoire courant dépend de l'endroit d'où le lanceur l'exécute.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\*.yaml" />
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\*.json" />
   </ItemGroup>
 
   <ItemGroup>

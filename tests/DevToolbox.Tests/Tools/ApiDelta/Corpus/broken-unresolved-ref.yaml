@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: Reference non resolue
+  version: 1.0.0
+paths:
+  /documents:
+    get:
+      operationId: listerDocuments
+      responses:
+        '200':
+          description: Premier usage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dossier'
+    post:
+      operationId: deposerDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Dossier'
+      responses:
+        '201':
+          description: Troisieme usage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dossier'
+components:
+  schemas:
+    Document:
+      type: object
+      properties:
+        titre:
+          type: string

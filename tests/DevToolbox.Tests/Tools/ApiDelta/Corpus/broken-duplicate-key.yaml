@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Cle en double
+  version: 1.0.0
+paths:
+  /documents:
+    get:
+      operationId: listerDocuments
+      responses:
+        '200':
+          description: Premiere valeur.
+        '200':
+          description: Seconde valeur, que la plupart des analyseurs retiennent en silence.
+components:
+  schemas:
+    Document:
+      type: object
+      properties:
+        titre:
+          type: string
+      properties:
+        libelle:
+          type: string
