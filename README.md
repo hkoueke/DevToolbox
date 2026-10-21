@@ -184,3 +184,8 @@ fichiers sur la release déjà là plutôt que d'échouer, et ne remplace sa des
 Les règles du dépôt ne sont pas décoratives : les avertissements sont des erreurs, quatre analyseurs sont
 actifs, et une liste d'API interdites transforme plusieurs règles en échecs de compilation plutôt qu'en
 remarques de relecture.
+
+Celles que le compilateur ne peut pas tenir sont écrites dans **[CONCEPTION.md](CONCEPTION.md)** : dix
+règles, chacune avec sa raison, sur les points de reprise, l'arbre de syntaxe et l'écriture d'un document.
+Lisez-les avant d'y toucher — ce sont les endroits où rien ne vous arrêtera, et où une erreur produit un
+fichier valide qui décrit autre chose.
