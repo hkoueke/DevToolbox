@@ -12,6 +12,8 @@
     <ProjectReference Include="..\DevToolbox.Presentation\DevToolbox.Presentation.csproj" />
     <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Presentation\DevToolbox.Tools.VarCompare.Presentation.csproj" />
     <ProjectReference Include="..\..\tools\VarCompare\DevToolbox.Tools.VarCompare.Infrastructure\DevToolbox.Tools.VarCompare.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\tools\ApiDelta\DevToolbox.Tools.ApiDelta.Presentation\DevToolbox.Tools.ApiDelta.Presentation.csproj" />
+    <ProjectReference Include="..\..\tools\ApiDelta\DevToolbox.Tools.ApiDelta.Infrastructure\DevToolbox.Tools.ApiDelta.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

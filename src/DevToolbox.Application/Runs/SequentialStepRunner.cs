@@ -18,32 +18,35 @@ public sealed class SequentialStepRunner : IStepRunner
 {
     private readonly IClock _clock;
     private readonly IRunCheckpointStore _checkpointStore;
-    private readonly IRunCheckpointFactory _checkpointFactory;
+    private readonly IReadOnlyList<IRunCheckpointFactory> _checkpointFactories;
     private readonly IRecoveryPrompt _recoveryPrompt;
     private readonly ILogger<SequentialStepRunner> _logger;
 
     /// <summary>Crée un moteur d'étapes.</summary>
     /// <param name="clock">Fournit l'heure courante.</param>
     /// <param name="checkpointStore">Conserve l'avancement après chaque étape réussie.</param>
-    /// <param name="checkpointFactory">Construit le point de reprise de l'outil en cours.</param>
+    /// <param name="checkpointFactories">
+    /// Les fabriques de points de reprise, une par outil. Celle qui correspond à l'outil de l'exécution est
+    /// choisie par son identifiant : le moteur est partagé, les fabriques ne le sont pas.
+    /// </param>
     /// <param name="recoveryPrompt">Demande au développeur quoi faire d'une étape en échec.</param>
     /// <param name="logger">Reçoit les transitions d'étape.</param>
     public SequentialStepRunner(
         IClock clock,
         IRunCheckpointStore checkpointStore,
-        IRunCheckpointFactory checkpointFactory,
+        IEnumerable<IRunCheckpointFactory> checkpointFactories,
         IRecoveryPrompt recoveryPrompt,
         ILogger<SequentialStepRunner> logger)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(checkpointStore);
-        ArgumentNullException.ThrowIfNull(checkpointFactory);
+        ArgumentNullException.ThrowIfNull(checkpointFactories);
         ArgumentNullException.ThrowIfNull(recoveryPrompt);
         ArgumentNullException.ThrowIfNull(logger);
 
         _clock = clock;
         _checkpointStore = checkpointStore;
-        _checkpointFactory = checkpointFactory;
+        _checkpointFactories = [.. checkpointFactories];
         _recoveryPrompt = recoveryPrompt;
         _logger = logger;
     }
@@ -57,6 +60,20 @@ public sealed class SequentialStepRunner : IStepRunner
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(steps);
 
+        // La portée de corrélation est ouverte ici, et non dans chaque outil : c'est le moteur qui voit
+        // passer toutes les lignes d'une exécution, et sans elle un journal mêle les exécutions sans que
+        // rien permette de les redémêler après coup.
+        using IDisposable? scope = _logger.BeginRunScope(context.Run);
+
+        return await RunStepsAsync(context, steps, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Déroule les étapes, en avançant ou en reculant le curseur selon ce qui est choisi.</summary>
+    private async Task<ToolRun> RunStepsAsync(
+        ToolRunContext context,
+        IReadOnlyList<IToolStep> steps,
+        CancellationToken cancellationToken)
+    {
         ToolRun run = context.Run;
         int cursor = 0;
 
@@ -221,7 +238,18 @@ public sealed class SequentialStepRunner : IStepRunner
 
     private async Task SaveCheckpointAsync(ToolRunContext context, CancellationToken cancellationToken)
     {
-        PersistedRun? checkpoint = _checkpointFactory.TryCreate(context);
+        IRunCheckpointFactory? factory = _checkpointFactories.FirstOrDefault(
+            candidate => string.Equals(candidate.ToolId, context.Run.ToolId, StringComparison.Ordinal));
+
+        if (factory is null)
+        {
+            // Dit, et non subi : un outil sans fabrique n'est pas reprenable, et le découvrir au prochain
+            // démarrage — devant une liste d'exécutions vide — serait découvrir trop tard.
+            Log.NoCheckpointFactory(_logger, context.Run.ToolId);
+            return;
+        }
+
+        PersistedRun? checkpoint = factory.TryCreate(context);
 
         if (checkpoint is not null)
         {

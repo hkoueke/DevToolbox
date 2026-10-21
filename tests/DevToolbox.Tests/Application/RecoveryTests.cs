@@ -202,10 +202,11 @@ public sealed class RecoveryTests
         store = Substitute.For<IRunCheckpointStore>();
 
         IRunCheckpointFactory factory = Substitute.For<IRunCheckpointFactory>();
+        factory.ToolId.Returns("test");
         factory.TryCreate(Arg.Any<ToolRunContext>()).Returns((PersistedRun?)null);
 
         return new SequentialStepRunner(
-            clock, store, factory, prompt, NullLogger<SequentialStepRunner>.Instance);
+            clock, store, [factory], prompt, NullLogger<SequentialStepRunner>.Instance);
     }
 
     private static ToolRunContext CreateContext() =>

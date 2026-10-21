@@ -47,8 +47,7 @@ public sealed class RunCheckpointStoreTests
 
         document.RootElement.EnumerateObject().Select(property => property.Name)
             .Should().BeEquivalentTo(
-                "runId", "toolId", "collection", "project",
-                "selectedGroups", "completedSteps", "startedAt", "lastUpdatedAt");
+                "runId", "toolId", "selection", "completedSteps", "startedAt", "lastUpdatedAt");
     }
 
     [Fact]
@@ -63,8 +62,8 @@ public sealed class RunCheckpointStoreTests
             await store.ListResumableAsync("varcompare", CancellationToken.None);
 
         resumable.Should().ContainSingle();
-        resumable[0].Project.Should().Be("MyProject");
-        resumable[0].SelectedGroups.Should().HaveCount(2);
+        resumable[0].Selection.Should().Contain(entry => string.Equals(entry.Label, "MyProject", StringComparison.Ordinal));
+        resumable[0].Selection.Count(entry => string.Equals(entry.Kind, "groupe", StringComparison.Ordinal)).Should().Be(2);
     }
 
     [Fact]
@@ -157,9 +156,12 @@ public sealed class RunCheckpointStoreTests
     private static PersistedRun Checkpoint() => new(
         Guid.NewGuid(),
         "varcompare",
-        "DefaultCollection",
-        "MyProject",
-        [new PersistedGroupSelection(1, "app-dev"), new PersistedGroupSelection(2, "app-prod")],
+        [
+            new PersistedSelectionEntry("collection", "DefaultCollection", "DefaultCollection"),
+            new PersistedSelectionEntry("projet", "MyProject", "MyProject"),
+            new PersistedSelectionEntry("groupe", "1", "app-dev"),
+            new PersistedSelectionEntry("groupe", "2", "app-prod"),
+        ],
         ["IdentifyProject", "ListGroups"],
         Now.AddMinutes(-5),
         Now);

@@ -163,18 +163,19 @@ public sealed class FileRunCheckpointStore : IRunCheckpointStore
 
     private static bool VerifyCheckpointShape()
     {
+        // La liste s'est resserrée en devenant générique : plus d'entier, et plus de type porteur d'un
+        // vocabulaire d'outil. Un point de reprise n'est plus qu'un identifiant, des chaînes et deux dates.
         HashSet<Type> permitted =
         [
             typeof(Guid),
             typeof(string),
-            typeof(int),
             typeof(DateTimeOffset),
             typeof(IReadOnlyList<string>),
-            typeof(IReadOnlyList<PersistedGroupSelection>),
+            typeof(IReadOnlyList<PersistedSelectionEntry>),
         ];
 
         return IsShapePermitted(typeof(PersistedRun), permitted)
-            && IsShapePermitted(typeof(PersistedGroupSelection), permitted);
+            && IsShapePermitted(typeof(PersistedSelectionEntry), permitted);
     }
 
     private static bool IsShapePermitted(Type type, HashSet<Type> permitted) =>

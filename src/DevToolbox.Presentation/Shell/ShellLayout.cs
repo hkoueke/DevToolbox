@@ -26,13 +26,14 @@ public sealed class ShellLayout
     /// <summary>Dessine l'en-tête : titre du produit, barre d'onglets et cible en cours de lecture.</summary>
     /// <param name="tools">Les outils enregistrés, dont les onglets composent la barre.</param>
     /// <param name="activeTab">L'onglet actuellement sélectionné.</param>
-    /// <param name="serverHost">L'hôte du serveur configuré.</param>
-    /// <param name="collection">La collection configurée.</param>
+    /// <param name="target">
+    /// La cible à nommer, ou <see langword="null"/> quand il n'y en a pas : tous les outils ne s'adressent
+    /// pas à un serveur, et l'en-tête ne doit pas nommer une cible que l'outil choisi ne contactera jamais.
+    /// </param>
     public void RenderHeader(
         IReadOnlyList<ITool> tools,
         string? activeTab,
-        string serverHost,
-        string collection)
+        string? target)
     {
         ArgumentNullException.ThrowIfNull(tools);
 
@@ -47,8 +48,10 @@ public sealed class ShellLayout
                 .Padding(0, 0, 0, 0));
         }
 
-        _console.MarkupLine(
-            "[grey]" + Markup.Escape(serverHost) + " ▸ " + Markup.Escape(collection) + "[/]");
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            _console.MarkupLine("[grey]" + Markup.Escape(target) + "[/]");
+        }
 
         _console.WriteLine();
     }

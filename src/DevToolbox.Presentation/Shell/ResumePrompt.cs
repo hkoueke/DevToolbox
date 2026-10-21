@@ -7,14 +7,19 @@ namespace DevToolbox.Presentation.Shell;
 /// Propose au démarrage suivant de reprendre ou d'oublier une exécution interrompue.
 /// </summary>
 /// <remarks>
-/// Ce qui est proposé est une <em>sélection</em>, jamais un résultat : la collection, le projet et les
-/// groupes choisis sont mémorisés, et reprendre relit ces groupes au lieu d'afficher un contenu mémorisé.
-/// L'invite le dit explicitement, car un développeur qui agirait sur une image périmée est précisément ce
-/// que ce mécanisme évite.
+/// Ce qui est proposé est une <em>sélection</em>, jamais un résultat : seuls les choix du développeur sont
+/// mémorisés, et reprendre les relit au lieu d'afficher un contenu mémorisé. L'invite le dit
+/// explicitement, car un développeur qui agirait sur une image périmée est précisément ce que ce mécanisme
+/// évite.
+/// <para>
+/// L'invite ne connaît aucun outil : elle affiche les éléments que l'outil a choisi de conserver, dans
+/// l'ordre où il les a écrits. C'est ce qui lui permet de servir des sélections aussi différentes qu'une
+/// liste de groupes de variables et deux fichiers accompagnés d'un mode.
+/// </para>
 /// </remarks>
 public sealed class ResumePrompt
 {
-    private const string ResumeLabel = "Reprendre (les groupes seront relus)";
+    private const string ResumeLabel = "Reprendre (la sélection sera relue)";
     private const string DiscardLabel = "Oublier cette exécution et repartir de zéro";
     private const string StartFreshLabel = "Repartir de zéro";
 
@@ -50,8 +55,8 @@ public sealed class ResumePrompt
             .Border(BoxBorder.Rounded));
 
         _console.MarkupLine(
-            "[grey]Seule votre sélection a été mémorisée. Reprendre relit les groupes, si bien que vous "
-            + "n'agissez jamais sur une image périmée.[/]");
+            "[grey]Seule votre sélection a été mémorisée. Reprendre la relit, si bien que vous n'agissez "
+            + "jamais sur une image périmée.[/]");
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
@@ -74,11 +79,18 @@ public sealed class ResumePrompt
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
 
-        grid.AddRow("[grey]collection[/]", Markup.Escape(run.Collection));
-        grid.AddRow("[grey]projet[/]", Markup.Escape(run.Project));
-        grid.AddRow(
-            "[grey]groupes[/]",
-            Markup.Escape(string.Join(", ", run.SelectedGroups.Select(group => group.Name))));
+        grid.AddRow("[grey]outil[/]", Markup.Escape(run.ToolId));
+
+        // Les éléments sont regroupés par sorte, dans l'ordre d'écriture : l'outil décide de ce qui mérite
+        // d'être montré, et l'invite n'a pas à savoir ce que les mots veulent dire.
+        foreach (IGrouping<string, PersistedSelectionEntry> kind in run.Selection.GroupBy(
+            entry => entry.Kind, StringComparer.Ordinal))
+        {
+            grid.AddRow(
+                "[grey]" + Markup.Escape(kind.Key) + "[/]",
+                Markup.Escape(string.Join(", ", kind.Select(entry => entry.Label))));
+        }
+
         grid.AddRow("[grey]démarrée le[/]", run.StartedAt.ToLocalTime().ToString("u", null));
         grid.AddRow("[grey]parvenue à[/]", DescribeProgress(run));
 

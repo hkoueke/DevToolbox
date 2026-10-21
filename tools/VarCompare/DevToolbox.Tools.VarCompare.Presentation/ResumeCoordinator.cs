@@ -1,3 +1,4 @@
+using System.Globalization;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.AzureDevOps;
 using DevToolbox.Domain.Runs;
@@ -92,9 +93,19 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
         return true;
     }
 
+    /// <summary>
+    /// Relit un élément de sélection mémorisé comme un groupe. Un élément illisible est écarté plutôt que
+    /// de faire échouer la reprise : un point de reprise corrompu ou écrit par une version antérieure ne
+    /// doit pas empêcher de travailler.
+    /// </summary>
+    private static RememberedGroup? ToRememberedGroup(PersistedSelectionEntry entry) =>
+        int.TryParse(entry.Key, CultureInfo.InvariantCulture, out int id)
+            ? new RememberedGroup(id, entry.Label)
+            : null;
+
     /// <inheritdoc />
     public IReadOnlyList<VariableGroupSummary> Reconcile(
-        IReadOnlyList<PersistedGroupSelection> remembered,
+        IReadOnlyList<RememberedGroup> remembered,
         IReadOnlyList<VariableGroupSummary> available)
     {
         ArgumentNullException.ThrowIfNull(remembered);
@@ -105,7 +116,7 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
         List<VariableGroupSummary> kept = [];
         List<string> dropped = [];
 
-        foreach (PersistedGroupSelection selection in remembered)
+        foreach (RememberedGroup selection in remembered)
         {
             if (byId.TryGetValue(selection.Id, out VariableGroupSummary? group))
             {
@@ -135,8 +146,22 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
     /// </summary>
     private static void Seed(ToolRunContext context, PersistedRun run)
     {
-        context.Set(VarCompareContextKeys.Project, new ProjectIdentifier(run.Project));
-        context.Set(VarCompareContextKeys.ResumedSelection, run.SelectedGroups);
+        // La traduction a lieu ici, à la frontière de l'outil : un point de reprise ne porte que des
+        // chaînes, et c'est varcompare qui sait que « 42 » est un identifiant de groupe.
+        string project = run.Selection
+            .FirstOrDefault(entry => string.Equals(entry.Kind, VarCompareSelectionKinds.Project, StringComparison.Ordinal))
+            ?.Key ?? string.Empty;
+
+        IReadOnlyList<RememberedGroup> groups =
+        [
+            .. run.Selection
+                .Where(entry => string.Equals(entry.Kind, VarCompareSelectionKinds.Group, StringComparison.Ordinal))
+                .Select(ToRememberedGroup)
+                .OfType<RememberedGroup>(),
+        ];
+
+        context.Set(VarCompareContextKeys.Project, new ProjectIdentifier(project));
+        context.Set(VarCompareContextKeys.ResumedSelection, groups);
 
         foreach (string completed in run.CompletedSteps)
         {

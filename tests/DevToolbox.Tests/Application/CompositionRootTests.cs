@@ -3,6 +3,7 @@ using DevToolbox.Console;
 using DevToolbox.Infrastructure.Logging;
 using DevToolbox.Infrastructure.Platform;
 using DevToolbox.Presentation.Shell;
+using DevToolbox.Tools.ApiDelta.Core.Steps;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Core.Steps;
@@ -54,41 +55,104 @@ public sealed class CompositionRootTests
     }
 
     [Fact]
-    public void The_five_named_steps_are_registered_in_execution_order()
+    public void Each_tool_composes_its_own_named_steps()
     {
-        // L'exécution est une suite ordonnée d'étapes nommées, dont le développeur voit l'avancement.
+        // Les étapes ne sont plus enregistrées sous IToolStep : une collection commune à toute la boîte à
+        // outils donnerait à chaque outil les étapes des autres. Chaque outil assemble donc les siennes, et
+        // ce test vérifie que chacune est bien enregistrée — une étape écrite mais jamais câblée doit faire
+        // échouer la construction, pas disparaître.
         using ServiceProvider provider = BuildProvider();
 
-        IReadOnlyList<IToolStep> steps = [.. provider.GetServices<IToolStep>()];
+        provider.GetServices<IToolStep>().Should().BeEmpty(
+            "aucune étape ne doit tomber dans la collection commune");
 
-        steps.Select(step => step.Name).Should().Equal(
+        IReadOnlyList<IToolStep> varCompare =
+        [
+            provider.GetRequiredService<IdentifyProjectStep>(),
+            provider.GetRequiredService<ListGroupsStep>(),
+            provider.GetRequiredService<SelectGroupsStep>(),
+            provider.GetRequiredService<RetrieveGroupsStep>(),
+            provider.GetRequiredService<BuildComparisonStep>(),
+        ];
+
+        varCompare.Select(step => step.Name).Should().Equal(
             IdentifyProjectStep.StepName,
             ListGroupsStep.StepName,
             SelectGroupsStep.StepName,
             RetrieveGroupsStep.StepName,
             BuildComparisonStep.StepName);
+
+        provider.GetRequiredService<SelectStep>().Name.Should().Be(ApiDeltaStepNames.Select);
+        provider.GetRequiredService<ReadTargetStep>().Name.Should().Be(ApiDeltaStepNames.ReadTarget);
+        provider.GetRequiredService<ReadSourceStep>().Name.Should().Be(ApiDeltaStepNames.ReadSource);
+        provider.GetRequiredService<ValidateStep>().Name.Should().Be(ApiDeltaStepNames.Validate);
+        provider.GetRequiredService<CompareStep>().Name.Should().Be(ApiDeltaStepNames.Compare);
+        provider.GetRequiredService<VersionStep>().Name.Should().Be(ApiDeltaStepNames.Version);
+        provider.GetRequiredService<AuditStep>().Name.Should().Be(ApiDeltaStepNames.Audit);
+        provider.GetRequiredService<PlanStep>().Name.Should().Be(ApiDeltaStepNames.Plan);
+        provider.GetRequiredService<ExtractStep>().Name.Should().Be(ApiDeltaStepNames.Extract);
+        provider.GetRequiredService<WriteStep>().Name.Should().Be(ApiDeltaStepNames.Write);
     }
 
     [Fact]
-    public void Every_step_declares_itself_idempotent_because_they_are_all_reads()
+    public void Every_step_declares_itself_idempotent()
     {
-        // Une étape qu'on ne peut pas rejouer sans risque doit se déclarer non reprenable. C'est le fait
-        // d'être en lecture seule qui rend ici la poursuite toujours sûre.
+        // Une étape qu'on ne peut pas rejouer sans risque doit se déclarer non reprenable. Les étapes de
+        // varcompare le sont parce qu'elles lisent ; celle d'apidelta parce que redemander ne change rien
+        // au monde.
         using ServiceProvider provider = BuildProvider();
 
-        provider.GetServices<IToolStep>().Should().OnlyContain(step => step.IsIdempotent);
+        IReadOnlyList<IToolStep> steps =
+        [
+            provider.GetRequiredService<IdentifyProjectStep>(),
+            provider.GetRequiredService<ListGroupsStep>(),
+            provider.GetRequiredService<SelectGroupsStep>(),
+            provider.GetRequiredService<RetrieveGroupsStep>(),
+            provider.GetRequiredService<BuildComparisonStep>(),
+            provider.GetRequiredService<SelectStep>(),
+            provider.GetRequiredService<ReadTargetStep>(),
+            provider.GetRequiredService<ReadSourceStep>(),
+            provider.GetRequiredService<ValidateStep>(),
+            provider.GetRequiredService<CompareStep>(),
+            provider.GetRequiredService<VersionStep>(),
+            provider.GetRequiredService<AuditStep>(),
+            provider.GetRequiredService<PlanStep>(),
+            provider.GetRequiredService<ExtractStep>(),
+            provider.GetRequiredService<WriteStep>(),
+        ];
+
+        steps.Should().OnlyContain(step => step.IsIdempotent);
     }
 
     [Fact]
-    public void The_tool_appears_under_a_tab_with_a_read_only_description()
+    public void Both_tools_appear_each_under_its_own_tab()
     {
         using ServiceProvider provider = BuildProvider();
 
-        ITool tool = provider.GetRequiredService<ITool>();
+        IReadOnlyList<ITool> tools = [.. provider.GetServices<ITool>()];
 
-        tool.Id.Should().Be("varcompare");
-        tool.Tab.Should().Be("Azure DevOps");
-        tool.Description.Should().Contain("lecture seule");
+        ITool varCompare = tools.Single(tool => string.Equals(tool.Id, "varcompare", StringComparison.Ordinal));
+        ITool apiDelta = tools.Single(tool => string.Equals(tool.Id, "apidelta", StringComparison.Ordinal));
+
+        varCompare.Tab.Should().Be("Azure DevOps");
+        varCompare.Description.Should().Contain("lecture seule");
+        varCompare.RequiresServer.Should().BeTrue();
+
+        apiDelta.Tab.Should().Be("OpenAPI");
+        apiDelta.RequiresServer.Should().BeFalse(
+            "apidelta lit deux fichiers locaux et n'émet aucune requête");
+    }
+
+    [Fact]
+    public void Each_tool_has_the_checkpoint_factory_that_knows_its_runs()
+    {
+        // Le moteur d'étapes est partagé, les fabriques ne le sont pas : il choisit par l'identifiant de
+        // l'outil. Sans cela, la dernière enregistrée l'emporterait et la reprise du second outil
+        // cesserait de fonctionner sans que rien ne le dise.
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetServices<IRunCheckpointFactory>().Select(factory => factory.ToolId)
+            .Should().BeEquivalentTo("varcompare", "apidelta");
     }
 
     [Fact]
@@ -101,6 +165,13 @@ public sealed class CompositionRootTests
 
         redaction.IsForbidden(typeof(VariableEntry)).Should().BeTrue();
         redaction.IsForbidden(typeof(VariableGroupSnapshot)).Should().BeTrue();
+        redaction.IsForbidden(typeof(DevToolbox.Tools.ApiDelta.Core.Syntax.SpecNode)).Should().BeTrue();
+        redaction.IsForbidden(typeof(DevToolbox.Tools.ApiDelta.Core.Syntax.MappingEntry))
+            .Should().BeTrue();
+        redaction.IsForbidden(typeof(DevToolbox.Tools.ApiDelta.Core.Syntax.ResolvedScalar))
+            .Should().BeTrue();
+        redaction.IsForbidden(typeof(DevToolbox.Tools.ApiDelta.Core.Comparison.ValueSummary))
+            .Should().BeTrue("un résumé de valeur n'a rien à faire dans un journal");
         redaction.IsForbidden(typeof(string)).Should().BeFalse();
     }
 

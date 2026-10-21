@@ -50,4 +50,10 @@ internal static partial class Log
         Level = LogLevel.Information,
         Message = "Recovery for failed step {StepName}: developer chose {Choice}.")]
     internal static partial void RecoveryChosen(ILogger logger, string stepName, string choice);
+
+    [LoggerMessage(
+        EventId = 1010,
+        Level = LogLevel.Warning,
+        Message = "No checkpoint factory is registered for tool {ToolId}; the run is not resumable.")]
+    internal static partial void NoCheckpointFactory(ILogger logger, string toolId);
 }

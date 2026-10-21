@@ -94,8 +94,8 @@ public sealed class SelectGroupsStep : IToolStep
         ToolRunContext context,
         IReadOnlyList<VariableGroupSummary> available)
     {
-        IReadOnlyList<PersistedGroupSelection>? remembered =
-            context.Get<IReadOnlyList<PersistedGroupSelection>>(VarCompareContextKeys.ResumedSelection);
+        IReadOnlyList<RememberedGroup>? remembered =
+            context.Get<IReadOnlyList<RememberedGroup>>(VarCompareContextKeys.ResumedSelection);
 
         if (remembered is null || remembered.Count == 0)
         {
@@ -104,7 +104,7 @@ public sealed class SelectGroupsStep : IToolStep
 
         // Consommée une seule fois : une relance ultérieure doit redemander plutôt que de réutiliser en
         // silence une ancienne sélection.
-        context.Set(VarCompareContextKeys.ResumedSelection, Array.Empty<PersistedGroupSelection>());
+        context.Set(VarCompareContextKeys.ResumedSelection, Array.Empty<RememberedGroup>());
 
         // Le rapprochement est délégué, parce qu'écarter un groupe doit se dire et que dire est l'affaire de
         // la présentation.
