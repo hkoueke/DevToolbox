@@ -9,7 +9,7 @@ using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
 using DevToolbox.Tools.ApiDelta.Core.Metamodel;
 using DevToolbox.Tools.ApiDelta.Core.Reporting;
@@ -131,7 +131,7 @@ public sealed class ArtifactDeterminismTests : IDisposable
         // Le chemin que rien n'exerçait de bout en bout : choisir, énoncer, construire, vérifier, écrire.
         // Une production corrigée qui aurait changé une route non retenue se relit et se valide : seule
         // la vérification de l'étape la refuse, et seul cet essai l'exerce en vrai.
-        Harness harness = new(_root, "corrigé", RunMode.Correct, "candidate-additive.yaml");
+        Harness harness = new(_root, "corrigé", RunMode.Consolidate, "candidate-additive.yaml");
 
         ToolRun run = await harness.RunAsync();
 
@@ -143,7 +143,7 @@ public sealed class ArtifactDeterminismTests : IDisposable
                     .Where(step => step.FailureReason is not null)
                     .Select(step => step.Name + " : " + step.FailureReason)));
 
-        string path = Path.Combine(harness.Output, ArtifactNames.CorrectedDocument);
+        string path = Path.Combine(harness.Output, ArtifactNames.ConsolidatedDocument);
 
         File.Exists(path).Should().BeTrue("la production corrigée doit avoir été écrite");
 
@@ -164,7 +164,7 @@ public sealed class ArtifactDeterminismTests : IDisposable
     [Fact]
     public async Task A_correct_run_leaves_the_production_file_untouched()
     {
-        Harness harness = new(_root, "intact", RunMode.Correct, "candidate-additive.yaml");
+        Harness harness = new(_root, "intact", RunMode.Consolidate, "candidate-additive.yaml");
 
         string before = Convert.ToHexStringLower(
             System.Security.Cryptography.SHA256.HashData(
@@ -182,16 +182,16 @@ public sealed class ArtifactDeterminismTests : IDisposable
     [Fact]
     public async Task Two_correct_runs_with_the_same_selection_write_the_same_bytes()
     {
-        Harness first = new(_root, "premier-corrigé", RunMode.Correct, "candidate-additive.yaml");
-        Harness second = new(_root, "second-corrigé", RunMode.Correct, "candidate-additive.yaml");
+        Harness first = new(_root, "premier-corrigé", RunMode.Consolidate, "candidate-additive.yaml");
+        Harness second = new(_root, "second-corrigé", RunMode.Consolidate, "candidate-additive.yaml");
 
         await first.RunAsync();
         await second.RunAsync();
 
         string one = await File.ReadAllTextAsync(
-            Path.Combine(first.Output, ArtifactNames.CorrectedDocument));
+            Path.Combine(first.Output, ArtifactNames.ConsolidatedDocument));
         string other = await File.ReadAllTextAsync(
-            Path.Combine(second.Output, ArtifactNames.CorrectedDocument));
+            Path.Combine(second.Output, ArtifactNames.ConsolidatedDocument));
 
         other.Should().Be(one, "mêmes entrées et même sélection donnent les mêmes octets");
     }
@@ -248,7 +248,7 @@ public sealed class ArtifactDeterminismTests : IDisposable
         internal Harness(
             string root,
             string name = "unique",
-            RunMode mode = RunMode.Compare,
+            RunMode mode = RunMode.Consolidate,
             string candidateName = "candidate-breaking.yaml")
         {
             Output = Path.Combine(root, name, "artefacts");

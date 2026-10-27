@@ -10,8 +10,15 @@ public static class ArtifactNames
     /// <summary>Le rapport lisible de la comparaison.</summary>
     public const string DeltaReport = "openapi-delta-report.md";
 
-    /// <summary>La production corrigée.</summary>
-    public const string CorrectedDocument = "openapi-production.corrected.yaml";
+    /// <summary>
+    /// La production consolidée : votre production, plus ce que vous avez retenu du compagnon.
+    /// </summary>
+    /// <remarks>
+    /// Renommée le 2026-10-27, de « corrected » à « consolidated ». Un nom d'artefact est une surface
+    /// extérieure : une chaîne d'intégration qui cherchait l'ancien ne le trouvera plus, et c'est pour
+    /// cela que le changement est consigné dans la spécification plutôt que glissé.
+    /// </remarks>
+    public const string ConsolidatedDocument = "openapi-production.consolidated.yaml";
 
     /// <summary>Le rapport lisible par une machine.</summary>
     public const string DeltaJson = "openapi-delta.json";
@@ -28,9 +35,4 @@ public static class ArtifactNames
     /// <summary>Le manifeste des transformations appliquées.</summary>
     public const string Manifest = "openapi-optimization-manifest.yaml";
 
-    /// <summary>Le rapport lisible de l'extrait.</summary>
-    public const string ExtractReport = "openapi-extract-report.md";
-
-    /// <summary>L'extrait des opérations choisies.</summary>
-    public const string Extract = "openapi-extract.yaml";
 }

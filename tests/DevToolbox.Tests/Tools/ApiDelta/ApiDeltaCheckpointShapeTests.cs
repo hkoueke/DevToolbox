@@ -2,7 +2,7 @@ using System.Text.Json;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
 using DevToolbox.Tools.ApiDelta.Presentation;
 using FluentAssertions;
@@ -65,39 +65,13 @@ public sealed class ApiDeltaCheckpointShapeTests
         RunSelection? read = ApiDeltaCheckpointFactory.TryRead(checkpoint);
 
         read.Should().NotBeNull();
-        read.Mode.Should().Be(RunMode.Compare);
+        read.Mode.Should().Be(RunMode.Consolidate);
         read.ProductionPath.Should().EndWith("production.yaml");
         read.CandidatePath.Should().EndWith("new-api.json");
         read.OutputDirectory.Should().Be(Path.Combine("C:", "travail", "artefacts"));
 
         // L'empreinte revient abrégée, ce qui suffit : elle sert à confronter, pas à prouver.
         read.ProductionHash.Should().Be("3f9a7c21b0d4");
-    }
-
-    [Fact]
-    public void Chosen_operations_survive_a_round_trip()
-    {
-        ToolRunContext context = CreateContext();
-
-        context.Set(
-            ApiDeltaContextKeys.Selection,
-            Selection() with
-            {
-                Mode = RunMode.Extract,
-                CandidatePath = null,
-                CandidateHash = null,
-                SelectedOperations =
-                [
-                    new OperationSelector("/documents", HttpOperationMethod.Post),
-                    new OperationSelector("/documents/{id}", HttpOperationMethod.Get),
-                ],
-            });
-
-        PersistedRun checkpoint = Factory().TryCreate(context)!;
-        RunSelection? read = ApiDeltaCheckpointFactory.TryRead(checkpoint);
-
-        read!.SelectedOperations.Select(operation => operation.Display).Should().Equal(
-            "POST /documents", "GET /documents/{id}");
     }
 
     [Fact]
@@ -129,7 +103,7 @@ public sealed class ApiDeltaCheckpointShapeTests
 
     private static RunSelection Selection() =>
         new(
-            RunMode.Compare,
+            RunMode.Consolidate,
             Path.Combine("C:", "travail", "production.yaml"),
             "3f9a7c21b0d4e8f1a2b3c4d5e6f7a8b9",
             Path.Combine("C:", "travail", "artefacts"),

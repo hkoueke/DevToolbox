@@ -47,7 +47,7 @@ public sealed class ReadTargetStep : IToolStep
             .ReadAsync(selection.ProductionPath, DocumentRole.Production, selection.Limits, cancellationToken)
             .ConfigureAwait(false);
 
-        DiagnosticCollector.Add(context, result.Diagnostics);
+        DiagnosticCollector.Add(context, result.Diagnostics, selection.ProductionPath);
 
         if (!result.IsFaithful)
         {

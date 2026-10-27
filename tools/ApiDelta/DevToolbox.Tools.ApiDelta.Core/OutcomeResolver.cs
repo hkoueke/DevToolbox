@@ -39,7 +39,7 @@ public static class OutcomeResolver
             return OutcomeCode.InvalidUsage;
         }
 
-        if (run.Diagnostics.Any(diagnostic => diagnostic.IsBlocking))
+        if (run.Diagnostics.Any(diagnostic => diagnostic.IsBlocking && !OnCompanionOnly(run, diagnostic)))
         {
             return OutcomeCode.LoadFailure;
         }
@@ -85,4 +85,23 @@ public static class OutcomeResolver
     /// </summary>
     private static bool IsConfiguration(Diagnostic diagnostic) =>
         diagnostic.Code.StartsWith("CONFIG-", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Indique qu'un verdict ne porte que sur la structure du fichier compagnon.
+    /// </summary>
+    /// <remarks>
+    /// Un tel verdict n'est pas un échec de lecture : le fichier a été lu, et c'est sa structure qui est
+    /// imparfaite. Comme il n'est jamais publié, l'exécution peut aboutir et le document consolidé
+    /// répondre de lui-même par sa propre vérification. Annoncer « loadFailure » sur une exécution qui a
+    /// écrit un document vérifié apprend à ne plus lire le code d'issue.
+    /// <para>
+    /// La structure seulement. Un compagnon qui n'a pas pu être <em>analysé</em> porte un autre code, et
+    /// celui-là reste un échec de lecture — il n'y avait rien à comparer.
+    /// </para>
+    /// </remarks>
+    private static bool OnCompanionOnly(ApiDeltaRun run, Diagnostic diagnostic) =>
+        run.Candidate is { } companion
+        && diagnostic.Code is DiagnosticCodes.StructuralViolation
+            or DiagnosticCodes.UnresolvedReference
+        && string.Equals(diagnostic.Document, companion.Path, StringComparison.Ordinal);
 }

@@ -13,11 +13,11 @@ public static class ApiDeltaSelectionKinds
     /// <summary>Le mode de l'exécution.</summary>
     public const string Mode = "ce qui était fait";
 
-    /// <summary>Le fichier en service, par chemin, étiqueté de son empreinte.</summary>
-    public const string Production = "fichier en service";
+    /// <summary>Le fichier de production, par chemin, étiqueté de son empreinte.</summary>
+    public const string Production = "votre production";
 
-    /// <summary>Le nouveau fichier, par chemin, étiqueté de son empreinte.</summary>
-    public const string Candidate = "nouveau fichier";
+    /// <summary>Le fichier compagnon, par chemin, étiqueté de son empreinte.</summary>
+    public const string Candidate = "fichier compagnon";
 
     /// <summary>Le dossier où les rapports sont écrits.</summary>
     public const string Output = "dossier des rapports";
@@ -25,12 +25,12 @@ public static class ApiDeltaSelectionKinds
     /// <summary>Le jeu de règles désigné, s'il y en a un.</summary>
     public const string Ruleset = "règles";
 
-    /// <summary>Une route retenue pour l'extraction.</summary>
-    public const string Operation = "route";
-
-    /// <summary>Une route retenue pour entrer en production.</summary>
+    /// <summary>Une route retenue pour entrer dans la production consolidée.</summary>
     public const string CorrectedRoute = "route à ajouter";
 
-    /// <summary>Une différence retenue pour entrer en production.</summary>
+    /// <summary>Une différence retenue pour entrer dans la production consolidée.</summary>
     public const string CorrectedDifference = "différence à reporter";
+
+    /// <summary>Un appariement entre une opération du contrat de service et une route.</summary>
+    public const string Correspondence = "appariement";
 }

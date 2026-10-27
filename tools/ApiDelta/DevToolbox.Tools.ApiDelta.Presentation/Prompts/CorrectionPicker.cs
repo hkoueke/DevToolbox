@@ -2,7 +2,7 @@ using System.Globalization;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
@@ -57,7 +57,7 @@ public sealed class CorrectionPicker
 
         if (chosen.Count == 0)
         {
-            _console.MarkupLine("[yellow]Rien n'a été retenu : aucune production corrigée ne sera écrite.[/]");
+            _console.MarkupLine("[yellow]Rien n'a été retenu : aucune production consolidée ne sera écrite.[/]");
 
             return new CorrectionSelection();
         }
@@ -97,6 +97,8 @@ public sealed class CorrectionPicker
                 plan.Components.ToString(CultureInfo.InvariantCulture));
         }
 
+        Derived(plan);
+
         foreach (DeclinedCorrection declined in plan.Declined)
         {
             _console.MarkupLine(
@@ -114,10 +116,41 @@ public sealed class CorrectionPicker
         }
 
         _console.MarkupLine(
-            "La production ne sera [bold]pas[/] modifiée : un document distinct sera écrit à côté des "
-            + "rapports.");
+            "Votre fichier de production ne sera [bold]pas[/] modifié : un fichier consolidé distinct "
+            + "sera écrit à côté des rapports.");
 
-        return _console.Confirm("Écrire la production corrigée de ces éléments ?", defaultValue: false);
+        return _console.Confirm("Écrire la production consolidée de ces éléments ?", defaultValue: false);
+    }
+
+    /// <summary>
+    /// Ce qu'un candidat projeté ajoute à l'énoncé : les chemins déjà portés, et ce qui restera vide.
+    /// </summary>
+    /// <remarks>
+    /// Dit avant l'accord, et non en ouvrant le fichier. Un développeur qui apprend après coup que trois
+    /// endroits du document qu'il vient de faire écrire ne portent rien l'apprend trop tard pour
+    /// renoncer, et c'est le moment de renoncer qui compte.
+    /// </remarks>
+    private void Derived(CorrectionPlan plan)
+    {
+        foreach (PathCollision collision in plan.Collisions)
+        {
+            _console.MarkupLine(
+                CultureInfo.InvariantCulture,
+                "[yellow]Chemin déjà porté — {0}[/]",
+                Markup.Escape(collision.Display));
+        }
+
+        if (plan.Unfilled.Count == 0)
+        {
+            return;
+        }
+
+        _console.MarkupLine(
+            CultureInfo.InvariantCulture,
+            "[yellow]{0} endroit(s) resteront non remplis[/] : la projection n'y a rien porté, et "
+            + "l'outil refuse de les deviner. Chacun portera « {1} » disant ce qui manque.",
+            plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture),
+            Markup.Escape(UnfilledMarker.Member));
     }
 
     /// <summary>Dit ce que la comparaison a trouvé, et ce qui n'apporte rien.</summary>
@@ -202,7 +235,7 @@ public sealed class CorrectionPicker
         Markup.Escape(
             route.Selector.Display + " · " + difference.ChangeId + " · "
             + difference.Location.Display + " — " + Plain(difference.Impact) + ", "
-            + Plain(difference.Confidence));
+            + Plain(difference.Confidence) + route.Footing);
 
     private static string Effect(ChangeImpact impact) => impact switch
     {

@@ -48,7 +48,7 @@ public sealed class SplicingEmitter : ISplicingEmitter
         {
             return Result.Fail<ReadOnlyMemory<byte>>(
                 FailureReason.InvalidInput,
-                "La production corrigée est écrite en recopiant les octets de la production autour de ce "
+                "La production consolidée est écrite en recopiant les octets de la production autour de ce "
                     + "qui change, ce qui demande une production écrite en YAML. Une production en JSON "
                     + "devrait être reformatée en entier, et le changement demandé disparaîtrait dans la "
                     + "réécriture.");

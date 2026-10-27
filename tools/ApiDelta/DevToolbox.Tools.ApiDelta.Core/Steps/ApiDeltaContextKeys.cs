@@ -59,16 +59,16 @@ public static class ApiDeltaContextKeys
     /// <summary>Ce que le nettoyage rapporterait, chiffré et non appliqué.</summary>
     public const string Plan = "apidelta.plan";
 
-    /// <summary>Les dépendances fermées de ce que le correctif emporte.</summary>
+    /// <summary>Les dépendances fermées de ce que la production consolidée emporte.</summary>
     public const string DependencyClosure = "apidelta.closure";
 
     /// <summary>Ce qui serait inséré en production, énoncé avant toute écriture.</summary>
     public const string CorrectionPlan = "apidelta.correction.plan";
 
-    /// <summary>La production corrigée, telle qu'elle sera écrite.</summary>
-    public const string CorrectedDocument = "apidelta.correction.document";
+    /// <summary>La production consolidée, telle qu'elle sera écrite.</summary>
+    public const string ConsolidatedDocument = "apidelta.consolidation.document";
 
-    /// <summary>Ce que la vérification de la production corrigée a pu établir.</summary>
+    /// <summary>Ce que la vérification de la production consolidée a pu établir.</summary>
     public const string CorrectionVerification = "apidelta.correction.verification";
 
     /// <summary>Ce que l'application du plan a produit, et ce qu'elle a refusé de produire.</summary>
@@ -86,6 +86,38 @@ public static class ApiDeltaContextKeys
     /// elle sera spécifiée, ajoute une surface et non un sens.
     /// </remarks>
     public const string Outcome = "apidelta.outcome";
+
+    /// <summary>Le contrat WSDL lu, quand le candidat en est un.</summary>
+    public const string WsdlContract = "apidelta.wsdl.contract";
+
+    /// <summary>Ce que la projection du WSDL n'a pas pu porter.</summary>
+    public const string WsdlProjectionGaps = "apidelta.wsdl.gaps";
+
+    /// <summary>Le document synthétique projeté depuis le contrat de service.</summary>
+    public const string WsdlProjection = "apidelta.wsdl.projection";
+
+    /// <summary>Les routes que la production porte, et la version qu'elle annonce.</summary>
+    public const string ProductionRoutes = "apidelta.production.routes";
+
+    /// <summary>L'appariement que le développeur a déclaré dans un fichier.</summary>
+    public const string DeclaredCorrespondence = "apidelta.correspondence.declared";
+
+    /// <summary>L'appariement retenu, confirmé ou non.</summary>
+    public const string Correspondence = "apidelta.correspondence";
+
+    /// <summary>Ce que la production couvre du contrat de service.</summary>
+    public const string Coverage = "apidelta.coverage";
+
+    /// <summary>
+    /// Ce sur quoi une sélection faite contre un contrat de service repose.
+    /// </summary>
+    /// <remarks>
+    /// Les trois choses qu'elle rassemble vivent déjà sous leurs propres clés, et l'assemblage est tout
+    /// de même déposé : l'écran de sélection, le constructeur de correction et les rapports en ont besoin
+    /// ensemble, et chacun les ayant rassemblées à sa façon, ils auraient fini par ne plus répondre la
+    /// même chose.
+    /// </remarks>
+    public const string WsdlFooting = "apidelta.wsdl.footing";
 
     /// <summary>Les artefacts écrits.</summary>
     public const string Artifacts = "apidelta.artifacts";

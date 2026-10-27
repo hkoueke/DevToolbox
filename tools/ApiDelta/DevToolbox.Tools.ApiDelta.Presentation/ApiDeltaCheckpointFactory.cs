@@ -2,7 +2,8 @@ using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Correspondence;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation;
@@ -85,9 +86,6 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
                 ApiDeltaSelectionKinds.Ruleset, selection.RulesetPath, selection.RulesetPath));
         }
 
-        entries.AddRange(selection.SelectedOperations.Select(operation => new PersistedSelectionEntry(
-            ApiDeltaSelectionKinds.Operation, operation.Display, operation.Display)));
-
         if (selection.Correction is { } correction)
         {
             entries.AddRange(correction.Routes.Select(route => new PersistedSelectionEntry(
@@ -97,6 +95,17 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
                 ApiDeltaSelectionKinds.CorrectedDifference,
                 difference.Display,
                 difference.Display)));
+        }
+
+        if (selection.Correspondence is { IsConfirmed: true } correspondence)
+        {
+            // Seules les entrées confirmées sont retenues. Une proposition reconduite d'une séance à
+            // l'autre serait une correspondance que l'outil se serait donnée à lui-même, et reprendre
+            // relit : seule la décision du développeur survit.
+            entries.AddRange(correspondence.Comparable.Select(entry => new PersistedSelectionEntry(
+                ApiDeltaSelectionKinds.Correspondence,
+                entry.Operation + " → " + entry.Route,
+                entry.Operation + " → " + entry.Route)));
         }
 
         return entries;
@@ -134,17 +143,6 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
             return null;
         }
 
-        IReadOnlyList<OperationSelector> operations =
-        [
-            .. run.Selection
-                .Where(entry => string.Equals(
-                    entry.Kind, ApiDeltaSelectionKinds.Operation, StringComparison.Ordinal))
-                .Select(entry => OperationSelector.TryParse(entry.Key, out OperationSelector? selector)
-                    ? selector
-                    : null)
-                .OfType<OperationSelector>(),
-        ];
-
         IReadOnlyList<OperationSelector> corrected =
         [
             .. Of(run, ApiDeltaSelectionKinds.CorrectedRoute)
@@ -175,10 +173,46 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
             RulesetPath: Key(run, ApiDeltaSelectionKinds.Ruleset),
             Correction: corrected.Count > 0 || reported.Count > 0
                 ? new CorrectionSelection(corrected, reported)
-                : null)
+                : null,
+            Correspondence: Paired(run));
+    }
+
+    /// <summary>
+    /// L'appariement mémorisé, relu confirmé.
+    /// </summary>
+    /// <remarks>
+    /// Confirmé, parce que l'écriture ne retient que des entrées confirmées : les relire autrement
+    /// ferait reposer la question à un développeur qui y avait déjà répondu, ce qui est précisément ce
+    /// que la mémorisation existe pour éviter. Écrire sans relire était le trou — une mémorisation dont
+    /// personne ne se sert coûte le même code et ne rend aucun service.
+    /// <para>
+    /// La séparation est celle que l'écriture a posée : « opération → route ». Une entrée illisible est
+    /// écartée en silence plutôt que de faire échouer la reprise, car une reprise qui refuse vaut moins
+    /// qu'une reprise qui repose une question.
+    /// </para>
+    /// </remarks>
+    private static OperationCorrespondence? Paired(PersistedRun run)
+    {
+        List<CorrespondenceEntry> entries = [];
+
+        foreach (string key in Of(run, ApiDeltaSelectionKinds.Correspondence))
         {
-            SelectedOperations = operations,
-        };
+            int separator = key.IndexOf('→', StringComparison.Ordinal);
+
+            if (separator <= 0 || separator == key.Length - 1)
+            {
+                continue;
+            }
+
+            entries.Add(new CorrespondenceEntry(
+                key[..separator].Trim(),
+                key[(separator + 1)..].Trim(),
+                CorrespondenceOrigin.Confirmed));
+        }
+
+        return entries.Count > 0
+            ? new OperationCorrespondence(entries, IsConfirmed: true)
+            : null;
     }
 
     /// <summary>Les clés d'une sorte donnée, dans l'ordre où elles ont été écrites.</summary>

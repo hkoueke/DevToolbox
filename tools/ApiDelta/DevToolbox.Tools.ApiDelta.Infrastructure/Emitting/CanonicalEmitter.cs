@@ -16,7 +16,7 @@ namespace DevToolbox.Tools.ApiDelta.Infrastructure.Emitting;
 /// scalaire signifie, puis choisit l'écriture qui préserve ce sens.
 /// <para>
 /// À distinguer de l'émetteur fidèle, qui réassemble les octets d'origine : celui-ci produit une écriture
-/// neuve, ce qu'il faut pour un correctif ou une copie remise en forme, et ce qui explique qu'aucun
+/// neuve, ce qu'il faut pour un document engendré ou une copie remise en forme, et ce qui explique qu'aucun
 /// commentaire n'y survive.
 /// </para>
 /// </remarks>
@@ -175,7 +175,7 @@ public sealed class CanonicalEmitter : ISpecEmitter
     /// </summary>
     /// <remarks>
     /// L'ordre canonique trie par clé, ce qui donne un fichier qui ne bouge plus d'une exécution à
-    /// l'autre. Conserver l'ordre d'origine reste proposé, parce qu'un correctif relu par un humain gagne
+    /// l'autre. Conserver l'ordre d'origine reste proposé, parce qu'un document relu par un humain gagne
     /// à ressembler au document dont il provient.
     /// </remarks>
     private static IEnumerable<MappingEntry> Order(

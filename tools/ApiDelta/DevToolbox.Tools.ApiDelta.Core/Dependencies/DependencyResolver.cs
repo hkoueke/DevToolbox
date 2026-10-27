@@ -53,7 +53,7 @@ public sealed class DependencyResolver : IDependencyResolver
 
         // La fermeture part des objets que le correctif emporte, non des emplacements de différence. Un
         // champ modifié ne porte aucune référence ; l'opération qui le contient en porte, et c'est elle
-        // qui sera écrite. Partir du champ laisserait sortir un correctif aux références pendantes.
+        // qui sera écrite. Partir du champ laisserait sortir un document aux références pendantes.
         foreach (string carried in roots
             .Select(CarriedObject.Of)
             .OfType<string>()
@@ -92,7 +92,7 @@ public sealed class DependencyResolver : IDependencyResolver
     /// <remarks>
     /// Une opération ne voyage jamais seule : les champs du niveau de son chemin — « parameters »,
     /// « servers » — partent avec elle, parce qu'ils la gouvernent. Ils portent des références, et
-    /// l'omission de ce détail est précisément ce qui fait sortir un correctif dont un paramètre partagé
+    /// l'omission de ce détail est précisément ce qui fait sortir un document dont un paramètre partagé
     /// pend dans le vide.
     /// </remarks>
     private static void Push(SpecDocument candidate, string carried, Stack<SpecNode> pending)

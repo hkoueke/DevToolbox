@@ -204,7 +204,7 @@ public sealed class ApplicationTests : IDisposable
 
     private static RunSelection Applying(IReadOnlyList<string>? allowed = null) =>
         new(
-            RunMode.Optimize,
+            RunMode.Analyse,
             "production.yaml",
             string.Empty,
             "sortie",

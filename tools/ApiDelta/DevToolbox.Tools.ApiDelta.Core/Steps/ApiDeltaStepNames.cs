@@ -18,14 +18,20 @@ public static class ApiDeltaStepNames
     /// <summary>Choisir ce qu'il faut lire, et ce qu'il faut en faire.</summary>
     public const string Select = "Choix des fichiers";
 
-    /// <summary>Lire la description de production.</summary>
-    public const string ReadTarget = "Lecture du fichier en service";
+    /// <summary>Lire le fichier de production.</summary>
+    public const string ReadTarget = "Lecture de votre production";
 
-    /// <summary>Lire la description candidate.</summary>
-    public const string ReadSource = "Lecture du nouveau fichier";
+    /// <summary>Lire le fichier compagnon, quand c'est une description OpenAPI.</summary>
+    public const string ReadSource = "Lecture du fichier compagnon";
+
+    /// <summary>La lecture d'un contrat de service WSDL, par chemin ou par adresse.</summary>
+    public const string ReadWsdl = "Lecture du contrat de service";
+
+    /// <summary>L'appariement des opérations du contrat avec les routes de la production.</summary>
+    public const string Correspond = "Appariement des opérations";
 
     /// <summary>Valider la structure et résoudre les références.</summary>
-    public const string Validate = "Vérification des deux fichiers";
+    public const string Validate = "Vérification des fichiers";
 
     /// <summary>Comparer les deux descriptions.</summary>
     public const string Compare = "Comparaison";
@@ -39,11 +45,8 @@ public static class ApiDeltaStepNames
     /// <summary>Établir ce que le nettoyage rapporterait.</summary>
     public const string Plan = "Chiffrage du nettoyage";
 
-    /// <summary>Construire l'extrait des opérations choisies.</summary>
-    public const string Extract = "Extraction";
-
-    /// <summary>Choisir ce qui entre en production, et le construire.</summary>
-    public const string Correct = "Ce qui entre en production";
+    /// <summary>Choisir ce qui entre dans la production consolidée, et la construire.</summary>
+    public const string Correct = "Ce qui entre dans la production consolidée";
 
     /// <summary>Écrire les artefacts.</summary>
     public const string Write = "Écriture des rapports";
@@ -51,8 +54,8 @@ public static class ApiDeltaStepNames
     /// <summary>Toutes les étapes, dans l'ordre d'exécution.</summary>
     public static IReadOnlyList<string> InOrder { get; } =
     [
-        Select, ReadTarget, ReadSource, Validate, Compare, Version, Audit, Plan, Extract, Correct,
-        Write,
+        Select, ReadTarget, ReadWsdl, ReadSource, Correspond, Validate, Compare, Version, Audit, Plan,
+        Correct, Write,
     ];
 
     /// <summary>Indique si un mode traverse une étape.</summary>
@@ -65,13 +68,13 @@ public static class ApiDeltaStepNames
 
         return step switch
         {
-            ReadSource or Compare => mode is RunMode.Compare or RunMode.Correct or RunMode.Everything,
+            // Tout ce qui demande un fichier compagnon : sa lecture, son appariement s'il est un
+            // contrat de service, la comparaison, la version à publier, et ce qui entre dans la
+            // production consolidée.
+            ReadWsdl or ReadSource or Correspond or Compare or Version or Correct =>
+                mode is RunMode.Consolidate,
 
-            // La version ne bouge pas pour une extraction : un extrait est une vue, pas un changement.
-            Version => mode is RunMode.Compare or RunMode.Correct or RunMode.Everything,
-            Audit or Plan => mode is RunMode.Audit or RunMode.Optimize or RunMode.Everything,
-            Extract => mode is RunMode.Extract,
-            Correct => mode is RunMode.Correct or RunMode.Everything,
+            Audit or Plan => mode is RunMode.Analyse,
             _ => true,
         };
     }

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Types partagés du corpus. Importé par catalogue-types.xsd, et par lui seul : c'est le troisième
+     document du graphe ordinaire, celui qu'on déplace pour éprouver le refus de lire à moitié. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://entreprise.local/commun"
+           xmlns:c="http://entreprise.local/commun"
+           elementFormDefault="qualified">
+
+  <!-- Facettes : longueur et motif. La projection les porte telles quelles. -->
+  <xs:simpleType name="Identifiant">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="36"/>
+      <xs:pattern value="[0-9a-fA-F-]{36}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Énumération : portée vers enum. -->
+  <xs:simpleType name="Etat">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="brouillon"/>
+      <xs:enumeration value="publie"/>
+      <xs:enumeration value="archive"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Bornes numériques : portées vers minimum et maximum. -->
+  <xs:simpleType name="Priorite">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="9"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Type grégorien : aucun équivalent typé en JSON Schema, donc porté approximativement. -->
+  <xs:simpleType name="Trimestre">
+    <xs:restriction base="xs:gYearMonth"/>
+  </xs:simpleType>
+
+  <xs:complexType name="Erreur">
+    <xs:sequence>
+      <xs:element name="code" type="xs:string"/>
+      <xs:element name="message" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

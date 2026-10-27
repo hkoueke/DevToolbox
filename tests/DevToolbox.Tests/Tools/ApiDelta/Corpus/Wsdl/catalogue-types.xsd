@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les types du catalogue. Importe commun.xsd, et porte exprès de quoi éprouver chaque sorte de ligne de
+     la table de projection : ce qui se porte, ce qui ne se porte qu'approximativement, et ce qui ne se
+     porte pas du tout. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://entreprise.local/catalogue/types"
+           xmlns:t="http://entreprise.local/catalogue/types"
+           xmlns:c="http://entreprise.local/commun"
+           elementFormDefault="qualified">
+
+  <xs:import namespace="http://entreprise.local/commun" schemaLocation="commun.xsd"/>
+
+  <!-- Séquence, minOccurs=0, maxOccurs, facettes, nillable : tout cela se porte. -->
+  <xs:complexType name="Document">
+    <xs:sequence>
+      <xs:element name="id" type="c:Identifiant"/>
+      <xs:element name="titre" type="xs:string"/>
+      <xs:element name="etat" type="c:Etat"/>
+      <xs:element name="priorite" type="c:Priorite" minOccurs="0"/>
+      <xs:element name="resume" type="xs:string" minOccurs="0" nillable="true"/>
+      <xs:element name="motsCles" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="depose" type="xs:dateTime"/>
+      <xs:element name="trimestre" type="c:Trimestre" minOccurs="0"/>
+      <!-- Cycle légal : un document appartient à un dossier qui contient des documents. -->
+      <xs:element name="dossier" type="t:Dossier" minOccurs="0"/>
+    </xs:sequence>
+    <!-- Aucun équivalent en OpenAPI : la plus grosse source de trous en pratique. -->
+    <xs:attribute name="version" type="xs:int"/>
+    <xs:attribute name="verrouille" type="xs:boolean"/>
+  </xs:complexType>
+
+  <xs:complexType name="Dossier">
+    <xs:sequence>
+      <xs:element name="id" type="c:Identifiant"/>
+      <xs:element name="libelle" type="xs:string"/>
+      <xs:element name="documents" type="t:Document" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="parent" type="t:Dossier" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Dérivation par extension : portée approximativement, vers allOf. -->
+  <xs:complexType name="DocumentDetaille">
+    <xs:complexContent>
+      <xs:extension base="t:Document">
+        <xs:sequence>
+          <xs:element name="auteur" type="xs:string"/>
+          <xs:element name="revisions" type="xs:int"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- Choix : porté approximativement, vers oneOf. -->
+  <xs:complexType name="Critere">
+    <xs:choice>
+      <xs:element name="parId" type="c:Identifiant"/>
+      <xs:element name="parTitre" type="xs:string"/>
+      <xs:element name="parEtat" type="c:Etat"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- xs:all : les membres d'un objet JSON ne sont pas ordonnés, donc porté exactement. -->
+  <xs:complexType name="Pagination">
+    <xs:all>
+      <xs:element name="page" type="xs:int"/>
+      <xs:element name="taille" type="xs:int"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- Groupe de substitution à tête abstraite : aucun équivalent. -->
+  <xs:element name="piece" type="t:Document" abstract="true"/>
+  <xs:element name="pieceJointe" type="t:Document" substitutionGroup="t:piece"/>
+  <xs:element name="pieceSignee" type="t:DocumentDetaille" substitutionGroup="t:piece"/>
+
+  <!-- Les éléments de message. -->
+  <xs:element name="deposerDocumentRequete" type="t:DocumentDetaille"/>
+  <xs:element name="deposerDocumentReponse" type="c:Identifiant"/>
+  <xs:element name="lireDocumentRequete" type="t:Critere"/>
+  <xs:element name="lireDocumentReponse" type="t:DocumentDetaille"/>
+  <xs:element name="archiverDocumentAvis" type="c:Identifiant"/>
+  <xs:element name="dossierModifieAvis" type="t:Dossier"/>
+  <xs:element name="interrogerDossierDemande" type="t:Pagination"/>
+  <xs:element name="interrogerDossierReponse" type="t:Dossier"/>
+  <xs:element name="erreur" type="c:Erreur"/>
+</xs:schema>

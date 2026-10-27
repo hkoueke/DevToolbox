@@ -181,22 +181,39 @@ public sealed class LayeringTests
     }
 
     [Fact]
-    public void ApiDelta_makes_no_outbound_call()
+    public void ApiDelta_confines_its_only_outbound_call_to_one_namespace()
     {
-        // apidelta lit deux fichiers locaux. L'absence de client HTTP dans ses trois assemblages est la
-        // forme structurelle de cette promesse : il n'y a pas de discipline à tenir.
-        foreach (Assembly assembly in new[]
+        // La règle était « aucun appel sortant » tant qu'apidelta ne lisait que des fichiers locaux. Elle
+        // s'est resserrée plutôt que lever : récupérer un contrat par son adresse est désormais prévu,
+        // mais reste le seul appel sortant de l'outil, et il vit dans un seul espace de noms. Le cœur et
+        // la présentation n'y touchent pas, si bien qu'aucune règle de récupération ne peut être
+        // contournée en appelant depuis ailleurs.
+        foreach (Assembly assembly in new[] { ApiDeltaCoreAssembly, ApiDeltaPresentationAssembly })
         {
-            ApiDeltaCoreAssembly, ApiDeltaInfrastructureAssembly, ApiDeltaPresentationAssembly,
-        })
-        {
-            TestResult result = Types.InAssembly(assembly)
+            AssertSatisfied(Types.InAssembly(assembly)
                 .ShouldNot()
                 .HaveDependencyOn("System.Net.Http")
-                .GetResult();
-
-            AssertSatisfied(result);
+                .GetResult());
         }
+
+        AssertSatisfied(Types.InAssembly(ApiDeltaInfrastructureAssembly)
+            .That()
+            .DoNotResideInNamespace("DevToolbox.Tools.ApiDelta.Infrastructure.Http")
+            .ShouldNot()
+            .HaveDependencyOn("System.Net.Http")
+            .GetResult());
+    }
+
+    [Fact]
+    public void ApiDelta_never_writes_over_http()
+    {
+        // Les méthodes d'écriture HTTP sont déjà bannies partout par RS0030. Cet essai dit la raison :
+        // récupérer un contrat est une lecture, et un outil qui saurait écrire vers un service pourrait
+        // le modifier — ce qu'aucune de ses promesses n'autorise.
+        AssertSatisfied(Types.InAssembly(ApiDeltaInfrastructureAssembly)
+            .ShouldNot()
+            .HaveDependencyOn("System.Net.Http.Json")
+            .GetResult());
     }
 
     private static void AssertSatisfied(TestResult result)

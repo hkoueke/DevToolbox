@@ -8,18 +8,18 @@ using DevToolbox.Tools.ApiDelta.Core.Syntax;
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
 /// <summary>
-/// Établit que la production corrigée dit ce qu'on lui a demandé, et rien de plus.
+/// Établit que la production consolidée dit ce qu'on lui a demandé, et rien de plus.
 /// </summary>
 /// <remarks>
 /// Les deux épreuves qui comptent vont par paire. Établir que rien d'autre n'a bougé, sans établir que ce
 /// qui devait bouger a bougé, laisserait passer une correction qui n'aurait rien fait ; l'inverse
 /// laisserait passer une correction qui aurait fait autre chose en plus. Prises ensemble, elles disent que
 /// le diff qu'un développeur lira est exactement la sélection qu'il a faite — et c'est la seule promesse
-/// qui rend une production corrigée relisable.
+/// qui rend une production consolidée relisable.
 /// </remarks>
 public sealed class CorrectionVerifier : ICorrectionVerifier
 {
-    private const string Name = "production corrigée";
+    private const string Name = "production consolidée";
     private const string VersionPointer = "/info/version";
 
     private readonly ISpecReader _reader;
@@ -79,7 +79,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
             : Compare(corrected, production, built);
     }
 
-    /// <summary>Confronte la production corrigée à la production, point par point.</summary>
+    /// <summary>Confronte la production consolidée à la production, point par point.</summary>
     private static CorrectionVerification Compare(
         SpecDocument corrected,
         SpecDocument production,
@@ -156,7 +156,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
 
             if (here is null)
             {
-                drifted.Add(node.Location.Display + " a disparu de la production corrigée");
+                drifted.Add(node.Location.Display + " a disparu de la production consolidée");
 
                 return;
             }
@@ -185,7 +185,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
 
             if (here is null)
             {
-                missing.Add(target.Display + " n'est pas dans la production corrigée");
+                missing.Add(target.Display + " n'est pas dans la production consolidée");
 
                 continue;
             }
@@ -201,7 +201,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         return missing;
     }
 
-    /// <summary>Les éléments neufs qui ne disent pas d'où ils viennent.</summary>
+    /// <summary>Les éléments neufs qui ne disent pas d'où ils viennent, ou ce qu'ils ne portent pas.</summary>
     private static List<string> Unmarked(SpecDocument corrected, BuiltCorrection built)
     {
         List<string> unmarked = [];
@@ -218,7 +218,61 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
             unmarked.Add(target.Display + " ne porte pas sa trace d'origine");
         }
 
+        unmarked.AddRange(Unannounced(corrected, built.Plan));
+
         return unmarked;
+    }
+
+    /// <summary>
+    /// Les endroits que le plan annonçait non remplis et que le document ne dit pas tels.
+    /// </summary>
+    /// <remarks>
+    /// Un marqueur de non-remplissage est <em>attendu</em> dans un document dérivé d'un contrat de
+    /// service, et ne doit jamais être lu comme un changement qui manque : l'endroit qu'il occupe est
+    /// précisément celui où la projection n'avait rien à porter, et exiger qu'il ait changé reviendrait à
+    /// exiger un schéma que l'outil a refusé de deviner. L'épreuve va donc dans l'autre sens — elle
+    /// établit que chaque endroit annoncé porte bien son marqueur, et que le nombre déclaré au niveau du
+    /// document est celui des marqueurs posés.
+    /// <para>
+    /// Le nombre est vérifié parce qu'il est la seule chose qu'un lecteur peut recouper sans relire le
+    /// document en entier. Un compte faux serait pire qu'absent : il laisserait croire qu'on a fini de
+    /// chercher.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<string> Unannounced(SpecDocument corrected, CorrectionPlan plan)
+    {
+        if (plan.Unfilled.Count == 0)
+        {
+            yield break;
+        }
+
+        foreach (IGrouping<SpecPointer, UnfilledMarker> at in plan.Unfilled.GroupBy(
+            marker => marker.Target))
+        {
+            SpecPointer member = at.Key.Child(UnfilledMarker.Member);
+
+            if (PointerNavigator.Find(corrected.Root, member.Json) is not SequenceNode posted)
+            {
+                yield return at.Key.Display
+                    + " devait dire ce que la projection n'y a pas porté, et ne le dit pas";
+            }
+            else if (posted.Items.Count != at.Count())
+            {
+                yield return at.Key.Display + " ne porte pas tous ses endroits non remplis";
+            }
+        }
+
+        SpecPointer declared = SpecPointer.Root.Child(CorrectionBuilder.Declaration)
+            .Child(UnfilledMarker.Count);
+
+        if (PointerNavigator.Find(corrected.Root, declared.Json) is not ScalarNode count
+            || !string.Equals(
+                count.Text,
+                plan.Unfilled.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StringComparison.Ordinal))
+        {
+            yield return "le document ne déclare pas le nombre exact d'endroits non remplis qu'il porte";
+        }
     }
 
     /// <summary>Indique qu'un emplacement est, ou est sous, un emplacement autorisé à changer.</summary>

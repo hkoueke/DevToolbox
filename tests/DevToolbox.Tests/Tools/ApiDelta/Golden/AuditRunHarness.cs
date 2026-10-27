@@ -58,7 +58,7 @@ internal sealed class AuditRunHarness
 
         _prompt.AskForSelection(Arg.Any<RunSelection?>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(new RunSelection(
-                apply ? RunMode.Optimize : RunMode.Audit,
+                RunMode.Analyse,
                 ProductionPath,
                 string.Empty,
                 Output,

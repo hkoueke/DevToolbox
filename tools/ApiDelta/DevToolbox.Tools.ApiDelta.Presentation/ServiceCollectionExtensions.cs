@@ -11,10 +11,12 @@ using DevToolbox.Tools.ApiDelta.Core.Fingerprinting;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
 using DevToolbox.Tools.ApiDelta.Core.Reporting;
 using DevToolbox.Tools.ApiDelta.Core.Metamodel;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
 using DevToolbox.Tools.ApiDelta.Core.Optimization.Rules;
 using DevToolbox.Tools.ApiDelta.Core.Versioning;
+using DevToolbox.Tools.ApiDelta.Core.Projection;
+using DevToolbox.Tools.ApiDelta.Core.Correspondence;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
 using DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 using DevToolbox.Tools.ApiDelta.Presentation.Rendering;
@@ -52,20 +54,19 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContractEquivalenceVerifier, ContractEquivalenceVerifier>();
         services.AddSingleton<IOptimizationApplier, OptimizationApplier>();
         services.AddSingleton<IOperationCatalog, OperationCatalog>();
-        services.AddSingleton<IExtractBuilder, ExtractBuilder>();
-        services.AddSingleton<IExtractVerifier, ExtractVerifier>();
         services.AddSingleton<IDocumentComparer, DocumentComparer>();
         services.AddSingleton<IVersionPolicy, VersionRecommender>();
         services.AddSingleton<IDependencyResolver, DependencyResolver>();
         services.AddSingleton<IApiDeltaPrompt, ApiDeltaPrompt>();
+        services.AddSingleton<IWsdlProjector, Projector>();
+        services.AddSingleton<ICorrespondenceProposer, SimilarityProposer>();
+        services.AddSingleton<CorrespondencePicker>();
+        services.AddSingleton<ICorrespondencePrompt, CorrespondenceSelectionPrompt>();
         services.AddSingleton<SelectionSummaryRenderer>();
         services.AddSingleton<DiagnosticsView>();
         services.AddSingleton<ComparisonView>();
         services.AddSingleton<FindingsView>();
         services.AddSingleton<ProposalsView>();
-        services.AddSingleton<ExtractView>();
-        services.AddSingleton<OperationPicker>();
-        services.AddSingleton<IOperationSelectionPrompt, OperationSelectionPrompt>();
         services.AddSingleton<ApiDeltaResumeCoordinator>();
 
         services.AddSingleton<IRunCheckpointFactory, ApiDeltaCheckpointFactory>();
@@ -74,22 +75,7 @@ public static class ServiceCollectionExtensions
         AddAuditRules(services);
         AddOptimizationRules(services);
 
-        // Les étapes écrites à ce jour, enregistrées par leur type concret puis assemblées dans l'ordre
-        // pour cet outil seul : sous IToolStep, elles tomberaient dans une collection commune à toute la
-        // boîte à outils, où chaque outil recevrait les étapes des autres. Les étapes suivantes
-        // rejoindront cette liste avec la tranche qui les implémente — une exécution ne doit jamais
-        // comporter une étape qui ne fait rien, car l'affichage la donnerait pour accomplie.
-        services.AddSingleton<SelectStep>();
-        services.AddSingleton<ReadTargetStep>();
-        services.AddSingleton<ReadSourceStep>();
-        services.AddSingleton<ValidateStep>();
-        services.AddSingleton<CompareStep>();
-        services.AddSingleton<VersionStep>();
-        services.AddSingleton<AuditStep>();
-        services.AddSingleton<PlanStep>();
-        services.AddSingleton<ExtractStep>();
-        services.AddSingleton<CorrectStep>();
-        services.AddSingleton<WriteStep>();
+        AddSteps(services);
 
         services.AddSingleton<ITool>(CreateTool);
 
@@ -98,7 +84,7 @@ public static class ServiceCollectionExtensions
 
 
     /// <summary>
-    /// Enregistre ce qui écrit la production corrigée.
+    /// Enregistre ce qui écrit la production consolidée.
     /// </summary>
     /// <remarks>
     /// Groupés, comme les règles le sont déjà : la méthode d'enregistrement a une longueur bornée, et un
@@ -187,19 +173,57 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>Assemble l'outil avec ses étapes, dans l'ordre d'exécution.</summary>
+    /// <summary>Déclare chaque étape par son type concret.</summary>
+    private static void AddSteps(IServiceCollection services)
+    {
+        // Les étapes écrites à ce jour, enregistrées par leur type concret puis assemblées dans l'ordre
+        // pour cet outil seul : sous IToolStep, elles tomberaient dans une collection commune à toute la
+        // boîte à outils, où chaque outil recevrait les étapes des autres. Les étapes suivantes
+        // rejoindront cette liste avec la tranche qui les implémente — une exécution ne doit jamais
+        // comporter une étape qui ne fait rien, car l'affichage la donnerait pour accomplie.
+        services.AddSingleton<SelectStep>();
+        services.AddSingleton<ReadTargetStep>();
+        services.AddSingleton<ReadSourceStep>();
+
+        // Enregistrée, mais pas encore dans le fil ci-dessous, et pour la raison écrite juste au-dessus :
+        // une exécution ne doit pas comporter une étape qui ne fait rien. Tant que la projection d'un
+        // contrat de service vers des routes n'existe pas, lire un WSDL ne produirait rien dont la suite
+        // puisse se servir, et l'affichage annoncerait pourtant « Lecture du contrat de service »
+        // accomplie sur chaque séance OpenAPI. Elle rejoindra la liste avec la tranche qui la consomme.
+        services.AddSingleton<ReadWsdlStep>();
+
+        // Même raison que ci-dessus, et le même rendez-vous : l'appariement ne produit rien tant que la
+        // sélection des routes à insérer ne le consomme pas. Les deux étapes entrent dans le fil
+        // ensemble, avec la tranche qui s'en sert.
+        services.AddSingleton<CorrespondStep>();
+        services.AddSingleton<ValidateStep>();
+        services.AddSingleton<CompareStep>();
+        services.AddSingleton<VersionStep>();
+        services.AddSingleton<AuditStep>();
+        services.AddSingleton<PlanStep>();
+        services.AddSingleton<CorrectStep>();
+        services.AddSingleton<WriteStep>();
+    }
+
     private static ApiDeltaTool CreateTool(IServiceProvider provider) =>
         new(
             provider.GetRequiredService<IStepRunner>(),
             [
                 provider.GetRequiredService<SelectStep>(),
                 provider.GetRequiredService<ReadTargetStep>(),
+
+                // La lecture du contrat de service précède celle du compagnon OpenAPI : c'est elle qui
+                // reconnaît un WSDL à son contenu, et la lecture OpenAPI ne fait rien si le compagnon en
+                // est un. L'appariement suit, parce que c'est lui qui projette le contrat dans la forme
+                // que la comparaison sait lire — rien ne se compare avant qu'il soit confirmé.
+                provider.GetRequiredService<ReadWsdlStep>(),
                 provider.GetRequiredService<ReadSourceStep>(),
+                provider.GetRequiredService<CorrespondStep>(),
                 provider.GetRequiredService<ValidateStep>(),
                 provider.GetRequiredService<CompareStep>(),
                 provider.GetRequiredService<VersionStep>(),
                 provider.GetRequiredService<AuditStep>(),
                 provider.GetRequiredService<PlanStep>(),
-                provider.GetRequiredService<ExtractStep>(),
                 provider.GetRequiredService<CorrectStep>(),
                 provider.GetRequiredService<WriteStep>(),
             ],
@@ -209,7 +233,6 @@ public static class ServiceCollectionExtensions
             provider.GetRequiredService<ComparisonView>(),
             provider.GetRequiredService<FindingsView>(),
             provider.GetRequiredService<ProposalsView>(),
-            provider.GetRequiredService<ExtractView>(),
             provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<Spectre.Console.IAnsiConsole>());
 }

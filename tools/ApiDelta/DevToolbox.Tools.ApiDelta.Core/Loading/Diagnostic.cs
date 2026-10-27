@@ -12,13 +12,23 @@ namespace DevToolbox.Tools.ApiDelta.Core.Loading;
 /// Les autres emplacements qui comptent : les deux moitiés d'une clé en double, chacun des usages d'une
 /// référence non résolue. Nommer un seul emplacement obligerait le lecteur à chercher les autres.
 /// </param>
+/// <param name="Document">
+/// Le fichier dont il est question, quand celui qui consigne le sait.
+/// </param>
+/// <remarks>
+/// Le fichier fait partie du diagnostic, et ce n'est pas un ornement. Il manquait : l'écran rangeait
+/// toutes les plaintes sous un seul en-tête, celui de la production, si bien qu'une plainte portant sur
+/// le fichier compagnon envoyait chercher dans un fichier parfaitement sain. C'est arrivé — « le champ
+/// 'title' est requis » affiché sous le nom d'une production qui avait un titre.
+/// </remarks>
 public sealed record Diagnostic(
     string Code,
     DiagnosticSeverity Severity,
     string Message,
     SpecPointer? Location = null,
     SourcePosition? Position = null,
-    IReadOnlyList<SourcePosition>? Related = null)
+    IReadOnlyList<SourcePosition>? Related = null,
+    string? Document = null)
 {
     /// <summary>Les autres emplacements qui comptent, jamais nuls à la lecture.</summary>
     public IReadOnlyList<SourcePosition> Related { get; init; } = Related ?? [];

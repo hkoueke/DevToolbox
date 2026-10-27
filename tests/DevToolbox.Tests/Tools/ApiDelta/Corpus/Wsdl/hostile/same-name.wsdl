@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Deux schémas nommés types.xsd dans deux dossiers. Lus depuis le disque c'est banal ; matérialisés
+     depuis une URL, ils ne peuvent pas cohabiter sous ce nom, et le second écraserait le premier en
+     silence. C'est le défaut que WR-012 existe pour empêcher. -->
+<wsdl:definitions name="Homonymes"
+    targetNamespace="http://entreprise.local/homonymes/wsdl"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <wsdl:types>
+    <xs:schema targetNamespace="http://entreprise.local/homonymes/wsdl">
+      <xs:import namespace="http://entreprise.local/homonymes/a" schemaLocation="same-name/a/types.xsd"/>
+      <xs:import namespace="http://entreprise.local/homonymes/b" schemaLocation="same-name/b/types.xsd"/>
+    </xs:schema>
+  </wsdl:types>
+</wsdl:definitions>

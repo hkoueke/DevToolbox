@@ -12,22 +12,32 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 /// <remarks>
 /// Les questions sont posées dans les mots de celui qui a deux fichiers OpenAPI sous la main, non dans
 /// ceux de la spécification. « Description de production » et « description candidate » sont justes et ne
-/// disent rien à personne : ce qu'on a devant soi, c'est le fichier en service et le nouveau.
+/// disent rien à personne : ce qu'on a devant soi, c'est le fichier de production et le nouveau.
 /// <para>
-/// Le fichier en service est demandé avant le mode, et le mode décide si le nouveau est demandé du tout :
+/// Le fichier de production est demandé avant le mode, et le mode décide si le nouveau est demandé du tout :
 /// un examen n'a qu'un fichier, et poser la question pour l'ignorer ensuite serait une cérémonie.
 /// </para>
 /// </remarks>
 public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 {
+    /// <summary>
+    /// Les deux choses qu'on vient faire ici, dites du point de vue de qui les demande.
+    /// </summary>
+    /// <remarks>
+    /// Deux entrées, et leurs libellés nomment le résultat attendu plutôt que le travail de l'outil :
+    /// « vous recevez un fichier de production consolidé » se décide, « comparer deux fichiers » se
+    /// traduit d'abord. Il y en avait six, découpées selon les étapes du code — comparer, corriger,
+    /// examiner, chiffrer, extraire, tout faire — et le développeur devait savoir laquelle enveloppait
+    /// laquelle pour choisir.
+    /// </remarks>
     private static readonly (RunMode Mode, string Label)[] Modes =
     [
-        (RunMode.Compare, "Comparer deux fichiers : qu'est-ce que le nouveau change ?"),
-        (RunMode.Correct, "Comparer, puis écrire le fichier de production avec les routes choisies"),
-        (RunMode.Audit, "Examiner un seul fichier : erreurs, oublis, répétitions"),
-        (RunMode.Optimize, "Chiffrer ce qu'un nettoyage ferait gagner, sans rien modifier"),
-        (RunMode.Extract, "Sortir une ou plusieurs routes dans un fichier à part"),
-        (RunMode.Everything, "Tout faire : comparer, examiner et chiffrer le nettoyage"),
+        (RunMode.Consolidate,
+            "Consolider ma production avec un autre fichier — je donne les deux, je reçois ma "
+            + "production avec ce que j'ai retenu dedans"),
+        (RunMode.Analyse,
+            "Analyser un fichier en vue d'un nettoyage — je donne un fichier, je reçois ce qu'il a "
+            + "accumulé et ce qu'un nettoyage lui gagnerait"),
     ];
 
     /// <summary>
@@ -77,8 +87,13 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
             return Result.Fail<RunSelection>(FailureReason.Cancelled, "L'exécution a été annulée.");
         }
 
+        // Le mode d'abord, parce qu'il décide ce qu'on demande ensuite. L'ordre inverse réclamait un
+        // fichier compagnon pour l'ignorer après, ou réclamait un fichier de production sans dire pour
+        // quoi faire — et c'est en demandant avant de savoir qu'on finit par demander pour rien.
+        RunMode mode = AskForMode();
+
         string production = AskForPath(
-            "Fichier OpenAPI (Swagger) [bold]actuellement en service[/], celui qui sert de référence");
+            "Votre fichier de [bold]production[/] : celui qui est en service aujourd'hui");
 
         if (string.IsNullOrWhiteSpace(production))
         {
@@ -86,21 +101,16 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 FailureReason.Cancelled, "Aucun fichier n'a été indiqué : il n'y a rien à faire.");
         }
 
-        RunMode mode = AskForMode();
+        Companion? asked = AskForCompanion(mode);
 
-        string? candidate = null;
-
-        if (mode is RunMode.Compare or RunMode.Correct or RunMode.Everything)
+        if (asked is not null && string.IsNullOrWhiteSpace(asked.Path))
         {
-            candidate = AskForPath("[bold]Nouveau[/] fichier OpenAPI, celui à comparer à l'actuel");
-
-            if (string.IsNullOrWhiteSpace(candidate))
-            {
-                return Result.Fail<RunSelection>(
-                    FailureReason.Cancelled,
-                    "Comparer demande deux fichiers, et le second n'a pas été indiqué.");
-            }
+            return Result.Fail<RunSelection>(
+                FailureReason.Cancelled,
+                "Consolider demande deux fichiers, et le compagnon n'a pas été indiqué.");
         }
+
+        string? candidate = asked?.Path;
 
         (string? ruleset, string? suppressions) = AskForConfiguration(production);
 
@@ -163,7 +173,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _console.MarkupLine(
-            "[yellow]Vous allez réécrire le fichier en service :[/] " + Markup.Escape(path));
+            "[yellow]Vous allez réécrire le fichier de production :[/] " + Markup.Escape(path));
 
         _console.MarkupLine(string.IsNullOrEmpty(backupPath)
             ? "[red]Aucune sauvegarde ne sera créée : vous l'avez refusée.[/]"
@@ -215,7 +225,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         if (File.Exists(candidate))
         {
             _console.MarkupLine(
-                "[grey]Un " + what + " se trouve à côté du fichier en service :[/] "
+                "[grey]Un " + what + " se trouve à côté du fichier de production :[/] "
                 + Markup.Escape(fileName));
 
             return _console.Prompt(
@@ -251,14 +261,14 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     /// </remarks>
     private RunSelection Intent(RunSelection selection)
     {
-        if (selection.Mode is not (RunMode.Optimize or RunMode.Everything))
+        if (selection.Mode is not RunMode.Analyse)
         {
             return selection;
         }
 
         if (!_console.Prompt(
                 new ConfirmationPrompt(
-                    "Appliquer à une copie ce qui est prouvé sûr, en plus de le chiffrer ?")
+                    "Appliquer à une copie ce qui est prouvé sûr, maintenant que vous savez ce que cela gagne ?")
                 { DefaultValue = false }))
         {
             return selection;
@@ -270,7 +280,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
             AllowedReviewRequiredRules = AskForAllowedRules(),
             InPlace = _console.Prompt(
                 new ConfirmationPrompt(
-                    "Réécrire le fichier en service lui-même, au lieu d'écrire une copie ?")
+                    "Réécrire le fichier de production lui-même, au lieu d'écrire une copie ?")
                 { DefaultValue = false }),
             Backup = _console.Prompt(
                 new ConfirmationPrompt("Créer une sauvegarde avant d'écrire ?")
@@ -300,7 +310,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         ];
     }
 
-    /// <summary>Indique si le dossier de sortie est hors de l'arborescence du fichier en service.</summary>
+    /// <summary>Indique si le dossier de sortie est hors de l'arborescence du fichier de production.</summary>
     private static bool Outside(string production, string output)
     {
         string reference = Path.GetFullPath(
@@ -313,7 +323,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     private bool ConfirmOutside(string output)
     {
         _console.MarkupLine(
-            "[yellow]Ce dossier est hors de l'arborescence du fichier en service :[/] "
+            "[yellow]Ce dossier est hors de l'arborescence du fichier de production :[/] "
             + Markup.Escape(Path.GetFullPath(output.Trim())));
 
         return _console.Prompt(
@@ -327,18 +337,34 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 + "[grey]chemin du fichier · laissez vide pour revenir au menu[/]")
                 .AllowEmpty());
 
+    /// <summary>
+    /// Demande le fichier compagnon, et seulement quand le mode en demande un.
+    /// </summary>
+    /// <param name="mode">Le mode choisi.</param>
+    /// <returns>Le chemin demandé, ou rien si ce mode n'en veut pas.</returns>
+    /// <remarks>
+    /// Rend un porteur plutôt qu'une chaîne, pour que « on n'a pas demandé » et « on a demandé et la
+    /// réponse est vide » ne soient pas le même <see langword="null"/> : le premier est le mode analyse,
+    /// le second est un renoncement, et les confondre annulerait une analyse parfaitement légitime.
+    /// </remarks>
+    private Companion? AskForCompanion(RunMode mode) => mode is RunMode.Consolidate
+        ? new Companion(AskForPath(
+            "Le fichier [bold]compagnon[/] : la description OpenAPI ou le contrat WSDL dont vous "
+            + "voulez reprendre quelque chose"))
+        : null;
+
     private RunMode AskForMode()
     {
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Que voulez-vous faire de ce fichier ?")
+                .Title("Que voulez-vous faire ?")
                 .AddChoices(Modes.Select(mode => mode.Label).ToArray()));
 
         return Modes.First(mode => string.Equals(mode.Label, chosen, StringComparison.Ordinal)).Mode;
     }
 
     /// <summary>
-    /// Demande où écrire, en proposant le dossier du fichier en service.
+    /// Demande où écrire, en proposant le dossier du fichier de production.
     /// </summary>
     /// <remarks>
     /// Ce dossier est la proposition parce que c'est là que le développeur regarde, mais il reste une
@@ -358,4 +384,8 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 .DefaultValue(suggestion)
                 .ShowDefaultValue());
     }
+
+    /// <summary>Le chemin du fichier compagnon, tel qu'il a été demandé.</summary>
+    /// <param name="Path">La réponse, éventuellement vide si le développeur a renoncé.</param>
+    private sealed record Companion(string Path);
 }

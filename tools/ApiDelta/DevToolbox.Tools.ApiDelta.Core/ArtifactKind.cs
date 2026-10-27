@@ -6,8 +6,8 @@ public enum ArtifactKind
     /// <summary>Le rapport lisible de la comparaison.</summary>
     DeltaReport,
 
-    /// <summary>La production corrigée : la production, plus ce que le développeur a retenu.</summary>
-    CorrectedDocument,
+    /// <summary>La production consolidée : la production, plus ce que le développeur a retenu.</summary>
+    ConsolidatedDocument,
 
     /// <summary>Le rapport lisible par une machine.</summary>
     DeltaJson,
@@ -24,6 +24,4 @@ public enum ArtifactKind
     /// <summary>Le manifeste des transformations appliquées.</summary>
     Manifest,
 
-    /// <summary>L'extrait : les opérations choisies, en description autonome.</summary>
-    Extract,
 }

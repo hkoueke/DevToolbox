@@ -12,4 +12,18 @@ public enum SpecFormat
 
     /// <summary>YAML.</summary>
     Yaml,
+
+    /// <summary>
+    /// Une description qui n'a jamais été écrite : projetée depuis un contrat d'un autre langage.
+    /// </summary>
+    /// <remarks>
+    /// Ses nœuds ne portent aucune étendue d'octets, parce qu'ils n'ont occupé aucun octet. L'émetteur
+    /// fidèle et l'épisseur lisent des étendues ; les pointer sur un document projeté produirait des
+    /// octets dénués de sens. La forme est nommée ici plutôt que déduite d'une convention, afin que
+    /// l'absence soit visible dans le type plutôt que découverte à l'usage.
+    /// <para>
+    /// Rien ne s'écrit sous cette forme : elle désigne une entrée de comparaison, jamais une sortie.
+    /// </para>
+    /// </remarks>
+    Projected,
 }

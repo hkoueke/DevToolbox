@@ -13,7 +13,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Steps;
 /// Examine la description de production, seule.
 /// </summary>
 /// <remarks>
-/// Seule, et c'est dans le sujet : l'audit ne compare rien. Il dit ce que le fichier en service a
+/// Seule, et c'est dans le sujet : l'audit ne compare rien. Il dit ce que le fichier de production a
 /// accumulé, et ce constat ne dépend d'aucun candidat — ce qui permet de l'exécuter quand il n'y en a pas.
 /// <para>
 /// Rejouable : parcourir un arbre déjà lu ne touche à rien et donne deux fois le même résultat.

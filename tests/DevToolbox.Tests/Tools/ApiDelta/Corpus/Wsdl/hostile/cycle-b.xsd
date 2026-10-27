@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://entreprise.local/cycle/b"
+           xmlns:a="http://entreprise.local/cycle/a"
+           xmlns:b="http://entreprise.local/cycle/b"
+           elementFormDefault="qualified">
+  <!-- Le retour : b réimporte a, ce qui boucle le graphe. -->
+  <xs:import namespace="http://entreprise.local/cycle/a" schemaLocation="cycle-a.xsd"/>
+  <xs:complexType name="Fils">
+    <xs:sequence>
+      <xs:element name="pere" type="a:Pere" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

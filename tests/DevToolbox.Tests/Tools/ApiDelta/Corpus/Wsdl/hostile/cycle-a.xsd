@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://entreprise.local/cycle/a"
+           xmlns:a="http://entreprise.local/cycle/a"
+           xmlns:b="http://entreprise.local/cycle/b"
+           elementFormDefault="qualified">
+  <xs:import namespace="http://entreprise.local/cycle/b" schemaLocation="cycle-b.xsd"/>
+  <xs:complexType name="Pere">
+    <xs:sequence>
+      <xs:element name="enfant" type="b:Fils" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

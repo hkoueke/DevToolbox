@@ -4,7 +4,7 @@ using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Metamodel;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Emitting;

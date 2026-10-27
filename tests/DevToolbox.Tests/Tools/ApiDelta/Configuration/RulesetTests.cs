@@ -205,9 +205,6 @@ public sealed class RulesetTests : IDisposable
             environmentPlaceholders:
               pattern: '\$\{(?<name>[a-z.]+)\}'
               known: [ maison.host ]
-            extract:
-              stampProvenance: false
-              defaultName: extrait.yaml
             """);
 
         ruleset.Limits.MaxBytes.Should().Be(1_048_576);
@@ -223,8 +220,6 @@ public sealed class RulesetTests : IDisposable
         ruleset.Naming.PathSegments.Should().Be(NamingStyle.Kebab);
         ruleset.Naming.Components.Should().Be(NamingStyle.Pascal);
         ruleset.KnownPlaceholders.Should().Equal("maison.host");
-        ruleset.Extract.StampProvenance.Should().BeFalse();
-        ruleset.Extract.DefaultName.Should().Be("extrait.yaml");
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Audit;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Loading;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
@@ -32,7 +32,6 @@ public sealed class ApiDeltaTool : ITool
     private readonly ComparisonView _comparison;
     private readonly FindingsView _findings;
     private readonly ProposalsView _proposals;
-    private readonly ExtractView _extract;
     private readonly IClock _clock;
     private readonly IAnsiConsole _console;
 
@@ -43,9 +42,8 @@ public sealed class ApiDeltaTool : ITool
     /// <param name="summary">Affiche ce qui a été retenu et l'état des étapes.</param>
     /// <param name="diagnostics">Affiche ce que la lecture et la validation ont trouvé à dire.</param>
     /// <param name="comparison">Affiche le compte des différences, puis le détail demandé.</param>
-    /// <param name="findings">Affiche ce que l'examen du fichier en service a constaté.</param>
+    /// <param name="findings">Affiche ce que l'examen du fichier de production a constaté.</param>
     /// <param name="proposals">Affiche ce que le nettoyage rapporterait.</param>
-    /// <param name="extract">Affiche ce que l'extraction a produit.</param>
     /// <param name="clock">Fournit l'heure de démarrage de l'exécution.</param>
     /// <param name="console">La console où écrire.</param>
     public ApiDeltaTool(
@@ -57,7 +55,6 @@ public sealed class ApiDeltaTool : ITool
         ComparisonView comparison,
         FindingsView findings,
         ProposalsView proposals,
-        ExtractView extract,
         IClock clock,
         IAnsiConsole console)
     {
@@ -69,7 +66,6 @@ public sealed class ApiDeltaTool : ITool
         ArgumentNullException.ThrowIfNull(comparison);
         ArgumentNullException.ThrowIfNull(findings);
         ArgumentNullException.ThrowIfNull(proposals);
-        ArgumentNullException.ThrowIfNull(extract);
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(console);
 
@@ -81,7 +77,6 @@ public sealed class ApiDeltaTool : ITool
         _comparison = comparison;
         _findings = findings;
         _proposals = proposals;
-        _extract = extract;
         _clock = clock;
         _console = console;
     }
@@ -106,14 +101,22 @@ public sealed class ApiDeltaTool : ITool
     /// </remarks>
     public bool RequiresServer => false;
 
+    /// <summary>
+    /// Les étapes que cette instance exécutera, dans l'ordre, par leur nom.
+    /// </summary>
+    /// <remarks>
+    /// Exposées pour qu'un essai puisse confronter la chaîne <em>réellement construite</em> à l'ordre
+    /// que <see cref="ApiDeltaStepNames.InOrder"/> déclare. Rien ne les confrontait, et deux étapes
+    /// écrites, enregistrées et éprouvées une par une sont restées hors de la chaîne pendant deux
+    /// tranches : l'outil ne savait pas lire un contrat de service alors que tout ce qu'il faut pour le
+    /// lire existait et passait ses essais.
+    /// </remarks>
+    public IReadOnlyList<string> StepNames => [.. _steps.Select(step => step.Name)];
+
     /// <inheritdoc />
     public async Task<ToolRun> RunAsync(CancellationToken cancellationToken)
     {
-        ToolRun run = new(
-            Guid.NewGuid(),
-            Id,
-            _clock.UtcNow,
-            [.. _steps.Select(step => step.Name)]);
+        ToolRun run = new(Guid.NewGuid(), Id, _clock.UtcNow, [.. StepNames]);
 
         ToolRunContext context = new(run);
 
@@ -154,13 +157,6 @@ public sealed class ApiDeltaTool : ITool
                 cancellationToken);
         }
 
-        if (context.Get<ExtractResult>(ApiDeltaContextKeys.Extract) is { } extract)
-        {
-            _extract.Show(
-                extract,
-                context.Get<IReadOnlyList<Artifact>>(ApiDeltaContextKeys.Artifacts) ?? []);
-        }
-
         return run;
     }
 
@@ -186,12 +182,17 @@ public sealed class ApiDeltaTool : ITool
         }
         else if (selection is not null)
         {
-            // L'état de la construction, dit franchement plutôt que laissé à deviner.
+            // Ce qui a réellement eu lieu, et non une phrase toute faite. L'ancienne annonçait un
+            // examen et un chiffrage même quand les deux étapes avaient été sautées : un message qui
+            // décrit une autre exécution que celle qu'on vient de regarder apprend à ne plus le lire.
             _console.MarkupLine(
-                "[grey]Les fichiers ont été lus et vérifiés, la comparaison et l'examen faits, le "
-                + "nettoyage chiffré, les rapports écrits. Aucun fichier n'a été modifié : "
-                + "l'application du nettoyage et l'extraction de routes arrivent avec les tranches "
-                + "suivantes.[/]");
+                selection.Mode == RunMode.Consolidate
+                    ? "[grey]Votre fichier de production et le fichier compagnon ont été lus et "
+                        + "comparés, et les rapports sont écrits. Votre fichier de production n'a pas "
+                        + "été modifié : ce qui a été retenu est allé dans le fichier consolidé, à "
+                        + "côté.[/]"
+                    : "[grey]Votre fichier a été lu, examiné, et ce qu'un nettoyage lui gagnerait est "
+                        + "chiffré. Votre fichier n'a pas été modifié.[/]");
         }
 
         _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir au menu.[/]");

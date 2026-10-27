@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE definitions [
+  <!ENTITY a "aaaaaaaaaa">
+  <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
+  <!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+  <!ENTITY d "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+  <!ENTITY e "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+  <!ENTITY f "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+  <!ENTITY g "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+  <!ENTITY h "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+]>
+<!-- Dix puissance huit caractères si on développe. Fermé par le même refus que doctype.wsdl : interdire
+     les définitions de type de document ferme XXE et l'expansion d'entités du même geste, ce qui est la
+     raison pour laquelle ce n'est pas un réglage. -->
+<wsdl:definitions name="Hostile"
+    targetNamespace="http://entreprise.local/hostile"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:documentation>&h;</wsdl:documentation>
+</wsdl:definitions>

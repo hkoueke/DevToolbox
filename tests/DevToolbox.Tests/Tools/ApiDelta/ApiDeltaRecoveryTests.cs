@@ -177,7 +177,7 @@ public sealed class ApiDeltaRecoveryTests
                 Context.Run.RunId,
                 "apidelta",
                 [
-                    new PersistedSelectionEntry(ApiDeltaSelectionKinds.Mode, "Audit", "Audit"),
+                    new PersistedSelectionEntry(ApiDeltaSelectionKinds.Mode, "Analyse", "Analyser un fichier"),
                     new PersistedSelectionEntry(
                         ApiDeltaSelectionKinds.Production,
                         ProductionPath,
@@ -229,6 +229,6 @@ public sealed class ApiDeltaRecoveryTests
         private static SpecFileFacts Facts(string hash) => new(ProductionPath, 1024, hash);
 
         private static RunSelection Selection() =>
-            new(RunMode.Audit, ProductionPath, string.Empty, @"C:\travail\artefacts");
+            new(RunMode.Analyse, ProductionPath, string.Empty, @"C:\travail\artefacts");
     }
 }

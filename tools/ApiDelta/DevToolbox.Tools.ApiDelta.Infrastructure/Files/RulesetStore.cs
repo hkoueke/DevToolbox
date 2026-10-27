@@ -47,7 +47,7 @@ public sealed class RulesetStore : IRulesetStore
         "versioning",
         "namingConventions",
         "environmentPlaceholders",
-        "extract",
+        "wsdl",
     };
 
     private static readonly HashSet<string> KnownRuleKeys = new(StringComparer.Ordinal)
@@ -197,7 +197,13 @@ public sealed class RulesetStore : IRulesetStore
             "versioning" => RulesetSections.Versioning(reader, entry.Value),
             "namingConventions" => RulesetSections.Naming(reader, entry.Value),
             "environmentPlaceholders" => RulesetSections.Placeholders(reader, entry.Value),
-            _ => RulesetSections.Extract(reader, entry.Value),
+            "wsdl" => RulesetSections.Wsdl(reader, entry.Value),
+
+            // Inatteignable : une clé inconnue a déjà été nommée, avec sa ligne et sa colonne, par le
+            // contrôle qui précède. Cette branche servait autrefois de repli vers la section
+            // d'extraction, si bien qu'une faute de frappe sur un nom de section se lisait comme un
+            // réglage ; elle ne lit plus rien.
+            _ => reader.Ruleset,
         };
     }
 

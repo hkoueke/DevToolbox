@@ -12,7 +12,7 @@ public interface ISuppressionStore
     Task<SuppressionReadResult> ReadAsync(string path, CancellationToken cancellationToken);
 
     /// <summary>Cherche un fichier de sourdines nommé par convention à côté d'une description.</summary>
-    /// <param name="descriptionPath">Le fichier en service.</param>
+    /// <param name="descriptionPath">Le fichier de production.</param>
     /// <returns>Le chemin trouvé, ou <see langword="null"/>.</returns>
     string? Discover(string descriptionPath);
 }

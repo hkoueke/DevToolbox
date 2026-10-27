@@ -151,7 +151,7 @@ public sealed class SafeTransformationTests : IDisposable
             OptimizationHarness.Plan(document),
             document,
             new RunSelection(
-                RunMode.Optimize,
+                RunMode.Analyse,
                 document.Path,
                 string.Empty,
                 "sortie",

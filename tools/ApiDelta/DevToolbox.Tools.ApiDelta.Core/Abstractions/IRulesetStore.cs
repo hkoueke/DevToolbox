@@ -22,7 +22,7 @@ public interface IRulesetStore
         CancellationToken cancellationToken);
 
     /// <summary>Cherche un jeu de règles nommé par convention à côté d'une description.</summary>
-    /// <param name="descriptionPath">Le fichier en service.</param>
+    /// <param name="descriptionPath">Le fichier de production.</param>
     /// <returns>Le chemin trouvé, ou <see langword="null"/>.</returns>
     string? Discover(string descriptionPath);
 }

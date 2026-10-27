@@ -37,11 +37,11 @@ public sealed class SelectionSummaryRenderer
         grid.AddColumn();
 
         grid.AddRow("[grey]ce qui est fait[/]", Markup.Escape(RunModeNames.Of(selection.Mode)));
-        grid.AddRow("[grey]fichier en service[/]", Describe(selection.ProductionPath, selection.ProductionHash));
+        grid.AddRow("[grey]fichier de production[/]", Describe(selection.ProductionPath, selection.ProductionHash));
 
         if (selection.CandidatePath is { } candidate)
         {
-            grid.AddRow("[grey]nouveau fichier[/]", Describe(candidate, selection.CandidateHash));
+            grid.AddRow("[grey]fichier compagnon[/]", Describe(candidate, selection.CandidateHash));
         }
 
         grid.AddRow("[grey]rapports écrits dans[/]", Markup.Escape(selection.OutputDirectory));

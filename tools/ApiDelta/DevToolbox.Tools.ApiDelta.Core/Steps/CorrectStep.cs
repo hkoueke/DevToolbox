@@ -6,7 +6,7 @@ using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 using DevToolbox.Tools.ApiDelta.Core.Versioning;
 
@@ -18,7 +18,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Steps;
 /// <remarks>
 /// L'ordre est la garantie. Choisir, puis énoncer, puis faire accepter, puis construire, puis vérifier sur
 /// les octets — et l'écriture n'a lieu qu'à l'étape suivante, et seulement si la vérification a abouti.
-/// Une production corrigée qui aurait changé une route que personne n'avait retenue se relit, se valide,
+/// Une production consolidée qui aurait changé une route que personne n'avait retenue se relit, se valide,
 /// et décrit autre chose : aucun contrôle moins coûteux ne le remarquerait.
 /// <para>
 /// Rejouable : rien ici n'écrit. La production n'est jamais réécrite dans ce mode, et il n'existe aucun
@@ -37,7 +37,7 @@ public sealed class CorrectStep : IToolStep
     /// <summary>Crée l'étape.</summary>
     /// <param name="catalog">Énumère les routes des deux descriptions.</param>
     /// <param name="prompt">Demande ce qui doit entrer, et fait accepter l'énoncé.</param>
-    /// <param name="builder">Construit la production corrigée.</param>
+    /// <param name="builder">Construit la production consolidée.</param>
     /// <param name="verifier">Établit qu'elle dit ce qu'on lui a demandé, et rien de plus.</param>
     /// <param name="dependencies">Ferme ce dont le contenu retenu a besoin.</param>
     /// <param name="options">Ce que la racine de composition fixe.</param>
@@ -101,12 +101,13 @@ public sealed class CorrectStep : IToolStep
         IReadOnlyList<Difference> differences,
         CancellationToken cancellationToken)
     {
-        CorrectionSelection chosen = Chosen(selection, production, candidate, differences);
+        WsdlFooting? footing = context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting);
+        CorrectionSelection chosen = Chosen(selection, production, candidate, differences, footing);
 
         if (chosen.IsEmpty)
         {
             // Une sélection vide n'est pas un échec : c'est une demande de ne rien écrire, et l'étape
-            // réussit en n'ayant rien produit. L'écriture ne trouvera donc aucune production corrigée.
+            // réussit en n'ayant rien produit. L'écriture ne trouvera donc aucune production consolidée.
             return Result.Success();
         }
 
@@ -128,7 +129,8 @@ public sealed class CorrectStep : IToolStep
             closure.Value,
             context.Get<VersionRecommendation>(ApiDeltaContextKeys.VersionRecommendation),
             _options.DefaultRuleset.Formatting,
-            selection.IncludeRemovals);
+            selection.IncludeRemovals,
+            footing);
 
         return Announce(context, request, Ruleset(context));
     }
@@ -176,7 +178,7 @@ public sealed class CorrectStep : IToolStep
             return Result.Fail(FailureReason.InvalidInput, verification.Explanation);
         }
 
-        context.Set(ApiDeltaContextKeys.CorrectedDocument, built.Value);
+        context.Set(ApiDeltaContextKeys.ConsolidatedDocument, built.Value);
 
         return Result.Success();
     }
@@ -191,14 +193,16 @@ public sealed class CorrectStep : IToolStep
         RunSelection selection,
         SpecDocument production,
         SpecDocument candidate,
-        IReadOnlyList<Difference> differences)
+        IReadOnlyList<Difference> differences,
+        WsdlFooting? footing)
     {
         if (selection.Correction is { IsEmpty: false } resumed)
         {
             return resumed;
         }
 
-        return _prompt.Ask(CorrectionCatalog.Build(production, candidate, differences, _catalog));
+        return _prompt.Ask(
+            CorrectionCatalog.Build(production, candidate, differences, _catalog, footing));
     }
 
     /// <summary>Les emplacements dont il faut fermer les dépendances.</summary>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<d:definitions
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:sp="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:cat="http://entreprise.local/catalogue/types"
+    xmlns:me="http://entreprise.local/catalogue/wsdl"
+    xmlns:d="http://schemas.xmlsoap.org/wsdl/"
+    targetNamespace="http://entreprise.local/catalogue/wsdl"
+    name="Catalogue">
+
+  <!-- La même livraison que catalogue.wsdl, écrite autrement de toutes les façons que WR-102 énumère :
+       d'autres préfixes, un autre ordre d'attributs, des balises appariées là où l'autre se ferme
+       elle-même, d'autres commentaires, du texte en CDATA, et les déclarations de haut niveau dans un
+       autre ordre — le service d'abord, les messages en dernier. Le contrat, lui, est le même. -->
+
+  <d:service name="Catalogue">
+    <d:documentation><![CDATA[Le point d'entrée du catalogue documentaire.]]></d:documentation>
+    <d:port binding="me:CatalogueBinding" name="CataloguePort">
+      <sp:address location="https://catalogue.entreprise.local/services/catalogue"></sp:address>
+    </d:port>
+  </d:service>
+
+  <d:binding type="me:CataloguePort" name="CatalogueBinding">
+    <sp:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <d:operation name="interrogerDossier">
+      <sp:operation soapAction="http://entreprise.local/catalogue/interrogerDossier"></sp:operation>
+      <d:output><sp:body use="literal"></sp:body></d:output>
+      <d:input><sp:body use="literal"></sp:body></d:input>
+    </d:operation>
+    <d:operation name="archiverDocument">
+      <sp:operation soapAction="http://entreprise.local/catalogue/archiverDocument"/>
+      <d:input><sp:body use="literal"/></d:input>
+    </d:operation>
+    <d:operation name="deposerDocument">
+      <sp:operation soapAction="http://entreprise.local/catalogue/deposerDocument"/>
+      <d:input><sp:body use="literal"/></d:input>
+      <d:output><sp:body use="literal"/></d:output>
+      <d:fault name="erreur"><sp:fault use="literal" name="erreur"/></d:fault>
+    </d:operation>
+    <d:operation name="dossierModifie">
+      <sp:operation soapAction="http://entreprise.local/catalogue/dossierModifie"/>
+      <d:output><sp:body use="literal"/></d:output>
+    </d:operation>
+    <d:operation name="lireDocument">
+      <sp:operation soapAction="http://entreprise.local/catalogue/lireDocument"/>
+      <d:input><sp:body use="literal"/></d:input>
+      <d:output><sp:body use="literal"/></d:output>
+      <d:fault name="erreur"><sp:fault use="literal" name="erreur"/></d:fault>
+    </d:operation>
+  </d:binding>
+
+  <d:portType name="CataloguePort">
+    <!-- Les opérations sont ici dans un autre ordre qu'ailleurs. L'ordre d'entrée et de sortie
+         *à l'intérieur* d'une opération, lui, n'a pas bougé : c'est la seule chose qui distingue une
+         sollicitation-réponse d'une requête-réponse, et la changer changerait le contrat. -->
+    <d:operation name="interrogerDossier">
+      <d:documentation>Le service interroge, l'appelant répond.</d:documentation>
+      <d:output message="me:interrogerDossierOut"></d:output>
+      <d:input message="me:interrogerDossierIn"></d:input>
+    </d:operation>
+
+    <d:operation name="archiverDocument">
+      <d:documentation><![CDATA[Signale l'archivage. Rien n'est rendu.]]></d:documentation>
+      <d:input message="me:archiverDocumentIn"/>
+    </d:operation>
+
+    <d:operation name="deposerDocument">
+      <d:documentation>Dépose un document et rend son identifiant.</d:documentation>
+      <d:input message="me:deposerDocumentIn"/>
+      <d:output message="me:deposerDocumentOut"/>
+      <d:fault message="me:erreurMessage" name="erreur"/>
+    </d:operation>
+
+    <d:operation name="dossierModifie">
+      <d:documentation>Avertit qu'un dossier a changé.</d:documentation>
+      <d:output message="me:dossierModifieOut"/>
+    </d:operation>
+
+    <d:operation name="lireDocument">
+      <d:documentation>Lit un document par critère.</d:documentation>
+      <d:input message="me:lireDocumentIn"/>
+      <d:output message="me:lireDocumentOut"/>
+      <d:fault message="me:erreurMessage" name="erreur"/>
+    </d:operation>
+  </d:portType>
+
+  <d:types>
+    <xsd:schema targetNamespace="http://entreprise.local/catalogue/wsdl">
+      <xsd:import schemaLocation="catalogue-types.xsd"
+                  namespace="http://entreprise.local/catalogue/types"></xsd:import>
+    </xsd:schema>
+  </d:types>
+
+  <d:documentation>
+    Dépôt et consultation de documents. Le service en service depuis 2019.
+  </d:documentation>
+
+  <d:message name="erreurMessage">
+    <d:part element="cat:erreur" name="corps"></d:part>
+  </d:message>
+  <d:message name="interrogerDossierIn">
+    <d:part element="cat:interrogerDossierReponse" name="corps"/>
+  </d:message>
+  <d:message name="interrogerDossierOut">
+    <d:part element="cat:interrogerDossierDemande" name="corps"/>
+  </d:message>
+  <d:message name="dossierModifieOut">
+    <d:part element="cat:dossierModifieAvis" name="corps"/>
+  </d:message>
+  <d:message name="archiverDocumentIn">
+    <d:part element="cat:archiverDocumentAvis" name="corps"/>
+  </d:message>
+  <d:message name="lireDocumentOut">
+    <d:part element="cat:lireDocumentReponse" name="corps"/>
+  </d:message>
+  <d:message name="lireDocumentIn">
+    <d:part element="cat:lireDocumentRequete" name="corps"/>
+  </d:message>
+  <d:message name="deposerDocumentOut">
+    <d:part element="cat:deposerDocumentReponse" name="corps"/>
+  </d:message>
+  <d:message name="deposerDocumentIn">
+    <d:part element="cat:deposerDocumentRequete" name="corps"/>
+  </d:message>
+</d:definitions>

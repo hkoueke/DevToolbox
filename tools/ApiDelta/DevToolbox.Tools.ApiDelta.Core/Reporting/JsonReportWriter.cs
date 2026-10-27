@@ -11,7 +11,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Reporting;
 /// <remarks>
 /// La disposition des champs est un contrat : un champ présent ici n'est jamais renommé ni détourné, et
 /// <c>schemaVersion</c> dit à un consommateur ce qu'il peut attendre. Les champs à venir — l'audit, le
-/// plan, l'extrait — s'ajouteront sans déplacer ceux-ci.
+/// plan — s'ajouteront sans déplacer ceux-ci.
 /// <para>
 /// Construit en <c>JsonNode</c> plutôt que par sérialisation de types annotés : la sortie doit être une
 /// forme stable que l'on relit en la regardant, non le reflet d'une hiérarchie de classes qui évoluerait
@@ -46,10 +46,12 @@ public static class JsonReportWriter
             ["ruleOutcomes"] = Outcomes(run),
             ["findings"] = Findings(run),
             ["redundancyGroups"] = RedundancyGroups(run),
-            ["extract"] = Extracted(run),
             ["suppressions"] = Suppressions(run),
             ["optimization"] = Planned(run),
             ["sizes"] = Sizes(run),
+            ["correspondence"] = Correspondence(run),
+            ["coverage"] = Coverage(run),
+            ["comparability"] = Comparability(run),
             ["steps"] = Steps(run),
             ["outcome"] = Outcome(run),
         };
@@ -196,74 +198,106 @@ public static class JsonReportWriter
     }
 
     /// <summary>
-    /// L'extrait : d'où il vient, ce que chaque opération a hérité, et ce que la vérification a établi.
+    /// L'appariement, entrée par entrée.
     /// </summary>
     /// <remarks>
-    /// L'héritage est publié opération par opération parce que c'est ce qu'un consommateur ne peut pas
-    /// reconstituer depuis l'extrait seul : un paramètre remonté au niveau du chemin y est indiscernable
-    /// d'un paramètre qui y était déjà.
+    /// Présent et nul plutôt qu'absent, comme les deux suivants : un consommateur machine doit pouvoir
+    /// distinguer « il n'y avait pas de contrat de service » de « la clé a changé de nom ». Le rapport
+    /// lisible fait la même chose avec une phrase, pour la même raison.
     /// </remarks>
-    private static JsonObject? Extracted(ApiDeltaRun run)
+    private static JsonObject? Correspondence(ApiDeltaRun run)
     {
-        if (run.Extract is not { } extract)
+        if (run.Footing is not { } footing || footing.Correspondence.Entries.Count == 0)
         {
             return null;
         }
 
-        JsonArray operations = [];
+        JsonArray entries = [];
 
-        foreach (Extraction.InheritanceRecord record in extract.InheritedContext)
+        foreach (Core.Correspondence.CorrespondenceEntry entry in footing.Correspondence.Entries)
         {
-            operations.Add(new JsonObject
+            entries.Add(new JsonObject
             {
-                ["path"] = record.Selector.Path,
-                ["method"] = record.Selector.MethodKey,
-                ["inherited"] = new JsonObject
-                {
-                    ["pathParameters"] = Words(record.PathParameters),
-                    ["servers"] = Words(record.Servers),
-                    ["security"] = Words(record.Security),
-                },
+                ["operation"] = entry.Operation,
+                ["route"] = entry.HasRoute ? entry.Route : null,
+                ["origin"] = entry.Origin.ToString(),
+                ["inferred"] = entry.IsInferred,
+                ["basis"] = entry.Basis,
+                ["alternatives"] = Words(entry.Alternatives),
             });
         }
 
         return new JsonObject
         {
-            ["source"] = new JsonObject
-            {
-                ["path"] = extract.Provenance.SourcePath,
-                ["sha256"] = extract.Provenance.SourceHash,
-            },
-            ["operations"] = operations,
-            ["closure"] = new JsonObject
-            {
-                ["components"] = extract.Closure.Required.Count,
-                ["externalPreserved"] = extract.Closure.ExternalPreserved.Count,
-            },
-            ["carriedTags"] = Words(extract.CarriedTags),
-            ["danglingExtensionReferences"] = Dangling(extract),
-            ["verification"] = new JsonObject
-            {
-                ["reparsed"] = extract.Verification.Reparsed,
-                ["revalidated"] = extract.Verification.Revalidated,
-                ["referencesResolved"] = extract.Verification.ReferencesResolved,
-                ["containsNothingUnselected"] = extract.Verification.ContainsNothingUnselected,
-                ["operationsEquivalent"] = extract.Verification.OperationsEquivalent,
-                ["differences"] = Words(extract.Verification.Differences),
-            },
+            ["confirmed"] = footing.Correspondence.IsConfirmed,
+            ["entries"] = entries,
         };
     }
 
-    private static JsonArray Dangling(Extraction.ExtractResult extract)
+    /// <summary>Ce que la production couvre du contrat, opération par opération.</summary>
+    private static JsonObject? Coverage(ApiDeltaRun run)
     {
-        JsonArray array = [];
-
-        foreach (Audit.Finding finding in extract.DanglingExtensionReferences)
+        if (run.Footing is not { } footing || !footing.Coverage.IsEstablished)
         {
-            array.Add(Entry(finding));
+            return null;
         }
 
-        return array;
+        JsonArray entries = [];
+
+        foreach (Core.Correspondence.CoverageEntry entry in footing.Coverage.Entries)
+        {
+            entries.Add(new JsonObject
+            {
+                ["operation"] = entry.Operation,
+                ["state"] = entry.State.ToString(),
+                ["route"] = entry.Route,
+                ["remedy"] = entry.Remedy,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["covered"] = footing.Coverage.Covered.Count(),
+            ["absent"] = footing.Coverage.Gaps.Count(),
+            ["ambiguous"] = footing.Coverage.Ambiguous.Count(),
+            ["entries"] = entries,
+        };
+    }
+
+    /// <summary>Quelle part du contrat avait une contrepartie, en chiffres recoupables.</summary>
+    private static JsonObject? Comparability(ApiDeltaRun run)
+    {
+        if (run.Footing?.Projection is not { } projection)
+        {
+            return null;
+        }
+
+        Projection.ProjectionFigures figures = projection.Figures;
+        int examined = figures.Carried + figures.Approximate + figures.NotCarried;
+        JsonObject grouped = [];
+
+        foreach (KeyValuePair<Projection.ProjectionGapReason, int> group in projection.ByReason
+            .OrderBy(group => group.Key))
+        {
+            grouped[group.Key.ToString()] = group.Value;
+        }
+
+        return new JsonObject
+        {
+            ["operations"] = figures.Operations,
+            ["pairedOperations"] = run.Footing.Correspondence.Comparable.Count,
+            ["schemas"] = figures.Schemas,
+            ["carried"] = figures.Carried,
+            ["approximate"] = figures.Approximate,
+            ["notCarried"] = figures.NotCarried,
+            ["declinedTypes"] = figures.DeclinedTypes,
+            ["examined"] = examined,
+
+            // Le quotient est écrit plutôt que laissé à calculer : deux consommateurs qui l'arrondissent
+            // autrement rapporteraient deux chiffres pour le même constat.
+            ["carriedPercent"] = examined == 0 ? null : (figures.Carried * 100) / examined,
+            ["notCarriedByReason"] = grouped,
+        };
     }
 
     private static JsonArray Words(IEnumerable<string> words)

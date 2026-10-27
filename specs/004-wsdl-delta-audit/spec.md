@@ -81,6 +81,66 @@ The feature was specified and then narrowed four times in one day. The record is
   projection cannot carry must be an unfilled marker rather than a plausible schema — because a plausible
   schema is the one output from which a reader cannot recover the fact that nobody knows.
 
+### Session 2026-10-27, while building User Story 3
+
+Two clarifications the implementation forced, both found at the end of the chain — where the generated
+document must be **valid**, and not merely re-readable.
+
+- **Q: Where does a derived *scalar* field say that it was derived?** → **In the document's own
+  declaration, which names the field.** WR-300 requires every derived element to carry its WSDL origin,
+  and OpenAPI allows an `x-` member only on an object: a field such as `summary` or `required` cannot hold
+  one. The origin of such a field therefore goes in the `x-apidelta-correction` declaration, under
+  `champsDerives`, naming the field, its document, its place and the confidence. Leaving it out would have
+  made a derived field indistinguishable from a copied one, which is the one thing WR-300 forbids — and
+  003's own remark already claimed this was done, without doing it.
+- **Q: What does a projected `xsd:choice` branch contain?** → **The particles of that branch, projected by
+  the ordinary particle rules.** The table row (`xsd:choice` → `oneOf`, `Approximate`) is unchanged; what
+  is now specified is the branch content. The first implementation wrote a `$comment` holding the type
+  name, which OpenAPI 3.0 does not allow — the generated document was refused by its own revalidation —
+  and which told a reader nothing about the type expected. It also left the choice's particles to be
+  projected a second time at the type level, where they were declared **all required at once**: the exact
+  opposite of a choice, asserted with the confidence of a carried rule. Both defects were invisible until
+  a projected schema had to be spliced into a production description and revalidated.
+
+### Session 2026-10-27, raised by a review of the release pull request
+
+- **Q: Does the tool follow a `wsdl:import`?** → **No, and it refuses the contract rather than read part
+  of it.** The sentence above names `wsdl:import` among the directives that bind a contract's documents,
+  and the implementation followed only `xsd:import`, `xsd:include` and `xsd:redefine` — those live inside
+  an `xs:schema`, where the import walker descends. A `wsdl:import` sits on the `wsdl:definitions` root
+  and was therefore neither followed **nor refused**: the contract was built from the entry document
+  alone, its imported operations, messages and bindings vanished without a word, and the read declared
+  itself faithful. That is precisely what WR-008 forbids. Following it is a feature for a later slice;
+  naming the refusal is the only honest answer meanwhile, and a refused read produces no contract, so
+  nothing is compared on half of one.
+- **Q: Was the confinement of WR-005 actually enforced?** → **It was enforced by a string prefix, which
+  is not enough**, and this is recorded as a defect rather than a change: under a root `…/contracts`, an
+  import `../contracts-secret/types.xsd` normalises to a path whose *string* starts with the root, so the
+  traversal refusal accepted a sibling directory. The check is now path-component aware. WR-005 already
+  required traversal to be "refused and named"; it simply was not, and that refusal is what pays for the
+  open-by-default local resolution.
+- **Q: Does a retrieval connect to the address the guard validated?** → **It does now.** The guard
+  resolved and validated a host's addresses, then the client resolved the host a second time to connect:
+  a permitted host whose DNS answer changed between the two reached an address the guard had never seen,
+  which defeated the internal-address check of WR-015 without touching it. The connection is now pinned
+  to a validated address, and the request keeps its hostname so that name indication and certificate
+  validation still bear on the name. A request carrying no validated address does not connect at all.
+- **Q: Did `wsdl.limits.fetchTimeoutSeconds` bite?** → **No, and now it does.** The budget lived in the
+  typed client's resilience handler, fixed when the client was registered, so a value a team wrote had no
+  effect and a graph of twenty imports could spend that budget twenty times over. It now bounds the whole
+  graph retrieval, and the refusal names the key. Third of its kind in this feature, after the nesting
+  depth and the enumeration budget: a declared limit that is never applied is worse than an absent one.
+
+### Session 2026-10-27, while building User Story 4
+
+- **Q: "Byte-identical generated documents" across three deliveries — including the origin traces?** →
+  **Outside what names the delivery.** WR-300 has every derived element name the WSDL document it came
+  from, with its line and column. Three deliveries are three files: requiring one trace for all three
+  would require it to be false for two of them. SC-001 is therefore verified with the document name and
+  the position neutralised, exactly as SC-014 is verified outside the run-metadata block — and a separate
+  check establishes that each delivery does name its own documents, so that neutralising never becomes a
+  licence to name the wrong one.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read the WSDL and its imports, or refuse to pretend (Priority: P1)

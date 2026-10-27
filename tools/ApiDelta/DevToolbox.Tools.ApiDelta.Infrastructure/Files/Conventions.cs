@@ -12,7 +12,7 @@ namespace DevToolbox.Tools.ApiDelta.Infrastructure.Files;
 internal static class Conventions
 {
     /// <summary>Le fichier portant ce nom à côté d'une description, s'il existe.</summary>
-    /// <param name="descriptionPath">Le fichier en service.</param>
+    /// <param name="descriptionPath">Le fichier de production.</param>
     /// <param name="fileName">Le nom cherché.</param>
     /// <returns>Le chemin complet, ou <see langword="null"/>.</returns>
     internal static string? Beside(string descriptionPath, string fileName)

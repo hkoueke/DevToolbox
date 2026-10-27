@@ -48,12 +48,15 @@ public static class MarkdownReportWriter
         Artifacts(builder, run);
         Limitations(builder, run);
         Carried(builder, run);
+        Correspondence(builder, run);
+        Coverage(builder, run);
+        Comparability(builder, run);
 
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
 
     /// <summary>
-    /// Écrit le rapport d'examen du fichier en service.
+    /// Écrit le rapport d'examen du fichier de production.
     /// </summary>
     /// <param name="run">L'exécution achevée.</param>
     /// <returns>Le rapport, en octets.</returns>
@@ -78,34 +81,6 @@ public static class MarkdownReportWriter
         Redundancy(builder, run);
         Proposals(builder, run);
         Suppressed(builder, run);
-        Artifacts(builder, run);
-        Limitations(builder, run);
-
-        return Encoding.UTF8.GetBytes(builder.ToString());
-    }
-
-    /// <summary>
-    /// Écrit le rapport de l'extrait.
-    /// </summary>
-    /// <param name="run">L'exécution achevée.</param>
-    /// <returns>Le rapport, en octets.</returns>
-    /// <remarks>
-    /// Un rapport à part, pour la même raison que celui de l'examen : une extraction ne compare rien, et
-    /// un rapport de comparaison dont les onze premières sections diraient « Aucun » se lirait comme une
-    /// comparaison qui n'a rien trouvé plutôt que comme une comparaison qui n'a pas eu lieu.
-    /// </remarks>
-    public static ReadOnlyMemory<byte> WriteExtract(ApiDeltaRun run)
-    {
-        ArgumentNullException.ThrowIfNull(run);
-
-        StringBuilder builder = new();
-
-        Metadata(builder, run);
-        builder.AppendLine("# Extrait d'une description OpenAPI").AppendLine();
-
-        Inputs(builder, run);
-        Validation(builder, run);
-        Extracted(builder, run);
         Artifacts(builder, run);
         Limitations(builder, run);
 
@@ -178,8 +153,21 @@ public static class MarkdownReportWriter
             .Append(" | ").Append(document.Format)
             .Append(" | ").Append(document.DeclaredVersion)
             .Append(" | ").Append(document.ByteLength.ToString(CultureInfo.InvariantCulture))
-            .Append(" | ").Append(document.ContentHash[..12])
+            .Append(" | ").Append(Fingerprint(document))
             .AppendLine(" |");
+
+    /// <summary>
+    /// L'empreinte d'un document lu, ou ce qui en tient lieu quand il n'y en a pas.
+    /// </summary>
+    /// <remarks>
+    /// Un document projeté depuis un contrat de service n'a pas d'empreinte : il n'est le contenu d'aucun
+    /// fichier, et lui en inventer une désignerait quelque chose qui n'existe pas. Le dire est la seule
+    /// réponse honnête — et la seule qui ne fasse pas tomber le rapport, ce que la découpe des douze
+    /// premiers caractères faisait sur une chaîne vide.
+    /// </remarks>
+    private static string Fingerprint(SpecDocument document) => document.ContentHash.Length >= 12
+        ? document.ContentHash[..12]
+        : "sans empreinte : document projeté, et non lu d'un fichier";
 
     private static void Validation(StringBuilder builder, ApiDeltaRun run)
     {
@@ -343,7 +331,7 @@ public static class MarkdownReportWriter
 
         if (run.Audit is not { } audit)
         {
-            builder.AppendLine("Sans objet : ce mode n'examine pas le fichier en service.").AppendLine();
+            builder.AppendLine("Sans objet : ce mode n'examine pas le fichier de production.").AppendLine();
             return;
         }
 
@@ -622,66 +610,6 @@ public static class MarkdownReportWriter
     private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// La section de l'extrait : d'où il vient, ce que chaque opération a emporté, et le verdict.
-    /// </summary>
-    /// <remarks>
-    /// L'héritage est dit opération par opération parce que c'est ce qu'un relecteur ne peut pas
-    /// reconstituer en lisant l'extrait seul : un paramètre venu du niveau du chemin y est indiscernable
-    /// d'un paramètre qui y était déjà. Le dire est ce qui permet de vérifier d'un coup d'œil que
-    /// l'extrait n'a rien perdu de ce qui protégeait l'opération.
-    /// </remarks>
-    private static void Extracted(StringBuilder builder, ApiDeltaRun run)
-    {
-        if (run.Extract is not { } extract)
-        {
-            return;
-        }
-
-        builder.AppendLine("## 20. Extrait").AppendLine();
-
-        builder.Append("- Tiré de `").Append(extract.Provenance.SourcePath)
-            .Append("` · sha256 ").AppendLine(extract.Provenance.SourceHash);
-        builder.Append("- Composants emportés : ")
-            .AppendLine(Number(extract.Closure.Required.Count));
-
-        if (extract.CarriedTags.Count > 0)
-        {
-            builder.Append("- Étiquettes emportées : ")
-                .AppendLine(string.Join(", ", extract.CarriedTags));
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("| Opération | Paramètres hérités | Serveurs | Sécurité |");
-        builder.AppendLine("|-----------|--------------------|----------|----------|");
-
-        foreach (Extraction.InheritanceRecord record in extract.InheritedContext)
-        {
-            builder.Append("| ").Append(record.Selector.Display)
-                .Append(" | ").Append(Listed(record.PathParameters))
-                .Append(" | ").Append(Listed(record.Servers))
-                .Append(" | ").Append(Listed(record.Security))
-                .AppendLine(" |");
-        }
-
-        builder.AppendLine();
-
-        foreach (Audit.Finding dangling in extract.DanglingExtensionReferences)
-        {
-            builder.Append("- **Extension à vérifier** : ").AppendLine(dangling.Message);
-        }
-
-        builder.Append(extract.Verification.Established
-                ? "- **Vérifié** : "
-                : "- **Rien n'a été publié** : ")
-            .AppendLine(extract.Verification.Explanation);
-
-        builder.AppendLine();
-    }
-
-    private static string Listed(IReadOnlyList<string> words) =>
-        words.Count == 0 ? "—" : string.Join(", ", words);
-
-    /// <summary>
     /// Les constats tus, avec leur justification et leur propriétaire, et ce qu'il faut relire.
     /// </summary>
     /// <remarks>
@@ -804,20 +732,22 @@ public static class MarkdownReportWriter
 
         if (run.Correction is not { } correction)
         {
-            builder.AppendLine("Sans objet : aucune production corrigée n'a été demandée.").AppendLine();
+            builder.AppendLine("Sans objet : aucune production consolidée n'a été demandée.").AppendLine();
 
             return;
         }
 
         builder.AppendLine(correction.Written
-            ? "La production corrigée a été écrite dans « " + ArtifactNames.CorrectedDocument
-                + " ». La production elle-même n'a pas été touchée."
-            : "Aucune production corrigée n'a été écrite.").AppendLine();
+            ? "La production consolidée a été écrite dans « " + ArtifactNames.ConsolidatedDocument
+                + " ». Votre fichier de production n'a pas été touché."
+            : "Aucune production consolidée n'a été écrite.").AppendLine();
+
+        Terminator(builder, run);
 
         builder.AppendLine("| Ce qui a été retenu | Effet |");
         builder.AppendLine("|---------------------|-------|");
 
-        foreach (Extraction.OperationSelector route in correction.Plan.Routes)
+        foreach (Operations.OperationSelector route in correction.Plan.Routes)
         {
             builder.Append("| ").Append(route.Display).AppendLine(" | route neuve |");
         }
@@ -835,6 +765,7 @@ public static class MarkdownReportWriter
 
         builder.AppendLine();
 
+        Derivations(builder, run, correction);
         Declined(builder, correction);
 
         if (!correction.Verification.Established && correction.Plan.Count > 0)
@@ -843,6 +774,289 @@ public static class MarkdownReportWriter
                 .AppendLine(correction.Verification.Explanation).AppendLine();
         }
     }
+
+    /// <summary>
+    /// D'où vient chaque route proposée depuis un contrat de service, et ce qui y reste non rempli.
+    /// </summary>
+    /// <remarks>
+    /// La dérivation est écrite, et non laissée à déduire. Un développeur qui lit « POST /documents »
+    /// sans savoir que le chemin vient du nom de l'opération et la méthode du verbe « deposer » ne peut
+    /// que l'accepter ou la refuser ; en voyant la dérivation, il peut la corriger — et c'est tout
+    /// l'objet de la correspondance.
+    /// <para>
+    /// Le repli est annoncé comme un repli. Un chemin qu'aucun verbe n'a produit et qui serait présenté
+    /// comme « dérivé » ferait passer plus vite sur une proposition qu'il faut justement regarder.
+    /// </para>
+    /// </remarks>
+    private static void Derivations(
+        StringBuilder builder, ApiDeltaRun run, Correction.CorrectionOutcome correction)
+    {
+        if (run.Footing is not { } footing || footing.Derivation.IsEmpty)
+        {
+            return;
+        }
+
+        builder.AppendLine("### Dérivation des routes proposées").AppendLine();
+        builder.AppendLine("| Opération du contrat | Itinéraire | Comment |");
+        builder.AppendLine("|----------------------|------------|---------|");
+
+        foreach (KeyValuePair<string, Projection.DerivedRoute> derived in footing.Derivation.Derivations)
+        {
+            builder.Append("| ").Append(derived.Key).Append(" | ").Append(derived.Value.Display)
+                .Append(" | ").Append(How(derived.Value)).AppendLine(" |");
+        }
+
+        builder.AppendLine();
+
+        Unfilled(builder, correction.Plan);
+        Collisions(builder, correction.Plan);
+    }
+
+    /// <summary>Comment un itinéraire a été obtenu, en une formule qui ne promet pas plus qu'elle ne tient.</summary>
+    private static string How(Projection.DerivedRoute derived) => derived.Kind switch
+    {
+        Projection.RouteDerivationKind.Derived =>
+            "dérivé : méthode d'après le verbe « " + derived.Verb + " », chemin d'après le sujet",
+        Projection.RouteDerivationKind.Partial =>
+            "partiel : chemin d'après le sujet, aucun verbe reconnu — la méthode est « POST » par défaut",
+        _ => "repli : rien de reconnaissable dans le nom, l'itinéraire n'est pas une dérivation",
+    };
+
+    /// <summary>Ce qui reste non rempli dans le document engendré, et combien.</summary>
+    private static void Unfilled(StringBuilder builder, Correction.CorrectionPlan plan)
+    {
+        if (plan.Unfilled.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append("**Endroits non remplis : ")
+            .Append(plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture))
+            .Append(".** La projection n'y a rien porté, et l'outil refuse de les deviner : chacun porte "
+                + "un « ")
+            .Append(Correction.UnfilledMarker.Member)
+            .AppendLine(" » disant ce qui manque.").AppendLine();
+
+        foreach (Correction.UnfilledMarker marker in plan.Unfilled)
+        {
+            builder.Append("- ").Append(marker.Target.Display).Append(" — ")
+                .AppendLine(marker.Display);
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>Les chemins dérivés qui tombent sur un chemin que la production porte déjà.</summary>
+    private static void Collisions(StringBuilder builder, Correction.CorrectionPlan plan)
+    {
+        if (plan.Collisions.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine("**Chemins déjà portés par la production.**").AppendLine();
+
+        foreach (Correction.PathCollision collision in plan.Collisions)
+        {
+            builder.Append("- ").AppendLine(collision.Display);
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Prévient quand la production ne finissait pas par une fin de ligne.
+    /// </summary>
+    /// <remarks>
+    /// Une phrase qui a coûté une matinée à quelqu'un. Un fichier dont la dernière ligne n'a pas de fin
+    /// de ligne en gagne une dès qu'on écrit après elle, et <em>tout</em> outil de comparaison affiche
+    /// alors cette ligne comme modifiée. Son contenu ne l'est pas — le vérificateur l'établit à l'octet
+    /// avant que le fichier n'existe — mais le relecteur lit « ligne supprimée » et cherche ce qu'il a
+    /// perdu.
+    /// <para>
+    /// Rien à corriger dans l'écriture : écrire après la dernière ligne la termine, et placer la
+    /// déclaration ailleurs serait arbitraire. Ce qui manquait, c'était de le dire.
+    /// </para>
+    /// </remarks>
+    private static void Terminator(StringBuilder builder, ApiDeltaRun run)
+    {
+        ReadOnlySpan<byte> bytes = run.Production.Source.Span;
+
+        if (bytes.Length == 0 || bytes[^1] == (byte)'\n')
+        {
+            return;
+        }
+
+        builder.AppendLine(
+            "**Votre fichier de production ne finissait pas par une fin de ligne.** La consolidation "
+            + "écrit après sa dernière ligne, qui en gagne donc une. Un outil de comparaison affichera "
+            + "cette ligne comme modifiée : son contenu ne l'est pas, et la vérification l'a établi à "
+            + "l'octet avant que le fichier ne soit écrit.").AppendLine();
+    }
+
+    /// <summary>
+    /// L'appariement entre les opérations du contrat et les routes de la production.
+    /// </summary>
+    /// <remarks>
+    /// Présente même vide, comme les deux suivantes. Une section qui disparaît quand elle n'a rien à
+    /// dire laisse un lecteur incapable de distinguer le silence de l'absence : il ne sait pas si
+    /// l'outil n'a rien trouvé ou s'il n'a pas regardé.
+    /// </remarks>
+    private static void Correspondence(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 21. Appariement des opérations").AppendLine();
+
+        if (run.Footing is not { } footing || footing.Correspondence.Entries.Count == 0)
+        {
+            builder.AppendLine(Absent(run)).AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine(footing.Correspondence.IsConfirmed
+            ? "L'appariement a été confirmé. Rien n'a été comparé avant cette confirmation."
+            : "**L'appariement n'a pas été confirmé**, et rien n'a donc été comparé.").AppendLine();
+
+        builder.AppendLine("| Opération | Route | Origine | Sur quoi |");
+        builder.AppendLine("|-----------|-------|---------|----------|");
+
+        foreach (Correspondence.CorrespondenceEntry entry in footing.Correspondence.Entries)
+        {
+            builder.Append("| ").Append(entry.Operation)
+                .Append(" | ").Append(entry.HasRoute ? entry.Route : "—")
+                .Append(" | ").Append(entry.Mark)
+                .Append(" | ").Append(entry.Basis ?? "—").AppendLine(" |");
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Ce que la production couvre du contrat, et ce qu'elle ne couvre pas.
+    /// </summary>
+    /// <remarks>
+    /// Séparée de la compatibilité, et c'est tout le sujet. La couverture dit ce qui manque, avec
+    /// certitude, parce qu'elle repose sur l'appariement confirmé et sur rien d'autre. Les mêler ferait
+    /// apparaître un manque parmi les ruptures : rien n'est cassé quand une opération n'a pas de route,
+    /// et les deux nouvelles ne s'adressent ni au même lecteur ni au même calendrier.
+    /// </remarks>
+    private static void Coverage(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 22. Couverture du contrat").AppendLine();
+
+        if (run.Footing is not { } footing || !footing.Coverage.IsEstablished)
+        {
+            builder.AppendLine(run.Footing is null
+                ? Absent(run)
+                : "La couverture n'a pas été établie : l'appariement n'a pas été confirmé. Ce n'est "
+                    + "pas une couverture totale, et ce n'est pas une couverture nulle — c'est un "
+                    + "constat qui n'a pas eu lieu.").AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine("| État | Opérations |");
+        builder.AppendLine("|------|------------|");
+        builder.Append("| couvertes | ").Append(Count(footing.Coverage.Covered)).AppendLine(" |");
+        builder.Append("| absentes de la production | ").Append(Count(footing.Coverage.Gaps))
+            .AppendLine(" |");
+        builder.Append("| ambiguës | ").Append(Count(footing.Coverage.Ambiguous)).AppendLine(" |");
+        builder.AppendLine();
+
+        foreach (Correspondence.CoverageEntry entry in footing.Coverage.Entries
+            .Where(entry => entry.Remedy is not null))
+        {
+            builder.Append("- **").Append(entry.Operation).Append("** — ").AppendLine(entry.Remedy);
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Quelle part du contrat avait une contrepartie comparable, en chiffres.
+    /// </summary>
+    /// <remarks>
+    /// Un chiffre, et non une tournure. « La projection s'est bien passée » laisse croire à une
+    /// équivalence ; « 62 % des constructions portées » se recoupe avec le reste du rapport et se
+    /// discute. Un lecteur doit pouvoir distinguer un rapport propre d'un rapport muet.
+    /// </remarks>
+    private static void Comparability(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 23. Part comparable du contrat").AppendLine();
+
+        if (run.Footing?.Projection is not { } projection)
+        {
+            builder.AppendLine(Absent(run)).AppendLine();
+
+            return;
+        }
+
+        Projection.ProjectionFigures figures = projection.Figures;
+        int examined = figures.Carried + figures.Approximate + figures.NotCarried;
+
+        builder.AppendLine("| Ce qui est compté | Nombre |");
+        builder.AppendLine("|-------------------|--------|");
+        builder.Append("| opérations projetées | ").Append(Figure(figures.Operations)).AppendLine(" |");
+        builder.Append("| opérations appariées | ")
+            .Append(Figure(run.Footing.Correspondence.Comparable.Count)).AppendLine(" |");
+        builder.Append("| constructions portées | ").Append(Figure(figures.Carried)).AppendLine(" |");
+        builder.Append("| portées à peu près | ").Append(Figure(figures.Approximate)).AppendLine(" |");
+        builder.Append("| non portées | ").Append(Figure(figures.NotCarried)).AppendLine(" |");
+        builder.Append("| types déclarés non projetables | ").Append(Figure(figures.DeclinedTypes))
+            .AppendLine(" |");
+        builder.AppendLine();
+
+        builder.Append("**Part portée exactement : ").Append(Percent(figures.Carried, examined))
+            .Append(" des ").Append(Figure(examined))
+            .AppendLine(" constructions examinées.**").AppendLine();
+
+        Grouped(builder, projection);
+    }
+
+    /// <summary>Ce qui n'a pas été porté, groupé par motif et compté.</summary>
+    /// <remarks>
+    /// Une entrée par motif, et son nombre. Quatre cents attributs non portés enseignent la même chose
+    /// au prix de quatre cents lignes ; le rapport en montre une, et chaque occurrence garde son
+    /// emplacement dans le document engendré.
+    /// </remarks>
+    private static void Grouped(StringBuilder builder, Projection.ProjectionResult projection)
+    {
+        if (projection.ByReason.Count == 0)
+        {
+            builder.AppendLine("Rien n'a été laissé derrière : le contrat se projette en entier.")
+                .AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine("| Ce qui n'a pas de contrepartie | Occurrences |");
+        builder.AppendLine("|--------------------------------|-------------|");
+
+        foreach (KeyValuePair<Projection.ProjectionGapReason, int> group in projection.ByReason
+            .OrderByDescending(group => group.Value)
+            .ThenBy(group => group.Key))
+        {
+            builder.Append("| ").Append(Projection.GapReasons.Say(group.Key))
+                .Append(" | ").Append(Figure(group.Value)).AppendLine(" |");
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>Ce qu'une section dit quand le candidat n'est pas un contrat de service.</summary>
+    private static string Absent(ApiDeltaRun run) => run.Candidate is null
+        ? "Sans objet : cette exécution n'avait pas de candidat."
+        : "Sans objet : le candidat n'est pas un contrat de service.";
+
+    private static string Count<T>(IEnumerable<T> items) =>
+        Figure(items.Count());
+
+    private static string Figure(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Une proportion, ou l'aveu qu'il n'y a rien à proportionner.</summary>
+    private static string Percent(int part, int total) => total == 0
+        ? "sans objet"
+        : ((part * 100) / total).ToString(CultureInfo.InvariantCulture) + " %";
 
     /// <summary>Ce qui a été retenu et écarté, avec la raison de chaque refus.</summary>
     private static void Declined(StringBuilder builder, Correction.CorrectionOutcome correction)
@@ -880,10 +1094,57 @@ public static class MarkdownReportWriter
                 .Append(" — ").AppendLine(skipped.SkipReason);
         }
 
+        Unread(builder, run);
         Unevaluated(builder, run);
 
         builder.AppendLine();
     }
+
+    /// <summary>
+    /// Ce que la lecture du contrat n'a pas résolu, et ce que la projection n'a pas pu établir.
+    /// </summary>
+    /// <remarks>
+    /// Dans les limites, et non dans une section à part : un import que la politique a refusé et un
+    /// type déclaré non projetable ne sont pas des constats sur le contrat, ce sont des trous dans ce
+    /// que le rapport affirme. Un lecteur doit les voir au même endroit que les autres réserves, avant
+    /// de se fier au reste.
+    /// </remarks>
+    private static void Unread(StringBuilder builder, ApiDeltaRun run)
+    {
+        foreach (Diagnostic unresolved in run.Diagnostics.Where(IsImportGap))
+        {
+            builder.Append("- Import non résolu : ").AppendLine(unresolved.Message);
+        }
+
+        if (run.Footing?.Projection is not { } projection)
+        {
+            return;
+        }
+
+        if (projection.Figures.DeclinedTypes > 0)
+        {
+            builder.Append("- ").Append(Figure(projection.Figures.DeclinedTypes))
+                .AppendLine(
+                    " type(s) déclarés non projetables : leur sens dépend d'une construction que "
+                    + "l'outil ne sait pas exprimer, et les projeter sans elle produirait un contrat "
+                    + "plus permissif que le vrai.");
+        }
+
+        if (projection.Figures.NotCarried > 0)
+        {
+            builder.Append("- ").Append(Figure(projection.Figures.NotCarried))
+                .AppendLine(
+                    " construction(s) sans contrepartie : la section 23 les groupe par motif, et le "
+                    + "document engendré porte un marqueur à chaque endroit concerné.");
+        }
+    }
+
+    /// <summary>Indique qu'un diagnostic dit qu'un import n'a pas été suivi.</summary>
+    private static bool IsImportGap(Diagnostic diagnostic) =>
+        diagnostic.Code is Wsdl.WsdlDiagnosticCodes.ImportUnresolved
+            or Wsdl.WsdlDiagnosticCodes.ImportOutsideRoot
+            or Wsdl.WsdlDiagnosticCodes.ImportRemoteRefused
+            or Wsdl.WsdlDiagnosticCodes.ImportCycle;
 
     /// <summary>
     /// Les règles qui n'ont pas pu être évaluées, et celles qui ont rendu moins qu'elles n'ont trouvé.

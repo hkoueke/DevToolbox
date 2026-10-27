@@ -3,7 +3,7 @@ using DevToolbox.Tools.ApiDelta.Core.Correction;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Abstractions;
 
-/// <summary>Écrit la production corrigée : la production, plus ce que le développeur a retenu.</summary>
+/// <summary>Écrit la production consolidée : la production, plus ce que le développeur a retenu.</summary>
 public interface ICorrectionBuilder
 {
     /// <summary>Établit ce qui serait inséré, sans rien écrire.</summary>
@@ -16,7 +16,7 @@ public interface ICorrectionBuilder
     /// </remarks>
     Result<CorrectionPlan> Plan(CorrectionRequest request);
 
-    /// <summary>Construit la production corrigée.</summary>
+    /// <summary>Construit la production consolidée.</summary>
     /// <param name="request">Ce qu'il faut pour corriger.</param>
     /// <returns>Les octets et ce qu'ils portent, ou un échec déjà affichable.</returns>
     Result<BuiltCorrection> Build(CorrectionRequest request);

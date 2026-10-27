@@ -149,23 +149,165 @@ internal static class RulesetSections
                 : reader.Ruleset.KnownPlaceholders,
         };
 
-    /// <summary>Les réglages de l'extraction.</summary>
-    internal static Ruleset Extract(Reader reader, SpecNode node)
+    /// <summary>
+    /// La lecture et la projection d'un contrat de service : budget, imports, table de verbes.
+    /// </summary>
+    /// <remarks>
+    /// Trois sous-sections, chacune refusant ce qu'elle ne comprend pas en le nommant. Une clé inconnue
+    /// ne tombe pas dans un repli silencieux : un réglage qu'on croit avoir posé et que l'outil n'a
+    /// jamais lu est pire qu'un réglage absent, parce qu'on cherche ailleurs la raison du résultat.
+    /// </remarks>
+    internal static Ruleset Wsdl(Reader reader, SpecNode node)
     {
-        ExtractSettings settings = reader.Ruleset.Extract;
+        reader.Unknown(node, "wsdl", "limits", "imports", "verbs");
 
-        return reader.Ruleset with
+        WsdlSettings settings = reader.Ruleset.Wsdl;
+
+        if (Child(node, "limits") is { } limits)
         {
-            Extract = settings with
-            {
-                StampProvenance = reader.Flag(
-                    node, "extract", "stampProvenance", settings.StampProvenance),
-                DefaultName = Reader.Text(node, "defaultName") ?? settings.DefaultName,
-                CarryDocumentExtensions = reader.Flag(
-                    node, "extract", "carryDocumentExtensions", settings.CarryDocumentExtensions),
-            },
+            settings = settings with { Limits = Budget(reader, limits, settings.Limits) };
+        }
+
+        if (Child(node, "imports") is { } imports)
+        {
+            settings = settings with { Imports = Resolution(reader, imports, settings.Imports) };
+        }
+
+        if (Child(node, "verbs") is MappingNode verbs)
+        {
+            settings = settings with { Verbs = Verbs(reader, verbs) };
+        }
+
+        return reader.Ruleset with { Wsdl = settings };
+    }
+
+    /// <summary>Le budget de lecture d'un contrat.</summary>
+    private static WsdlLimits Budget(Reader reader, SpecNode node, WsdlLimits limits)
+    {
+        reader.Unknown(
+            node,
+            "wsdl.limits",
+            "maxDocumentBytes",
+            "maxNestingDepth",
+            "maxImportChainDepth",
+            "maxDocumentCount",
+            "maxEnumerationValues",
+            "maxResponseBytes",
+            "fetchTimeoutSeconds");
+
+        return limits with
+        {
+            MaxDocumentBytes = reader.Number(
+                node, "wsdl.limits", "maxDocumentBytes", limits.MaxDocumentBytes),
+            MaxNestingDepth = (int)reader.Number(
+                node, "wsdl.limits", "maxNestingDepth", limits.MaxNestingDepth),
+            MaxImportChainDepth = (int)reader.Number(
+                node, "wsdl.limits", "maxImportChainDepth", limits.MaxImportChainDepth),
+            MaxDocumentCount = (int)reader.Number(
+                node, "wsdl.limits", "maxDocumentCount", limits.MaxDocumentCount),
+            MaxEnumerationValues = (int)reader.Number(
+                node, "wsdl.limits", "maxEnumerationValues", limits.MaxEnumerationValues),
+            MaxResponseBytes = reader.Number(
+                node, "wsdl.limits", "maxResponseBytes", limits.MaxResponseBytes),
+            FetchTimeoutSeconds = (int)reader.Number(
+                node, "wsdl.limits", "fetchTimeoutSeconds", limits.FetchTimeoutSeconds),
         };
     }
+
+    /// <summary>
+    /// Ce que la résolution des imports s'autorise. Le distant sans hôte est une configuration invalide.
+    /// </summary>
+    /// <remarks>
+    /// Refusé, et non lu comme « tous les hôtes ». Permettre le distant sans nommer personne ne veut
+    /// rien dire, et la lecture charitable — celle qui devine ce que l'auteur a voulu — est précisément
+    /// celle qui ouvrirait le réseau entier sur une ligne incomplète.
+    /// </remarks>
+    private static ImportPolicy Resolution(Reader reader, SpecNode node, ImportPolicy policy)
+    {
+        reader.Unknown(
+            node,
+            "wsdl.imports",
+            "root",
+            "allowRemote",
+            "allowedHosts",
+            "allowPlainHttp",
+            "maxRedirects",
+            "confirmedAddresses");
+
+        ImportPolicy resolved = policy with
+        {
+            ConfinementRoot = Reader.Text(node, "root") ?? policy.ConfinementRoot,
+            AllowRemote = reader.Flag(node, "wsdl.imports", "allowRemote", policy.AllowRemote),
+            AllowedHosts = Reader.Strings(node, "allowedHosts") is { Count: > 0 } hosts
+                ? hosts
+                : policy.AllowedHosts,
+            AllowPlainHttp = reader.Flag(
+                node, "wsdl.imports", "allowPlainHttp", policy.AllowPlainHttp),
+            MaxRedirects = (int)reader.Number(
+                node, "wsdl.imports", "maxRedirects", policy.MaxRedirects),
+            ConfirmedAddresses = Reader.Strings(node, "confirmedAddresses") is { Count: > 0 } confirmed
+                ? confirmed
+                : policy.ConfirmedAddresses,
+        };
+
+        if (!resolved.IsCoherent)
+        {
+            reader.Refuse(
+                "« wsdl.imports.allowRemote » demande une liste « allowedHosts » non vide : résoudre "
+                + "par le réseau sans liste d'autorisation n'est pas une porte ouverte, c'est une "
+                + "erreur.",
+                node.Position);
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// La table de verbes : un mot du nom d'une opération, et la méthode HTTP qu'il commande.
+    /// </summary>
+    /// <remarks>
+    /// Les méthodes admises sont celles qu'une route peut porter. Un verbe associé à autre chose est
+    /// refusé en le nommant plutôt qu'ignoré : une table dont la moitié des lignes n'aurait rien fait
+    /// produirait des itinéraires que personne n'a demandés, sans que rien ne le dise.
+    /// </remarks>
+    private static Dictionary<string, string> Verbs(Reader reader, MappingNode node)
+    {
+        Dictionary<string, string> table = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (MappingEntry entry in node.Entries)
+        {
+            if (entry.Value is not ScalarNode method)
+            {
+                reader.Refuse(
+                    "« wsdl.verbs." + entry.Key.Text + " » vaut une méthode HTTP.", entry.Key.Position);
+
+                continue;
+            }
+
+            string wanted = method.Text.ToUpperInvariant();
+
+            if (!Methods.Contains(wanted))
+            {
+                reader.Refuse(
+                    "« wsdl.verbs." + entry.Key.Text + " » vaut " + string.Join(", ", Methods) + ".",
+                    method.Position);
+
+                continue;
+            }
+
+            table[entry.Key.Text] = wanted;
+        }
+
+        return table;
+    }
+
+    private static SpecNode? Child(SpecNode node, string key) => (node as MappingNode)?.Find(key);
+
+    /// <summary>Les méthodes qu'un itinéraire dérivé peut porter.</summary>
+    private static readonly HashSet<string> Methods = new(StringComparer.Ordinal)
+    {
+        "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE",
+    };
 
     /// <summary>
     /// Ce qu'une section a besoin pour se lire : le jeu de règles en cours, et où déposer un refus.
@@ -188,6 +330,39 @@ internal static class RulesetSections
                 "Dans « " + path + " » : " + message,
                 SpecPointer.Root,
                 position));
+
+        /// <summary>
+        /// Refuse, une par une, les clés qu'une section ne connaît pas.
+        /// </summary>
+        /// <param name="node">La section.</param>
+        /// <param name="section">Son nom, pour que le refus dise où chercher.</param>
+        /// <param name="known">Les clés admises.</param>
+        /// <remarks>
+        /// Nommée avec sa ligne et sa colonne, parce qu'une faute de frappe dans une configuration est
+        /// invisible autrement : le réglage qu'on croit avoir posé n'agit pas, l'outil se comporte comme
+        /// s'il n'existait pas, et on cherche la raison du résultat partout sauf dans le fichier.
+        /// </remarks>
+        internal void Unknown(SpecNode node, string section, params string[] known)
+        {
+            if (node is not MappingNode mapping)
+            {
+                Refuse("« " + section + " » est une association.", node.Position);
+
+                return;
+            }
+
+            HashSet<string> admitted = new(known, StringComparer.Ordinal);
+
+            foreach (ScalarNode key in mapping.Entries
+                .Select(entry => entry.Key)
+                .Where(key => !admitted.Contains(key.Text)))
+            {
+                Refuse(
+                    "« " + section + "." + key.Text + " » n'est pas une clé connue. Celles de "
+                        + "cette section sont : " + string.Join(", ", known) + ".",
+                    key.Position);
+            }
+        }
 
         /// <summary>Le texte d'une clé, ou rien.</summary>
         internal static string? Text(SpecNode node, string key) =>

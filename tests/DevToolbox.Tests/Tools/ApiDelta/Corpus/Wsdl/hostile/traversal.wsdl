@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Un schéma hors de la racine déclarée. Doit être refusé en nommant le chemin qu'il aurait quitté :
+     « confiné » sans refus nommé serait un confinement que personne ne peut vérifier. -->
+<wsdl:definitions name="Traversee"
+    targetNamespace="http://entreprise.local/hostile"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <wsdl:types>
+    <xs:schema targetNamespace="http://entreprise.local/hostile">
+      <xs:import namespace="http://entreprise.local/ailleurs"
+                 schemaLocation="../../../../../../Windows/System32/drivers/etc/hosts"/>
+    </xs:schema>
+  </wsdl:types>
+</wsdl:definitions>
