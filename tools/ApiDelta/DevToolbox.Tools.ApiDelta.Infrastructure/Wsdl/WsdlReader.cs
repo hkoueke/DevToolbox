@@ -139,11 +139,56 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
+        if (Deeper(root, limits.MaxNestingDepth))
+        {
+            diagnostics.Add(Budget(
+                "la profondeur d'imbrication d'un document", limits.MaxNestingDepth, name));
+
+            return WsdlReadResult.Refused(diagnostics);
+        }
+
         Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
 
         return definitions is null
             ? WsdlReadResult.Refused(diagnostics)
             : Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+    }
+
+    /// <summary>
+    /// Indique que l'arbre descend plus bas que le budget ne le permet.
+    /// </summary>
+    /// <param name="root">La racine du document.</param>
+    /// <param name="budget">La profondeur admise.</param>
+    /// <returns><see langword="true"/> si le budget est dépassé.</returns>
+    /// <remarks>
+    /// Mesurée sur l'arbre, après analyse, et non pendant. Un document assez profond pour faire
+    /// déborder une pile la ferait déborder <em>dans l'analyseur</em>, avant qu'aucun compteur à nous
+    /// n'ait eu la main ; ce que ce budget protège est ce qui vient après — nos propres parcours
+    /// récursifs, qui descendent cet arbre-là. La mesure s'arrête dès que le budget est dépassé, si
+    /// bien qu'un document monstrueux ne coûte pas plus cher à refuser qu'à mesurer jusqu'au seuil.
+    /// </remarks>
+    private static bool Deeper(XElement root, int budget)
+    {
+        Queue<(XElement Element, int Depth)> pending = new();
+
+        pending.Enqueue((root, 1));
+
+        while (pending.Count > 0)
+        {
+            (XElement element, int depth) = pending.Dequeue();
+
+            if (depth > budget)
+            {
+                return true;
+            }
+
+            foreach (XElement child in element.Elements())
+            {
+                pending.Enqueue((child, depth + 1));
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

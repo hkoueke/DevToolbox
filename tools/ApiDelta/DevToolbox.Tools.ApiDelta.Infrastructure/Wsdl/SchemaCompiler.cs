@@ -68,12 +68,16 @@ internal static class SchemaCompiler
 
         SchemaConflicts.Report(document, definitions, walker.Schemas, diagnostics);
 
-        return Finish(set, walker, diagnostics, document);
+        return Finish(set, walker, limits, diagnostics, document);
     }
 
     /// <summary>Compile, puis relève les types sous une forme que la projection sait lire.</summary>
     private static SchemaSetResult Finish(
-        XmlSchemaSet set, ImportWalker walker, List<Diagnostic> diagnostics, string document)
+        XmlSchemaSet set,
+        ImportWalker walker,
+        WsdlLimits limits,
+        List<Diagnostic> diagnostics,
+        string document)
     {
         try
         {
@@ -90,7 +94,7 @@ internal static class SchemaCompiler
         }
 
         return new SchemaSetResult(
-            XsdTypeReader.Read(set, document),
+            XsdTypeReader.Read(set, document, limits, diagnostics),
             XsdTypeReader.Elements(set),
             walker.Documents,
             walker.Unresolved);

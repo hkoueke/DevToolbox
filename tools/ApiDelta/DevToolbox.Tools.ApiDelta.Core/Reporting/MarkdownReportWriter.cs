@@ -48,6 +48,9 @@ public static class MarkdownReportWriter
         Artifacts(builder, run);
         Limitations(builder, run);
         Carried(builder, run);
+        Correspondence(builder, run);
+        Coverage(builder, run);
+        Comparability(builder, run);
 
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
@@ -947,6 +950,170 @@ public static class MarkdownReportWriter
         builder.AppendLine();
     }
 
+    /// <summary>
+    /// L'appariement entre les opérations du contrat et les routes de la production.
+    /// </summary>
+    /// <remarks>
+    /// Présente même vide, comme les deux suivantes. Une section qui disparaît quand elle n'a rien à
+    /// dire laisse un lecteur incapable de distinguer le silence de l'absence : il ne sait pas si
+    /// l'outil n'a rien trouvé ou s'il n'a pas regardé.
+    /// </remarks>
+    private static void Correspondence(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 21. Appariement des opérations").AppendLine();
+
+        if (run.Footing is not { } footing || footing.Correspondence.Entries.Count == 0)
+        {
+            builder.AppendLine(Absent(run)).AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine(footing.Correspondence.IsConfirmed
+            ? "L'appariement a été confirmé. Rien n'a été comparé avant cette confirmation."
+            : "**L'appariement n'a pas été confirmé**, et rien n'a donc été comparé.").AppendLine();
+
+        builder.AppendLine("| Opération | Route | Origine | Sur quoi |");
+        builder.AppendLine("|-----------|-------|---------|----------|");
+
+        foreach (Correspondence.CorrespondenceEntry entry in footing.Correspondence.Entries)
+        {
+            builder.Append("| ").Append(entry.Operation)
+                .Append(" | ").Append(entry.HasRoute ? entry.Route : "—")
+                .Append(" | ").Append(entry.Mark)
+                .Append(" | ").Append(entry.Basis ?? "—").AppendLine(" |");
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Ce que la production couvre du contrat, et ce qu'elle ne couvre pas.
+    /// </summary>
+    /// <remarks>
+    /// Séparée de la compatibilité, et c'est tout le sujet. La couverture dit ce qui manque, avec
+    /// certitude, parce qu'elle repose sur l'appariement confirmé et sur rien d'autre. Les mêler ferait
+    /// apparaître un manque parmi les ruptures : rien n'est cassé quand une opération n'a pas de route,
+    /// et les deux nouvelles ne s'adressent ni au même lecteur ni au même calendrier.
+    /// </remarks>
+    private static void Coverage(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 22. Couverture du contrat").AppendLine();
+
+        if (run.Footing is not { } footing || !footing.Coverage.IsEstablished)
+        {
+            builder.AppendLine(run.Footing is null
+                ? Absent(run)
+                : "La couverture n'a pas été établie : l'appariement n'a pas été confirmé. Ce n'est "
+                    + "pas une couverture totale, et ce n'est pas une couverture nulle — c'est un "
+                    + "constat qui n'a pas eu lieu.").AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine("| État | Opérations |");
+        builder.AppendLine("|------|------------|");
+        builder.Append("| couvertes | ").Append(Count(footing.Coverage.Covered)).AppendLine(" |");
+        builder.Append("| absentes de la production | ").Append(Count(footing.Coverage.Gaps))
+            .AppendLine(" |");
+        builder.Append("| ambiguës | ").Append(Count(footing.Coverage.Ambiguous)).AppendLine(" |");
+        builder.AppendLine();
+
+        foreach (Correspondence.CoverageEntry entry in footing.Coverage.Entries
+            .Where(entry => entry.Remedy is not null))
+        {
+            builder.Append("- **").Append(entry.Operation).Append("** — ").AppendLine(entry.Remedy);
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Quelle part du contrat avait une contrepartie comparable, en chiffres.
+    /// </summary>
+    /// <remarks>
+    /// Un chiffre, et non une tournure. « La projection s'est bien passée » laisse croire à une
+    /// équivalence ; « 62 % des constructions portées » se recoupe avec le reste du rapport et se
+    /// discute. Un lecteur doit pouvoir distinguer un rapport propre d'un rapport muet.
+    /// </remarks>
+    private static void Comparability(StringBuilder builder, ApiDeltaRun run)
+    {
+        builder.AppendLine("## 23. Part comparable du contrat").AppendLine();
+
+        if (run.Footing?.Projection is not { } projection)
+        {
+            builder.AppendLine(Absent(run)).AppendLine();
+
+            return;
+        }
+
+        Projection.ProjectionFigures figures = projection.Figures;
+        int examined = figures.Carried + figures.Approximate + figures.NotCarried;
+
+        builder.AppendLine("| Ce qui est compté | Nombre |");
+        builder.AppendLine("|-------------------|--------|");
+        builder.Append("| opérations projetées | ").Append(Figure(figures.Operations)).AppendLine(" |");
+        builder.Append("| opérations appariées | ")
+            .Append(Figure(run.Footing.Correspondence.Comparable.Count)).AppendLine(" |");
+        builder.Append("| constructions portées | ").Append(Figure(figures.Carried)).AppendLine(" |");
+        builder.Append("| portées à peu près | ").Append(Figure(figures.Approximate)).AppendLine(" |");
+        builder.Append("| non portées | ").Append(Figure(figures.NotCarried)).AppendLine(" |");
+        builder.Append("| types déclarés non projetables | ").Append(Figure(figures.DeclinedTypes))
+            .AppendLine(" |");
+        builder.AppendLine();
+
+        builder.Append("**Part portée exactement : ").Append(Percent(figures.Carried, examined))
+            .Append(" des ").Append(Figure(examined))
+            .AppendLine(" constructions examinées.**").AppendLine();
+
+        Grouped(builder, projection);
+    }
+
+    /// <summary>Ce qui n'a pas été porté, groupé par motif et compté.</summary>
+    /// <remarks>
+    /// Une entrée par motif, et son nombre. Quatre cents attributs non portés enseignent la même chose
+    /// au prix de quatre cents lignes ; le rapport en montre une, et chaque occurrence garde son
+    /// emplacement dans le document engendré.
+    /// </remarks>
+    private static void Grouped(StringBuilder builder, Projection.ProjectionResult projection)
+    {
+        if (projection.ByReason.Count == 0)
+        {
+            builder.AppendLine("Rien n'a été laissé derrière : le contrat se projette en entier.")
+                .AppendLine();
+
+            return;
+        }
+
+        builder.AppendLine("| Ce qui n'a pas de contrepartie | Occurrences |");
+        builder.AppendLine("|--------------------------------|-------------|");
+
+        foreach (KeyValuePair<Projection.ProjectionGapReason, int> group in projection.ByReason
+            .OrderByDescending(group => group.Value)
+            .ThenBy(group => group.Key))
+        {
+            builder.Append("| ").Append(Projection.GapReasons.Say(group.Key))
+                .Append(" | ").Append(Figure(group.Value)).AppendLine(" |");
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>Ce qu'une section dit quand le candidat n'est pas un contrat de service.</summary>
+    private static string Absent(ApiDeltaRun run) => run.Candidate is null
+        ? "Sans objet : cette exécution n'avait pas de candidat."
+        : "Sans objet : le candidat n'est pas un contrat de service.";
+
+    private static string Count<T>(IEnumerable<T> items) =>
+        Figure(items.Count());
+
+    private static string Figure(int value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Une proportion, ou l'aveu qu'il n'y a rien à proportionner.</summary>
+    private static string Percent(int part, int total) => total == 0
+        ? "sans objet"
+        : ((part * 100) / total).ToString(CultureInfo.InvariantCulture) + " %";
+
     /// <summary>Ce qui a été retenu et écarté, avec la raison de chaque refus.</summary>
     private static void Declined(StringBuilder builder, Correction.CorrectionOutcome correction)
     {
@@ -983,10 +1150,57 @@ public static class MarkdownReportWriter
                 .Append(" — ").AppendLine(skipped.SkipReason);
         }
 
+        Unread(builder, run);
         Unevaluated(builder, run);
 
         builder.AppendLine();
     }
+
+    /// <summary>
+    /// Ce que la lecture du contrat n'a pas résolu, et ce que la projection n'a pas pu établir.
+    /// </summary>
+    /// <remarks>
+    /// Dans les limites, et non dans une section à part : un import que la politique a refusé et un
+    /// type déclaré non projetable ne sont pas des constats sur le contrat, ce sont des trous dans ce
+    /// que le rapport affirme. Un lecteur doit les voir au même endroit que les autres réserves, avant
+    /// de se fier au reste.
+    /// </remarks>
+    private static void Unread(StringBuilder builder, ApiDeltaRun run)
+    {
+        foreach (Diagnostic unresolved in run.Diagnostics.Where(IsImportGap))
+        {
+            builder.Append("- Import non résolu : ").AppendLine(unresolved.Message);
+        }
+
+        if (run.Footing?.Projection is not { } projection)
+        {
+            return;
+        }
+
+        if (projection.Figures.DeclinedTypes > 0)
+        {
+            builder.Append("- ").Append(Figure(projection.Figures.DeclinedTypes))
+                .AppendLine(
+                    " type(s) déclarés non projetables : leur sens dépend d'une construction que "
+                    + "l'outil ne sait pas exprimer, et les projeter sans elle produirait un contrat "
+                    + "plus permissif que le vrai.");
+        }
+
+        if (projection.Figures.NotCarried > 0)
+        {
+            builder.Append("- ").Append(Figure(projection.Figures.NotCarried))
+                .AppendLine(
+                    " construction(s) sans contrepartie : la section 23 les groupe par motif, et le "
+                    + "document engendré porte un marqueur à chaque endroit concerné.");
+        }
+    }
+
+    /// <summary>Indique qu'un diagnostic dit qu'un import n'a pas été suivi.</summary>
+    private static bool IsImportGap(Diagnostic diagnostic) =>
+        diagnostic.Code is Wsdl.WsdlDiagnosticCodes.ImportUnresolved
+            or Wsdl.WsdlDiagnosticCodes.ImportOutsideRoot
+            or Wsdl.WsdlDiagnosticCodes.ImportRemoteRefused
+            or Wsdl.WsdlDiagnosticCodes.ImportCycle;
 
     /// <summary>
     /// Les règles qui n'ont pas pu être évaluées, et celles qui ont rendu moins qu'elles n'ont trouvé.

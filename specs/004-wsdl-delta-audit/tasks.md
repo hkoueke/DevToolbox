@@ -409,15 +409,15 @@ before it has read anything.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T089 [P] Add the correspondence, coverage and comparability sections to `Core/Reporting/MarkdownReportWriter.cs`, in a fixed order, present even when empty (WR-602)
-- [ ] T090 [P] Carry the same three sections into `Core/Reporting/JsonReportWriter.cs`, so the machine-readable report says what the readable one says (WR-600)
-- [ ] T091 [P] State the proportion compared as a figure and not as prose, in `Core/Reporting/MarkdownReportWriter.cs` (WR-603, SC-005)
-- [ ] T092 [P] Report every import left unresolved by policy and every projection that could not be established, in the limitations section of `Core/Reporting/MarkdownReportWriter.cs` (WR-604)
-- [ ] T093 Register the contract, the retrieved origin and the projection gap with `RedactionRegistry` in `Infra/ServiceCollectionExtensions.cs`, so no retrieved value can reach a log sink (WR-605)
-- [ ] T094 [P] Create `Tests/Wsdl/WsdlSecretsTests.cs` — across every file a run writes, no credential, token or secret-shaped value appears, including a contract whose `soap:address` carries one (SC-015)
+- [X] T089 [P] Add the correspondence, coverage and comparability sections to `Core/Reporting/MarkdownReportWriter.cs`, in a fixed order, present even when empty (WR-602)
+- [X] T090 [P] Carry the same three sections into `Core/Reporting/JsonReportWriter.cs`, so the machine-readable report says what the readable one says (WR-600)
+- [X] T091 [P] State the proportion compared as a figure and not as prose, in `Core/Reporting/MarkdownReportWriter.cs` (WR-603, SC-005)
+- [X] T092 [P] Report every import left unresolved by policy and every projection that could not be established, in the limitations section of `Core/Reporting/MarkdownReportWriter.cs` (WR-604)
+- [X] T093 Register the contract, the retrieved origin and the projection gap with `RedactionRegistry` in `Infra/ServiceCollectionExtensions.cs`, so no retrieved value can reach a log sink (WR-605)
+- [X] T094 [P] Create `Tests/Wsdl/WsdlSecretsTests.cs` — across every file a run writes, no credential, token or secret-shaped value appears, including a contract whose `soap:address` carries one (SC-015)
 - [ ] T095 [P] Create `Tests/Wsdl/WsdlResumeTests.cs` — a run interrupted after confirmation resumes without asking again, retrieves nothing, and reaches identical artifacts outside the metadata block (SC-014)
 - [ ] T096 [P] Create `Tests/Wsdl/WsdlPerformanceTests.cs` — 200 operations and 5,000 types across 20 documents under thirty seconds, **measured per phase**: 003's performance test found a stack overflow rather than a slowdown, and only the per-phase curve showed where (SC-002)
-- [ ] T097 [P] Create `Tests/Wsdl/WsdlLimitTests.cs` — every configured limit, when reached, reported with the limit named (SC-013)
+- [X] T097 [P] Create `Tests/Wsdl/WsdlLimitTests.cs` — every configured limit, when reached, reported with the limit named (SC-013)
 - [ ] T098 Create `Tests/Wsdl/WsdlOfflineTests.cs` — no outbound call when the inputs are files, established by observation and not by inspecting configuration (SC-012)
 - [ ] T099 [P] Update `README.md` — apidelta accepts a WSDL candidate, and what the new report sections say
 - [ ] T100 [P] Update `CONCEPTION.md` with the rules this feature adds, if any survive the implementation — a rule earns its place by having been broken once

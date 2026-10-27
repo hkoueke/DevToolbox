@@ -7,6 +7,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 /// <param name="Derivation">D'où chaque élément projeté vient, et ce que la projection n'a pas porté.</param>
 /// <param name="Correspondence">L'appariement entre les opérations et les routes de la production.</param>
 /// <param name="Coverage">Ce que la production couvre du contrat.</param>
+/// <param name="Projection">Ce que la projection a produit et laissé derrière, pour les rapports.</param>
 /// <remarks>
 /// Les trois voyagent ensemble parce qu'elles répondent ensemble à une seule question : sur quelle base
 /// le développeur choisit-il. La projection dit ce que la traduction valait, la correspondance dit si la
@@ -20,7 +21,8 @@ namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 public sealed record WsdlFooting(
     DerivationIndex Derivation,
     OperationCorrespondence Correspondence,
-    CoverageReport Coverage)
+    CoverageReport Coverage,
+    ProjectionResult? Projection = null)
 {
     /// <summary>Une base qui ne sait rien : le candidat n'est pas un contrat de service.</summary>
     public static WsdlFooting None { get; } = new(

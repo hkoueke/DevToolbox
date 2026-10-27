@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Xml;
 using System.Xml.Schema;
+using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 
 namespace DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
@@ -47,8 +49,14 @@ internal static class XsdTypeReader
     /// <summary>Relève les types globaux du jeu.</summary>
     /// <param name="set">Le jeu compilé.</param>
     /// <param name="document">Le document d'entrée, pour les emplacements.</param>
+    /// <param name="limits">Le budget, dont celui des valeurs d'une énumération.</param>
+    /// <param name="diagnostics">Où consigner un budget atteint.</param>
     /// <returns>Les types, par nom qualifié.</returns>
-    internal static IReadOnlyDictionary<string, XsdType> Read(XmlSchemaSet set, string document)
+    internal static IReadOnlyDictionary<string, XsdType> Read(
+        XmlSchemaSet set,
+        string document,
+        WsdlLimits limits,
+        List<Core.Loading.Diagnostic> diagnostics)
     {
         Dictionary<string, XsdType> types = new(StringComparer.Ordinal);
 
@@ -63,11 +71,41 @@ internal static class XsdTypeReader
                 continue;
             }
 
-            types[type.QualifiedName.ToString()] = Describe(type, document, set);
+            XsdType described = Describe(type, document, set);
+
+            if (Enumerations(described) > limits.MaxEnumerationValues)
+            {
+                diagnostics.Add(Budget(type.QualifiedName.ToString(), limits, document));
+
+                continue;
+            }
+
+            types[type.QualifiedName.ToString()] = described;
         }
 
         return types;
     }
+
+    /// <summary>Le nombre de valeurs qu'une énumération déclare.</summary>
+    private static int Enumerations(XsdType type) =>
+        type.Facets.Count(facet => string.Equals(facet.Kind, "enumeration", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Le refus d'un type dont l'énumération dépasse le budget, la limite nommée.
+    /// </summary>
+    /// <remarks>
+    /// Le type est écarté et le refus consigné : lire la moitié d'une énumération produirait un contrat
+    /// qui refuse des valeurs que le vrai accepte, ce qui est pire que ne pas le lire du tout. Le budget
+    /// est généreux pour cette raison — il est là pour arrêter l'hostile, pas pour gêner l'inhabituel.
+    /// </remarks>
+    private static Core.Loading.Diagnostic Budget(string type, WsdlLimits limits, string document) =>
+        new(
+            Core.Loading.DiagnosticCodes.LimitReached,
+            Core.Loading.DiagnosticSeverity.Error,
+            "La lecture de « " + Path.GetFileName(document) + " » a atteint une limite : le nombre de "
+                + "valeurs d'une énumération vaut au plus "
+                + limits.MaxEnumerationValues.ToString(CultureInfo.InvariantCulture)
+                + ", et « " + type + " » en déclare davantage.");
 
     private static XsdType Describe(XmlSchemaType type, string document, XmlSchemaSet set) =>
         type switch

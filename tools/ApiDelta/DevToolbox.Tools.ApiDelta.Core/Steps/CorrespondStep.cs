@@ -125,7 +125,7 @@ public sealed class CorrespondStep : IToolStep
             context.Set(
                 ApiDeltaContextKeys.WsdlFooting,
                 new Correction.WsdlFooting(
-                    DerivationIndex.From(contract, projected), settled, coverage));
+                    DerivationIndex.From(contract, projected), settled, coverage, projected));
         }
 
         return Result.Success();

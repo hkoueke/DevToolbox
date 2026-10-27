@@ -50,6 +50,9 @@ public static class JsonReportWriter
             ["suppressions"] = Suppressions(run),
             ["optimization"] = Planned(run),
             ["sizes"] = Sizes(run),
+            ["correspondence"] = Correspondence(run),
+            ["coverage"] = Coverage(run),
+            ["comparability"] = Comparability(run),
             ["steps"] = Steps(run),
             ["outcome"] = Outcome(run),
         };
@@ -203,6 +206,109 @@ public static class JsonReportWriter
     /// reconstituer depuis l'extrait seul : un paramètre remonté au niveau du chemin y est indiscernable
     /// d'un paramètre qui y était déjà.
     /// </remarks>
+    /// <summary>
+    /// L'appariement, entrée par entrée.
+    /// </summary>
+    /// <remarks>
+    /// Présent et nul plutôt qu'absent, comme les deux suivants : un consommateur machine doit pouvoir
+    /// distinguer « il n'y avait pas de contrat de service » de « la clé a changé de nom ». Le rapport
+    /// lisible fait la même chose avec une phrase, pour la même raison.
+    /// </remarks>
+    private static JsonObject? Correspondence(ApiDeltaRun run)
+    {
+        if (run.Footing is not { } footing || footing.Correspondence.Entries.Count == 0)
+        {
+            return null;
+        }
+
+        JsonArray entries = [];
+
+        foreach (Core.Correspondence.CorrespondenceEntry entry in footing.Correspondence.Entries)
+        {
+            entries.Add(new JsonObject
+            {
+                ["operation"] = entry.Operation,
+                ["route"] = entry.HasRoute ? entry.Route : null,
+                ["origin"] = entry.Origin.ToString(),
+                ["inferred"] = entry.IsInferred,
+                ["basis"] = entry.Basis,
+                ["alternatives"] = Words(entry.Alternatives),
+            });
+        }
+
+        return new JsonObject
+        {
+            ["confirmed"] = footing.Correspondence.IsConfirmed,
+            ["entries"] = entries,
+        };
+    }
+
+    /// <summary>Ce que la production couvre du contrat, opération par opération.</summary>
+    private static JsonObject? Coverage(ApiDeltaRun run)
+    {
+        if (run.Footing is not { } footing || !footing.Coverage.IsEstablished)
+        {
+            return null;
+        }
+
+        JsonArray entries = [];
+
+        foreach (Core.Correspondence.CoverageEntry entry in footing.Coverage.Entries)
+        {
+            entries.Add(new JsonObject
+            {
+                ["operation"] = entry.Operation,
+                ["state"] = entry.State.ToString(),
+                ["route"] = entry.Route,
+                ["remedy"] = entry.Remedy,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["covered"] = footing.Coverage.Covered.Count(),
+            ["absent"] = footing.Coverage.Gaps.Count(),
+            ["ambiguous"] = footing.Coverage.Ambiguous.Count(),
+            ["entries"] = entries,
+        };
+    }
+
+    /// <summary>Quelle part du contrat avait une contrepartie, en chiffres recoupables.</summary>
+    private static JsonObject? Comparability(ApiDeltaRun run)
+    {
+        if (run.Footing?.Projection is not { } projection)
+        {
+            return null;
+        }
+
+        Projection.ProjectionFigures figures = projection.Figures;
+        int examined = figures.Carried + figures.Approximate + figures.NotCarried;
+        JsonObject grouped = [];
+
+        foreach (KeyValuePair<Projection.ProjectionGapReason, int> group in projection.ByReason
+            .OrderBy(group => group.Key))
+        {
+            grouped[group.Key.ToString()] = group.Value;
+        }
+
+        return new JsonObject
+        {
+            ["operations"] = figures.Operations,
+            ["pairedOperations"] = run.Footing.Correspondence.Comparable.Count,
+            ["schemas"] = figures.Schemas,
+            ["carried"] = figures.Carried,
+            ["approximate"] = figures.Approximate,
+            ["notCarried"] = figures.NotCarried,
+            ["declinedTypes"] = figures.DeclinedTypes,
+            ["examined"] = examined,
+
+            // Le quotient est écrit plutôt que laissé à calculer : deux consommateurs qui l'arrondissent
+            // autrement rapporteraient deux chiffres pour le même constat.
+            ["carriedPercent"] = examined == 0 ? null : (figures.Carried * 100) / examined,
+            ["notCarriedByReason"] = grouped,
+        };
+    }
+
     private static JsonObject? Extracted(ApiDeltaRun run)
     {
         if (run.Extract is not { } extract)
