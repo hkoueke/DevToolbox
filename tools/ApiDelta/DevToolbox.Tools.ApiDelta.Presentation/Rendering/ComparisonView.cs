@@ -129,7 +129,7 @@ public sealed class ComparisonView
         }
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Ce que le nouveau fichier change[/]")
+            .Header("[bold]Ce que le fichier compagnon change[/]")
             .Border(BoxBorder.Rounded));
 
         foreach (Artifact artifact in artifacts)

@@ -283,7 +283,7 @@ found, when it failed). **Invariant**: no optimized artifact is written unless a
 
 ---
 
-## 8b. Extraction
+## 8b. Désigner une opération
 
 ### `OperationSelector`
 
@@ -294,44 +294,18 @@ found, when it failed). **Invariant**: no optimized artifact is written unless a
 
 Equality is by both members, ordinally. A selector is what the developer picked, independent of where it
 sits in the tree — which is what lets it survive a restart as two strings and be re-resolved against a
-freshly read document (FR-913).
+freshly read document (FR-705).
 
 ### `SelectableOperation`
 
-What the picker shows: `Selector`, `Summary`, `Tags`, `Deprecated`, `Location`. Built by walking the paths
+What a picker shows: `Selector`, `Summary`, `Tags`, `Deprecated`, `Location`. Built by walking the paths
 once; it carries no schema and no example, so listing four hundred operations costs four hundred short
 strings.
 
-### `ExtractRequest`
-
-`Selectors`, `StampProvenance`, `OutputName`. **Invariant**: an empty `Selectors` is a usage error refused
-before any work (FR-701) — there is no such thing as an empty extract.
-
-### `EffectiveOperation`
-
-The operation after inheritance is applied: its own fields, plus the path item's parameters merged under
-the override rules, plus the servers in force, plus the security requirement in force. **Invariant**: this
-is the unit FR-910 compares, on both sides. Comparing the written operation rather than the effective one
-would pass an extract that had quietly dropped a path-level parameter or a global security requirement —
-which is the exact failure this mode has to be unable to produce.
-
-### `ExtractResult`
-
-| Member | Type | Notes |
-|---|---|---|
-| `Document` | `SpecNode` | the built extract, before emission |
-| `Closure` | `DependencyClosure` | what came along, and why (FR-904) |
-| `CarriedTags` | `IReadOnlyList<string>` | FR-906 |
-| `InheritedContext` | `IReadOnlyList<InheritanceRecord>` | per selector: which path parameters, servers and security requirement were carried, so the report can show it |
-| `DanglingExtensionReferences` | `IReadOnlyList<Finding>` | carried extensions naming paths the extract does not contain (FR-909) |
-| `Provenance` | `ExtractProvenance` | source path, source hash, selectors, tool version |
-| `Verification` | `ExtractVerification` | |
-
-### `ExtractVerification`
-
-`Reparsed`, `Revalidated`, `ReferencesResolved`, `ContainsNothingUnselected`, `OperationsEquivalent`, plus
-`Differences` for what equivalence found when it failed. **Invariant**: no extract is written unless all
-five are true (FR-910), and the comparison runs on the emitted bytes, as in §8's `VerificationResult`.
+Ces deux formes et le catalogue qui les produit vivaient sous le titre « Extraction », et ont survécu au
+retrait de ce mode le 2026-10-27 : c'est la consolidation qui les emploie désormais. Les formes propres à
+l'extrait — `ExtractRequest`, `ExtractResult`, `ExtractVerification`, `EffectiveOperation` — sont retirées
+avec FR-900 à FR-913.
 
 ---
 
@@ -368,9 +342,8 @@ Everything the developer chose, and the only thing that survives the process.
 
 | Member | Type | Notes |
 |---|---|---|
-| `Mode` | `RunMode` | `Compare`, `Patch`, `Audit`, `Optimize`, `Extract`, `Everything` (FR-700) |
-| `Extract` | `ExtractRequest?` | present only for the extract mode (§8b) |
-| `CandidatePath` / `ProductionPath` | `string?` / `string` | candidate absent for audit and optimize (FR-701) |
+| `Mode` | `RunMode` | `Consolidate` ou `Analyse`, et rien d'autre (FR-700) |
+| `CandidatePath` / `ProductionPath` | `string?` / `string` | le compagnon est absent en mode analyse (FR-701) |
 | `CandidateHash` / `ProductionHash` | `string?` / `string` | what makes resuming safe (FR-705) |
 | `OutputDirectory` | `string` | confined; artifacts land here |
 | `RulesetPath` / `SuppressionsPath` | `string?` | |

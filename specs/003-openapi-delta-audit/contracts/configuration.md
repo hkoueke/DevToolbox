@@ -83,11 +83,6 @@ versioning:
 output:
   maxGrowthPercent: 0       # an optimized document larger than the original is refused
 
-extract:
-  stampProvenance: true     # one x-apidelta-extract extension at the root; a partial file should say so
-  defaultName: openapi-extract.yaml
-  carryDocumentExtensions: true   # document-level x-* travel with the extract (FR-909)
-
 suppressions:
   requireJustification: true
 ```
@@ -159,9 +154,10 @@ The shipped defaults are the values above, with three deliberate choices:
 - **`references.allowLocal: false`, `allowRemote: false`** — the secure default, and the deterministic one.
 - **`OPT-006` and `OPT-009` disabled** — the two transformations that change generated client type names
   and published metadata respectively.
-- **`extract.stampProvenance: true`** — the one case where the tool adds something to a document it
-  generated, and it is there so the document can say what it is. It never touches an extension that was
-  already present.
+- **La section `extract` est retirée** — le 2026-10-27, avec FR-900 à FR-913. Une clé de configuration
+  pour un mode qui n'existe plus serait refusée par le contrôle des clés inconnues, ce qui est le bon
+  comportement et une mauvaise surprise : un jeu de règles d'équipe qui la portait doit être nettoyé, et
+  le refus le nommera avec sa ligne.
 - **The organization-specific values are present but replaceable** — the `x-sg-` prefix, the French
   deprecation phrase, the `$(catalog.host)` placeholder pattern. They come from the source product
   requirements document's own corpus, so the tool is useful on that corpus out of the box and not tied to

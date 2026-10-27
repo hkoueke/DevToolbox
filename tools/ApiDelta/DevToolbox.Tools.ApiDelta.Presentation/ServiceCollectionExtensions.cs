@@ -11,7 +11,7 @@ using DevToolbox.Tools.ApiDelta.Core.Fingerprinting;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
 using DevToolbox.Tools.ApiDelta.Core.Reporting;
 using DevToolbox.Tools.ApiDelta.Core.Metamodel;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
 using DevToolbox.Tools.ApiDelta.Core.Optimization.Rules;
 using DevToolbox.Tools.ApiDelta.Core.Versioning;
@@ -54,8 +54,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IContractEquivalenceVerifier, ContractEquivalenceVerifier>();
         services.AddSingleton<IOptimizationApplier, OptimizationApplier>();
         services.AddSingleton<IOperationCatalog, OperationCatalog>();
-        services.AddSingleton<IExtractBuilder, ExtractBuilder>();
-        services.AddSingleton<IExtractVerifier, ExtractVerifier>();
         services.AddSingleton<IDocumentComparer, DocumentComparer>();
         services.AddSingleton<IVersionPolicy, VersionRecommender>();
         services.AddSingleton<IDependencyResolver, DependencyResolver>();
@@ -69,9 +67,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ComparisonView>();
         services.AddSingleton<FindingsView>();
         services.AddSingleton<ProposalsView>();
-        services.AddSingleton<ExtractView>();
-        services.AddSingleton<OperationPicker>();
-        services.AddSingleton<IOperationSelectionPrompt, OperationSelectionPrompt>();
         services.AddSingleton<ApiDeltaResumeCoordinator>();
 
         services.AddSingleton<IRunCheckpointFactory, ApiDeltaCheckpointFactory>();
@@ -89,7 +84,7 @@ public static class ServiceCollectionExtensions
 
 
     /// <summary>
-    /// Enregistre ce qui écrit la production corrigée.
+    /// Enregistre ce qui écrit la production consolidée.
     /// </summary>
     /// <remarks>
     /// Groupés, comme les règles le sont déjà : la méthode d'enregistrement a une longueur bornée, et un
@@ -206,7 +201,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<VersionStep>();
         services.AddSingleton<AuditStep>();
         services.AddSingleton<PlanStep>();
-        services.AddSingleton<ExtractStep>();
         services.AddSingleton<CorrectStep>();
         services.AddSingleton<WriteStep>();
     }
@@ -217,13 +211,19 @@ public static class ServiceCollectionExtensions
             [
                 provider.GetRequiredService<SelectStep>(),
                 provider.GetRequiredService<ReadTargetStep>(),
+
+                // La lecture du contrat de service précède celle du compagnon OpenAPI : c'est elle qui
+                // reconnaît un WSDL à son contenu, et la lecture OpenAPI ne fait rien si le compagnon en
+                // est un. L'appariement suit, parce que c'est lui qui projette le contrat dans la forme
+                // que la comparaison sait lire — rien ne se compare avant qu'il soit confirmé.
+                provider.GetRequiredService<ReadWsdlStep>(),
                 provider.GetRequiredService<ReadSourceStep>(),
+                provider.GetRequiredService<CorrespondStep>(),
                 provider.GetRequiredService<ValidateStep>(),
                 provider.GetRequiredService<CompareStep>(),
                 provider.GetRequiredService<VersionStep>(),
                 provider.GetRequiredService<AuditStep>(),
                 provider.GetRequiredService<PlanStep>(),
-                provider.GetRequiredService<ExtractStep>(),
                 provider.GetRequiredService<CorrectStep>(),
                 provider.GetRequiredService<WriteStep>(),
             ],
@@ -233,7 +233,6 @@ public static class ServiceCollectionExtensions
             provider.GetRequiredService<ComparisonView>(),
             provider.GetRequiredService<FindingsView>(),
             provider.GetRequiredService<ProposalsView>(),
-            provider.GetRequiredService<ExtractView>(),
             provider.GetRequiredService<IClock>(),
             provider.GetRequiredService<Spectre.Console.IAnsiConsole>());
 }

@@ -2,7 +2,7 @@ using System.Globalization;
 using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
@@ -10,7 +10,7 @@ using DevToolbox.Tools.ApiDelta.Core.Syntax;
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
 /// <summary>
-/// Écrit la production corrigée : les octets de la production, plus ce que le développeur a retenu.
+/// Écrit la production consolidée : les octets de la production, plus ce que le développeur a retenu.
 /// </summary>
 /// <remarks>
 /// Une différence de conception avec le correctif que cet outil produisait auparavant, et elle vaut d'être
@@ -86,7 +86,7 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         {
             return Result.Fail<BuiltCorrection>(
                 FailureReason.InvalidInput,
-                "Rien n'a été retenu : il n'y a donc pas de production corrigée à écrire. Une sélection "
+                "Rien n'a été retenu : il n'y a donc pas de production consolidée à écrire. Une sélection "
                     + "vide est une demande de ne rien écrire, jamais une demande de tout écrire.");
         }
 
@@ -207,7 +207,7 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
 
     /// <summary>Inscrit la version recommandée, et déclare que le document est une correction proposée.</summary>
     /// <remarks>
-    /// La déclaration n'est pas une politesse : sans elle, une production corrigée est indistinguable
+    /// La déclaration n'est pas une politesse : sans elle, une production consolidée est indistinguable
     /// d'une production publiée, et c'est le seul endroit où cet outil pourrait laisser croire qu'un
     /// document est un contrat alors qu'il est une proposition.
     /// </remarks>

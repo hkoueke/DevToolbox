@@ -5,7 +5,7 @@ using DevToolbox.Tools.ApiDelta.Core.Versioning;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
-/// <summary>Ce qu'il faut pour écrire la production corrigée.</summary>
+/// <summary>Ce qu'il faut pour écrire la production consolidée.</summary>
 /// <param name="Production">La description en service, dont les octets seront recopiés.</param>
 /// <param name="Candidate">La description candidate, d'où vient le contenu retenu.</param>
 /// <param name="Differences">Ce que la comparaison a trouvé.</param>

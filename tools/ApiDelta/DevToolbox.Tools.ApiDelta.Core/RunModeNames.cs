@@ -15,12 +15,8 @@ public static class RunModeNames
     /// <returns>Un nom en français, au singulier.</returns>
     public static string Of(RunMode mode) => mode switch
     {
-        RunMode.Compare => "comparaison",
-        RunMode.Correct => "production corrigée",
-        RunMode.Audit => "examen du fichier",
-        RunMode.Optimize => "chiffrage du nettoyage",
-        RunMode.Extract => "extraction de routes",
-        RunMode.Everything => "tout",
+        RunMode.Consolidate => "consolidation de la production",
+        RunMode.Analyse => "analyse d'un fichier",
         _ => "inconnu",
     };
 }

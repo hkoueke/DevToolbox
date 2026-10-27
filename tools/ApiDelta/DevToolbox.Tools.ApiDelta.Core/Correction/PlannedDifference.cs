@@ -1,5 +1,5 @@
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;

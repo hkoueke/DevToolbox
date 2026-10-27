@@ -103,7 +103,7 @@ public sealed class FindingsView
         }
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Ce que le fichier en service a accumulé[/]")
+            .Header("[bold]Ce que le fichier de production a accumulé[/]")
             .Border(BoxBorder.Rounded));
 
         RenderIncomplete(audit);

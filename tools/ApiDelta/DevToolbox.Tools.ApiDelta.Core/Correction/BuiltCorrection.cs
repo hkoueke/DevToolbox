@@ -1,6 +1,6 @@
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
-/// <summary>La production corrigée, telle qu'elle sera écrite.</summary>
+/// <summary>La production consolidée, telle qu'elle sera écrite.</summary>
 /// <param name="Serialized">Les octets exacts qui seront publiés.</param>
 /// <param name="Plan">Ce qui y a été inséré, pour que la vérification ait de quoi se mesurer.</param>
 /// <param name="Marks">Les traces posées, une par élément ajouté ou modifié.</param>

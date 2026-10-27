@@ -88,6 +88,11 @@ public sealed class CorrespondStep : IToolStep
         context.Set(ApiDeltaContextKeys.WsdlProjection, projected);
         context.Set(ApiDeltaContextKeys.WsdlProjectionGaps, projected.Gaps);
 
+        // Le document projeté tient le rôle du candidat pour tout ce qui suit. C'est le pari de cette
+        // tranche rendu effectif : la comparaison, le catalogue, le constructeur et le vérificateur
+        // tournent sans savoir qu'ils regardent un contrat de service traduit.
+        context.Set(ApiDeltaContextKeys.CandidateDocument, projected.Document);
+
         return await ConfirmAsync(context, contract, production, cancellationToken)
             .ConfigureAwait(false);
     }

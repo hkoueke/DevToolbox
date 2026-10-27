@@ -51,7 +51,7 @@ public sealed class PlanStep : IToolStep
         {
             return Task.FromResult(Result.Fail(
                 FailureReason.InvalidInput,
-                "Il n'y a rien à chiffrer : le fichier en service n'a pas été examiné."));
+                "Il n'y a rien à chiffrer : le fichier de production n'a pas été examiné."));
         }
 
         context.Set(

@@ -1,6 +1,6 @@
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 
-namespace DevToolbox.Tools.ApiDelta.Core.Extraction;
+namespace DevToolbox.Tools.ApiDelta.Core.Operations;
 
 /// <summary>Une opération telle que l'écran de sélection la montre.</summary>
 /// <param name="Selector">Ce que le développeur retiendra.</param>

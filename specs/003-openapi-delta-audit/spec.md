@@ -94,6 +94,43 @@ this specification is the authority and the difference is recorded under Assumpt
   a third verifier of the same shape as `ContractEquivalenceVerifier` and `ExtractVerifier`, the mode, the
   report sections and the tests are a phase of their own. Until it lands, this specification is ahead of
   the code, and that gap is recorded here rather than left to be discovered.
+### Session 2026-10-27 — deux entrées de menu, et le vocabulaire de l'utilisateur
+
+Demandée en regardant l'outil tourner : six entrées de menu pour deux intentions réelles, et un
+vocabulaire qui était celui de la spécification plutôt que celui de la personne devant l'écran.
+
+- Q: Combien d'entrées de menu ? → R: **Deux.** « Consolider une production », qui prend un fichier de
+  production et un fichier compagnon et rend un fichier de production consolidé ; et « Analyser un
+  fichier en vue d'un nettoyage », qui prend un seul fichier. FR-700 et FR-701 sont réécrites en
+  conséquence. Les quatre entrées retirées ne correspondaient pas à des intentions distinctes : comparer
+  seul est ce que consolider fait déjà en chemin, et son rapport le dit ; examiner et chiffrer le
+  nettoyage sont deux moitiés d'une même question — « que vaut ce fichier, et que gagnerait-il à être
+  nettoyé » — qu'aucun utilisateur ne pose séparément ; et « tout faire » n'était un mode que parce que
+  les autres étaient trop petits.
+- Q: L'extraction d'une route dans une description autonome survit-elle ? → R: **Non, elle est retirée.**
+  FR-900 à FR-913 et l'histoire 9 sont retirées, et le code avec elles — l'invite de sélection, le
+  constructeur, le vérificateur, l'artefact, le rapport d'extrait et la section de configuration. Le motif
+  n'est pas qu'elle fonctionnait mal : elle fonctionnait, et son vérificateur était l'un des trois de même
+  forme dont cet outil tire sa crédibilité. Le motif est qu'elle répond à une question que cet outil n'est
+  pas celui qu'on ouvre pour poser. Ce qu'elle a laissé derrière reste et sert ailleurs : la désignation
+  d'une opération par chemin et méthode, le catalogue d'opérations, et les règles de nettoyage qui
+  *extraient* un schéma écrit sur place — lesquelles n'ont jamais eu de rapport avec ce mode malgré leur
+  nom.
+- Q: Le mode d'analyse écrit-il le fichier nettoyé ? → R: **Non, pas de lui-même.** Il chiffre d'abord, et
+  n'écrit la copie nettoyée que si le développeur l'accepte. FR-600 et FR-650 sont inchangées sur ce
+  point : c'est déjà ce que l'outil fait, et la fusion des deux anciens modes ne doit pas transformer un
+  chiffrage en application.
+- Q: Quel vocabulaire ? → R: **Celui de l'utilisateur.** « fichier de production », « fichier
+  compagnon », « fichier de production consolidé » remplacent « fichier en service », « nouveau fichier »
+  et « production corrigée » partout : à l'écran, dans les rapports, dans la documentation, et dans le nom
+  de l'artefact — `openapi-production.consolidated.yaml`. Le nom d'un artefact est une surface
+  extérieure : une chaîne d'intégration qui le cherchait sous l'ancien nom ne le trouvera plus, et c'est
+  consigné ici pour que ce soit une décision et non une surprise.
+- Note: le mode figure dans les points de reprise. Un point de reprise écrit sous l'ancien vocabulaire
+  n'est plus relisible, et cesse donc de proposer une reprise — proprement, sans échec, ce que FR-705 et
+  son essai tiennent déjà. Aucune donnée n'est perdue ; une séance interrompue avant ce changement est
+  simplement à refaire.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)
@@ -367,47 +404,11 @@ it moves to the suppressed list with its justification rather than disappearing.
 
 ---
 
-### User Story 9 - Take one route out, as a description you can actually use (Priority: P3)
+### Histoire 9, retirée — sortir une route dans une description autonome
 
-A developer needs one endpoint, not the four-hundred-operation file it lives in — to hand to a client team,
-to feed a generator, to register in a gateway, or to reason about on its own. They point the tool at the
-description, narrow a long list down to the routes they want, pick them, and get back a standalone OpenAPI
-description containing exactly those operations and everything they depend on: the schemas, the parameters
-they inherit from their path, the servers, the security scheme that protects them, the tags they use.
-Nothing else. The source file is untouched, and the extract says on its face that it is a part rather than
-a whole.
-
-**Why this priority**: it is the most obviously useful thing in this feature that has nothing to do with
-comparing two files, and it is the cheapest, because the dependency closure that makes a corrected
-description complete is the same work over a different set of roots. It is P3 rather than P2 because a team
-that cannot see what its next release breaks has a more urgent problem — but its dependencies are thin
-enough that it can be pulled forward right after the comparison lands if the need is immediate.
-
-**Independent Test**: select one operation that shares its path with others, inherits path-level
-parameters, is covered by a global security requirement and references a chain of schemas. Confirm the
-extract contains that operation and no other, resolves completely, keeps the inherited parameters and the
-security scheme, and is contract-identical in effective form to the same operation in the source.
-
-**Acceptance Scenarios**:
-
-1. **Given** a description of several hundred operations, **When** the developer looks for a route,
-   **Then** they can narrow the list before choosing, and select operations across several paths in one
-   pass.
-2. **Given** a selected operation that references a chain of schemas, **When** the extract is produced,
-   **Then** every schema in the chain is present and no reference is left unresolved.
-3. **Given** a selected operation whose path declares parameters shared by all its operations, **When** the
-   extract is produced, **Then** those parameters are still in force for it.
-4. **Given** a selected operation covered by a global security requirement, **When** the extract is
-   produced, **Then** the requirement and the scheme it names are carried over, and the operation is not
-   left unprotected.
-5. **Given** a path with four operations of which one was selected, **When** the extract is produced,
-   **Then** the other three are absent, and so is every component only they needed.
-6. **Given** an extract has been produced, **When** the source description is inspected, **Then** it is
-   byte-identical to what it was, and its version is unchanged in both files.
-7. **Given** the tool cannot establish that a selected operation survived extraction unchanged, **When** the
-   run completes, **Then** no extract is published and the failure says which operation and what differed.
-8. **Given** an extract, **When** it is opened, **Then** it states its own provenance — which description
-   it came from and which operations were chosen — so it cannot be mistaken for the whole API.
+Retirée le 2026-10-27, avec FR-900 à FR-913. Elle était la plus manifestement utile de cette
+fonctionnalité à qui n'avait rien à comparer, et c'est aussi pourquoi elle n'y appartenait pas : elle
+répond à une question qu'on n'ouvre pas cet outil pour poser. Le journal de clarifications dit le reste.
 
 ---
 
@@ -1046,13 +1047,17 @@ file nobody had assembled.
 
 **Running it**
 
-- **FR-700**: The tool MUST offer the modes compare, correct, audit, optimize, extract, and everything. The
-  everything mode MUST NOT apply optimizations unless application was explicitly requested, and MUST NOT
-  extract: an extract requires a selection, and there is no selection to infer.
-- **FR-701**: Compare and correct MUST require both a candidate and a production description; audit and
-  optimize MUST require only production; extract MUST require one description and a non-empty selection of
-  operations. A missing or unreadable input, or an empty selection, MUST be reported as a usage error
-  before any work begins.
+- **FR-700**: The tool MUST offer exactly two modes, named for what the person in front of the screen came
+  to do: **consolidate** a production description from a companion description, and **analyse** one
+  description with a view to cleaning it. Neither comparison alone nor auditing alone is a mode: the first
+  is what consolidating does on the way, and says in its report; the second is one half of a question
+  nobody asks in halves.
+- **FR-701**: Consolidating MUST require both a production description and a companion description;
+  analysing MUST require only the one description. A missing or unreadable input MUST be reported as a
+  usage error before any work begins.
+- **FR-701a**: Analysing MUST quantify before it writes. The cleaned copy MUST NOT be produced unless the
+  developer accepts it, and the acceptance MUST follow the figures rather than precede them: an
+  authorisation given before knowing what it buys is not an authorisation.
 - **FR-702**: A run MUST be an ordered sequence of named, individually recoverable steps rather than one
   monolithic operation.
 - **FR-703**: On failure the developer MUST be offered, at least: retry the failed step, continue from the
@@ -1081,53 +1086,17 @@ file nobody had assembled.
 - **FR-710**: Each run MUST be identifiable by a correlation identifier that appears in its logs and in its
   machine-readable report, so that one execution can be reconstructed afterwards.
 
-**Extracting a chosen subset**
+**Withdrawn: extracting a chosen subset**
 
-- **FR-900**: The tool MUST be able to produce, from one description and a developer-chosen set of
-  operations, a standalone OpenAPI description containing those operations and nothing that is not required
-  by them.
-- **FR-901**: Selection MUST be possible per operation — a path and a method — and not only per path, and
-  MUST accept several operations across several paths in one pass.
-- **FR-902**: The tool MUST present the selectable operations with their path, method, summary and tags,
-  and MUST let the developer narrow a long list before choosing. A description of a thousand operations is
-  not a list to be scrolled.
-- **FR-903**: The extract MUST be a valid OpenAPI description of the same declared version as its source,
-  carrying the version field, `info`, and the selected paths.
-- **FR-904**: The extract MUST contain the transitive closure of everything the selected operations
-  reference, resolved under FR-200, and MUST contain no unresolved internal reference.
-- **FR-905**: The extract MUST preserve what each selected operation inherits from its context: the
-  parameters declared on its path item, the servers declared at document and path level, and the global
-  security requirement together with the schemes it names. **An operation that was authenticated MUST NOT
-  become unauthenticated by being extracted.**
-- **FR-905a**: A parameter's identity, for deciding what an operation inherits and what it masks, MUST be
-  taken after following a local reference. A path-level parameter written as a reference MUST be named in
-  the report and MUST be masked by an operation that redeclares the same name and location inline.
-- **FR-906**: The extract MUST carry the tag definitions the selected operations use, and MUST NOT carry
-  those they do not.
-- **FR-907**: The extract MUST NOT contain any path, operation or component that the selection does not
-  require. What was not chosen is not shipped.
-- **FR-908**: The extract MUST preserve `info.version` unchanged, and the version engine MUST NOT run for
-  this mode. An extract is a view of a description, not a change to it.
-- **FR-909**: Vendor extensions MUST be carried over unchanged, including those at document level. Where a
-  carried extension refers to a path or operation the extract does not contain, the tool MUST report that
-  as a finding and MUST NOT edit the extension — FR-806 stands here as everywhere.
-- **FR-910**: Before publishing an extract, the tool MUST verify its own work: the extract reparses,
-  revalidates, resolves every reference, contains nothing unselected, and every selected operation is
-  contract-equivalent — in its effective form, after inheritance is applied on both sides — to the same
-  operation in the source. If equivalence cannot be established, no extract is published, the run is
-  unsuccessful, and the report names the operation and what differed.
-- **FR-910a**: The extract's own report MUST be a separate artifact carrying input metadata, validation
-  status, the extract section, the generated artifacts and the limitations — never the comparison report,
-  which in this mode would have nothing to compare. It MUST be written even when verification failed,
-  because it is what explains the refusal.
-- **FR-911**: The run's reports MUST record the extract's provenance: the source path, the source content
-  hash, and every operation selected. The extract document itself MUST also carry that provenance, under a
-  single clearly named vendor extension, so that a partial description cannot be mistaken for a whole one.
-  Stamping MUST be configurable and MUST be enabled by default.
-- **FR-912**: The source description MUST be left byte-identical. An extract is always a new artifact, and
-  the in-place path of FR-550 MUST NOT be available for this mode.
-- **FR-913**: The selection MUST survive a restart as part of the run selection under FR-705, and resuming
-  MUST re-read the source and refuse, naming it, if a selected operation is no longer present.
+FR-900 to FR-913 are withdrawn, with user story 9 and the code behind them — the selection prompt, the
+builder, the verifier, the artifact, the extract's own report and its configuration section. The
+clarification of 2026-10-27 records why, and the reason is worth keeping where the requirements were: the
+mode worked, and its verifier was one of the three of identical shape from which this tool draws its
+credibility. It was withdrawn because it answers a question nobody opens *this* tool to ask.
+
+What it leaves behind stays, and serves elsewhere: designating an operation by path and method, the
+operation catalogue, and the cleanup rules that *extract* an inline schema — which never had anything to
+do with this mode despite their name.
 
 **The boundaries of this feature**
 
@@ -1272,9 +1241,10 @@ file nobody had assembled.
   The source document's five milestones map onto P1 and P2 (comparison, versioning, the corrected
   description), P2 (audit) and P3 (optimization, configuration); the release the source document describes
   is complete only when all of its acceptance criteria are met, which this specification covers in full.
-- **An extract is a view, not a change.** FR-908 and FR-912 are what keep it one: the version does not
-  move, the source is not touched, and the extract is a new file. The temptation to treat extraction as
-  "production, trimmed" is what would eventually have it writing back.
+- **An extract is a view, not a change.** Withdrawn with FR-900 to FR-913 on 2026-10-27. The assumption is
+  kept on the record because the temptation it names outlives the mode: treating any derived output as
+  "production, trimmed" is what would eventually have it writing back. The consolidated description is
+  held to the same line by FR-515 — it never overwrites production, under any flag.
 - **Selecting what to keep, not what to drop.** A developer names the routes they want; an
   "everything except these" selection is out of scope for this release. Both are reasonable, but only one
   of them makes the verification of FR-910 straightforward, because the thing to prove is a property of

@@ -59,16 +59,16 @@ public static class ApiDeltaContextKeys
     /// <summary>Ce que le nettoyage rapporterait, chiffré et non appliqué.</summary>
     public const string Plan = "apidelta.plan";
 
-    /// <summary>Les dépendances fermées de ce que le correctif emporte.</summary>
+    /// <summary>Les dépendances fermées de ce que la production consolidée emporte.</summary>
     public const string DependencyClosure = "apidelta.closure";
 
     /// <summary>Ce qui serait inséré en production, énoncé avant toute écriture.</summary>
     public const string CorrectionPlan = "apidelta.correction.plan";
 
-    /// <summary>La production corrigée, telle qu'elle sera écrite.</summary>
-    public const string CorrectedDocument = "apidelta.correction.document";
+    /// <summary>La production consolidée, telle qu'elle sera écrite.</summary>
+    public const string ConsolidatedDocument = "apidelta.consolidation.document";
 
-    /// <summary>Ce que la vérification de la production corrigée a pu établir.</summary>
+    /// <summary>Ce que la vérification de la production consolidée a pu établir.</summary>
     public const string CorrectionVerification = "apidelta.correction.verification";
 
     /// <summary>Ce que l'application du plan a produit, et ce qu'elle a refusé de produire.</summary>

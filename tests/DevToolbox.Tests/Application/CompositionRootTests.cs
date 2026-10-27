@@ -10,6 +10,7 @@ using DevToolbox.Infrastructure.Logging;
 using DevToolbox.Infrastructure.Platform;
 using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
+using DevToolbox.Tools.ApiDelta.Presentation;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Core.Steps;
@@ -61,6 +62,22 @@ public sealed class CompositionRootTests
         provider.GetRequiredService<ICorrespondenceProposer>().Should().NotBeNull();
         provider.GetRequiredService<ICorrespondencePrompt>().Should().NotBeNull();
         provider.GetRequiredService<CorrespondStep>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void The_chain_the_real_graph_builds_is_the_chain_the_tool_declares()
+    {
+        // Résoudre une étape ne prouve pas qu'elle tourne. « ReadWsdl » et « Correspond » étaient
+        // écrites, enregistrées, résolues par l'essai ci-dessus et éprouvées une par une — et absentes
+        // de la chaîne pendant deux tranches, si bien que l'outil ne savait pas lire un contrat de
+        // service alors que tout ce qu'il faut pour le lire existait et passait ses essais.
+        using ServiceProvider provider = BuildProvider();
+
+        ApiDeltaTool tool = provider.GetServices<ITool>().OfType<ApiDeltaTool>().Single();
+
+        tool.StepNames.Should().Equal(
+            ApiDeltaStepNames.InOrder,
+            "l'ordre déclaré et la chaîne construite ne doivent pas pouvoir diverger");
     }
 
     [Fact]
@@ -152,7 +169,6 @@ public sealed class CompositionRootTests
         provider.GetRequiredService<VersionStep>().Name.Should().Be(ApiDeltaStepNames.Version);
         provider.GetRequiredService<AuditStep>().Name.Should().Be(ApiDeltaStepNames.Audit);
         provider.GetRequiredService<PlanStep>().Name.Should().Be(ApiDeltaStepNames.Plan);
-        provider.GetRequiredService<ExtractStep>().Name.Should().Be(ApiDeltaStepNames.Extract);
         provider.GetRequiredService<WriteStep>().Name.Should().Be(ApiDeltaStepNames.Write);
     }
 
@@ -179,7 +195,6 @@ public sealed class CompositionRootTests
             provider.GetRequiredService<VersionStep>(),
             provider.GetRequiredService<AuditStep>(),
             provider.GetRequiredService<PlanStep>(),
-            provider.GetRequiredService<ExtractStep>(),
             provider.GetRequiredService<WriteStep>(),
         ];
 

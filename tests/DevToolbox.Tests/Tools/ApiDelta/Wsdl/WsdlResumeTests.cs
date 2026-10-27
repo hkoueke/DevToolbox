@@ -7,7 +7,7 @@ using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 using DevToolbox.Tools.ApiDelta.Core.Correspondence;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Loading;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
@@ -139,7 +139,7 @@ public sealed class WsdlResumeTests
         [new CorrespondenceEntry("deposerDocument", "POST /documents", CorrespondenceOrigin.Proposed)]);
 
     private static RunSelection Selection() => new(
-        RunMode.Correct,
+        RunMode.Consolidate,
         "production.yaml",
         "sha256:3f9a7c21b0d4",
         Path.Combine("C:", "travail", "artefacts"),

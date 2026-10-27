@@ -16,31 +16,36 @@ corriger soi-même.
 
 ## apidelta
 
-Compare deux fichiers OpenAPI (Swagger) — ou un contrat de service WSDL en face d'une production
-OpenAPI —, dit ce qui casse pour les applications qui appellent, puis **vous rend le fichier de
-production avec les routes que vous choisissez déjà dedans**. Il examine aussi celui qui
-est en service, chiffre ce qu'un nettoyage rapporterait, et sort une route dans une description autonome.
+Deux choses, et deux seulement :
+
+- **Consolider ma production avec un autre fichier.** Vous donnez votre fichier de production et un
+  fichier compagnon — une description OpenAPI (Swagger) ou un contrat de service WSDL. L'outil dit ce qui
+  casse pour les applications qui appellent, vous laisse choisir ce que vous reprenez, et **vous rend
+  votre fichier de production avec ces éléments déjà dedans**, écrit à côté.
+- **Analyser un fichier en vue d'un nettoyage.** Vous donnez un fichier. L'outil l'examine — erreurs,
+  oublis, répétitions — et chiffre ce qu'un nettoyage lui gagnerait. Il n'applique rien de lui-même : il
+  chiffre d'abord, et vous décidez ensuite.
 
 Ce qu'il promet, et ce qu'il refuse :
 
-- **Il ne modifie jamais le fichier en service**, sauf demande explicite *et* confirmation nommant le
+- **Il ne modifie jamais le fichier de production**, sauf demande explicite *et* confirmation nommant le
   fichier — la seule action de la boîte qui ne se défait pas en supprimant un rapport. La production
   corrigée, elle, est écrite à côté : aucun drapeau ne la fait écrire par-dessus l'original.
-- **Hors des endroits que vous avez choisis, la production corrigée est la production, octet pour octet.**
+- **Hors des endroits que vous avez choisis, la production consolidée est la production, octet pour octet.**
   Commentaires, indentation, ordre des clés y survivent, parce que l'outil recopie les octets d'origine au
   lieu de réécrire le fichier. Le diff que vous relisez est la sélection que vous avez faite, et rien
   d'autre n'est arrivé à côté.
 - **Il dit ce qu'il va insérer avant de l'insérer**, élément par élément, avec l'effet et la confiance que
   la comparaison a établis. Un changement cassant est annoncé comme tel : vous pouvez le vouloir, pas
   l'emporter sans le savoir.
-- **Il prouve son propre travail avant de publier.** Une production corrigée n'existe sur le disque que si
+- **Il prouve son propre travail avant de publier.** Une production consolidée n'existe sur le disque que si
   l'outil l'a relue, revalidée, a résolu chaque référence, et a établi que ce que vous n'avez pas choisi
   est identique à l'octet et que ce que vous avez choisi ne diffère que comme demandé. Faute de quoi rien
   n'est écrit, et le rapport dit pourquoi.
 
-### Le nouveau fichier peut aussi être un WSDL
+### Le fichier compagnon peut aussi être un WSDL
 
-`apidelta` accepte un contrat de service WSDL 1.1 comme nouveau fichier, en face d'une production OpenAPI.
+`apidelta` accepte un contrat de service WSDL 1.1 comme fichier compagnon, en face d'une production OpenAPI.
 Il suit les imports — schémas voisins compris — dans un périmètre qu'il annonce, puis **projette** le
 contrat dans la forme qu'il sait déjà comparer. Le document d'entrée peut être un chemin ou une adresse ;
 dans le second cas l'outil écrit d'abord sur le disque tout ce qu'il a obtenu, et ne lit que ces fichiers.
@@ -77,7 +82,7 @@ vous-même l'adresse d'un contrat, et le seul appel sortant est alors celui-là.
 | Réseau d'entreprise ou VPN | les outils Azure DevOps | l'hôte du serveur se résout et répond |
 | Accès en lecture à la collection | les outils Azure DevOps | vous pouvez ouvrir la page Library dans un navigateur |
 
-Les trois dernières lignes sont les prérequis de **varcompare**, non ceux de la boîte. `apidelta` lit deux
+Les trois dernières lignes sont les prérequis de **varcompare**, non ceux de la boîte. `apidelta` lit un ou deux
 fichiers sur votre disque : il fonctionne sur un poste qui n'a jamais vu de serveur Azure DevOps, et son
 onglet est atteignable sans qu'aucune adresse de serveur ait été saisie.
 

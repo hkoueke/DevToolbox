@@ -56,7 +56,7 @@ public static class MarkdownReportWriter
     }
 
     /// <summary>
-    /// Écrit le rapport d'examen du fichier en service.
+    /// Écrit le rapport d'examen du fichier de production.
     /// </summary>
     /// <param name="run">L'exécution achevée.</param>
     /// <returns>Le rapport, en octets.</returns>
@@ -81,34 +81,6 @@ public static class MarkdownReportWriter
         Redundancy(builder, run);
         Proposals(builder, run);
         Suppressed(builder, run);
-        Artifacts(builder, run);
-        Limitations(builder, run);
-
-        return Encoding.UTF8.GetBytes(builder.ToString());
-    }
-
-    /// <summary>
-    /// Écrit le rapport de l'extrait.
-    /// </summary>
-    /// <param name="run">L'exécution achevée.</param>
-    /// <returns>Le rapport, en octets.</returns>
-    /// <remarks>
-    /// Un rapport à part, pour la même raison que celui de l'examen : une extraction ne compare rien, et
-    /// un rapport de comparaison dont les onze premières sections diraient « Aucun » se lirait comme une
-    /// comparaison qui n'a rien trouvé plutôt que comme une comparaison qui n'a pas eu lieu.
-    /// </remarks>
-    public static ReadOnlyMemory<byte> WriteExtract(ApiDeltaRun run)
-    {
-        ArgumentNullException.ThrowIfNull(run);
-
-        StringBuilder builder = new();
-
-        Metadata(builder, run);
-        builder.AppendLine("# Extrait d'une description OpenAPI").AppendLine();
-
-        Inputs(builder, run);
-        Validation(builder, run);
-        Extracted(builder, run);
         Artifacts(builder, run);
         Limitations(builder, run);
 
@@ -359,7 +331,7 @@ public static class MarkdownReportWriter
 
         if (run.Audit is not { } audit)
         {
-            builder.AppendLine("Sans objet : ce mode n'examine pas le fichier en service.").AppendLine();
+            builder.AppendLine("Sans objet : ce mode n'examine pas le fichier de production.").AppendLine();
             return;
         }
 
@@ -638,66 +610,6 @@ public static class MarkdownReportWriter
     private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// La section de l'extrait : d'où il vient, ce que chaque opération a emporté, et le verdict.
-    /// </summary>
-    /// <remarks>
-    /// L'héritage est dit opération par opération parce que c'est ce qu'un relecteur ne peut pas
-    /// reconstituer en lisant l'extrait seul : un paramètre venu du niveau du chemin y est indiscernable
-    /// d'un paramètre qui y était déjà. Le dire est ce qui permet de vérifier d'un coup d'œil que
-    /// l'extrait n'a rien perdu de ce qui protégeait l'opération.
-    /// </remarks>
-    private static void Extracted(StringBuilder builder, ApiDeltaRun run)
-    {
-        if (run.Extract is not { } extract)
-        {
-            return;
-        }
-
-        builder.AppendLine("## 20. Extrait").AppendLine();
-
-        builder.Append("- Tiré de `").Append(extract.Provenance.SourcePath)
-            .Append("` · sha256 ").AppendLine(extract.Provenance.SourceHash);
-        builder.Append("- Composants emportés : ")
-            .AppendLine(Number(extract.Closure.Required.Count));
-
-        if (extract.CarriedTags.Count > 0)
-        {
-            builder.Append("- Étiquettes emportées : ")
-                .AppendLine(string.Join(", ", extract.CarriedTags));
-        }
-
-        builder.AppendLine();
-        builder.AppendLine("| Opération | Paramètres hérités | Serveurs | Sécurité |");
-        builder.AppendLine("|-----------|--------------------|----------|----------|");
-
-        foreach (Extraction.InheritanceRecord record in extract.InheritedContext)
-        {
-            builder.Append("| ").Append(record.Selector.Display)
-                .Append(" | ").Append(Listed(record.PathParameters))
-                .Append(" | ").Append(Listed(record.Servers))
-                .Append(" | ").Append(Listed(record.Security))
-                .AppendLine(" |");
-        }
-
-        builder.AppendLine();
-
-        foreach (Audit.Finding dangling in extract.DanglingExtensionReferences)
-        {
-            builder.Append("- **Extension à vérifier** : ").AppendLine(dangling.Message);
-        }
-
-        builder.Append(extract.Verification.Established
-                ? "- **Vérifié** : "
-                : "- **Rien n'a été publié** : ")
-            .AppendLine(extract.Verification.Explanation);
-
-        builder.AppendLine();
-    }
-
-    private static string Listed(IReadOnlyList<string> words) =>
-        words.Count == 0 ? "—" : string.Join(", ", words);
-
-    /// <summary>
     /// Les constats tus, avec leur justification et leur propriétaire, et ce qu'il faut relire.
     /// </summary>
     /// <remarks>
@@ -820,20 +732,20 @@ public static class MarkdownReportWriter
 
         if (run.Correction is not { } correction)
         {
-            builder.AppendLine("Sans objet : aucune production corrigée n'a été demandée.").AppendLine();
+            builder.AppendLine("Sans objet : aucune production consolidée n'a été demandée.").AppendLine();
 
             return;
         }
 
         builder.AppendLine(correction.Written
-            ? "La production corrigée a été écrite dans « " + ArtifactNames.CorrectedDocument
+            ? "La production consolidée a été écrite dans « " + ArtifactNames.ConsolidatedDocument
                 + " ». La production elle-même n'a pas été touchée."
-            : "Aucune production corrigée n'a été écrite.").AppendLine();
+            : "Aucune production consolidée n'a été écrite.").AppendLine();
 
         builder.AppendLine("| Ce qui a été retenu | Effet |");
         builder.AppendLine("|---------------------|-------|");
 
-        foreach (Extraction.OperationSelector route in correction.Plan.Routes)
+        foreach (Operations.OperationSelector route in correction.Plan.Routes)
         {
             builder.Append("| ").Append(route.Display).AppendLine(" | route neuve |");
         }

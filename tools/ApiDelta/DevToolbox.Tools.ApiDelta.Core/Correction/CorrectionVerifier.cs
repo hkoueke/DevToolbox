@@ -8,18 +8,18 @@ using DevToolbox.Tools.ApiDelta.Core.Syntax;
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
 /// <summary>
-/// Établit que la production corrigée dit ce qu'on lui a demandé, et rien de plus.
+/// Établit que la production consolidée dit ce qu'on lui a demandé, et rien de plus.
 /// </summary>
 /// <remarks>
 /// Les deux épreuves qui comptent vont par paire. Établir que rien d'autre n'a bougé, sans établir que ce
 /// qui devait bouger a bougé, laisserait passer une correction qui n'aurait rien fait ; l'inverse
 /// laisserait passer une correction qui aurait fait autre chose en plus. Prises ensemble, elles disent que
 /// le diff qu'un développeur lira est exactement la sélection qu'il a faite — et c'est la seule promesse
-/// qui rend une production corrigée relisable.
+/// qui rend une production consolidée relisable.
 /// </remarks>
 public sealed class CorrectionVerifier : ICorrectionVerifier
 {
-    private const string Name = "production corrigée";
+    private const string Name = "production consolidée";
     private const string VersionPointer = "/info/version";
 
     private readonly ISpecReader _reader;
@@ -79,7 +79,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
             : Compare(corrected, production, built);
     }
 
-    /// <summary>Confronte la production corrigée à la production, point par point.</summary>
+    /// <summary>Confronte la production consolidée à la production, point par point.</summary>
     private static CorrectionVerification Compare(
         SpecDocument corrected,
         SpecDocument production,
@@ -156,7 +156,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
 
             if (here is null)
             {
-                drifted.Add(node.Location.Display + " a disparu de la production corrigée");
+                drifted.Add(node.Location.Display + " a disparu de la production consolidée");
 
                 return;
             }
@@ -185,7 +185,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
 
             if (here is null)
             {
-                missing.Add(target.Display + " n'est pas dans la production corrigée");
+                missing.Add(target.Display + " n'est pas dans la production consolidée");
 
                 continue;
             }

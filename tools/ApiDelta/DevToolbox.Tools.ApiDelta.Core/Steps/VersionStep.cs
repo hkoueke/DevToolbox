@@ -49,7 +49,7 @@ public sealed class VersionStep : IToolStep
         IReadOnlyList<Difference> differences =
             context.Get<IReadOnlyList<Difference>>(ApiDeltaContextKeys.Differences) ?? [];
 
-        // La version imposée viendra de l'invite qui accompagne le correctif : c'est là qu'un développeur
+        // La version imposée viendra de l'invite qui accompagne la consolidation : c'est là qu'un développeur
         // a une raison d'en désigner une. Le moteur sait déjà la traiter.
         VersionRecommendation recommendation = _policy.Recommend(
             differences, production, VersioningPolicy.Default);

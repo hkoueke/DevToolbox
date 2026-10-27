@@ -65,3 +65,19 @@
   specification follows it — confirmation before any write (FR-550, FR-709), checkpoints that hold only the
   selection and never document content (FR-705), redaction at the writing boundary (FR-607), and a run
   built from named, individually recoverable steps (FR-702, FR-703).
+
+### Re-validation, 2026-10-27 — six modes become two, extraction withdrawn
+
+- **The specification lost User Story 9 and FR-900 to FR-913**, and FR-700 and FR-701 were rewritten
+  again. The same reasoning as 2026-10-16 applies in reverse, and it is worth stating because it is the
+  symmetry that keeps a specification honest: a mode list that lists a mode the tool no longer offers is
+  wrong, not merely generous. Both requirements were edited rather than annotated.
+- **FR-701a was added** — analysing quantifies before it writes. It records a behaviour the code already
+  had and no requirement named, which is the kind of gap a re-validation exists to close.
+- **Three contracts were corrected, not only amended.** `artifacts.md` still named a `Patch` artifact
+  withdrawn on 2026-10-21 and an `Extract` artifact withdrawn now; `console-experience.md` described a
+  six-entry menu and an operation picker; `configuration.md` documented an `extract` section. A contract
+  that names what the code stopped writing is the drift a contract exists to prevent — it was found by
+  reading them against the code rather than by anything failing.
+- **The withdrawn requirements are recorded where they stood**, with the reason, rather than deleted
+  silently. The mode worked; it was withdrawn because it answers a question nobody opens this tool to ask.

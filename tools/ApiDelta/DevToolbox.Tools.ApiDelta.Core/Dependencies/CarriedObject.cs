@@ -8,9 +8,9 @@ namespace DevToolbox.Tools.ApiDelta.Core.Dependencies;
 /// </summary>
 /// <remarks>
 /// Cette règle existe ici une seule fois parce que deux lecteurs doivent en donner la même réponse :
-/// l'écrivain, qui décide ce que le correctif contient, et le résolveur de dépendances, qui décide ce qu'il
+/// l'écrivain, qui décide ce que la production consolidée contient, et le résolveur de dépendances, qui décide ce qu'il
 /// faut emporter avec. Si les deux divergeaient d'un cran — l'un partant du champ modifié, l'autre de
-/// l'opération qui le contient — le correctif référencerait des composants que la fermeture n'a jamais
+/// l'opération qui le contient — le document référencerait des composants que la fermeture n'a jamais
 /// visités, et il sortirait avec des références pendantes. C'est exactement la panne que cette règle
 /// partagée empêche, et la raison pour laquelle elle n'est pas écrite deux fois.
 /// </remarks>
@@ -20,7 +20,7 @@ public static class CarriedObject
     /// <param name="location">L'emplacement de la différence.</param>
     /// <returns>
     /// Le pointeur de l'objet complet, ou <see langword="null"/> si l'emplacement n'appartient à rien
-    /// qu'un correctif emporte — une entrée d'<c>info</c>, par exemple, dont seule la version est reprise.
+    /// qu'une consolidation emporte — une entrée d'<c>info</c>, par exemple, dont seule la version est reprise.
     /// </returns>
     public static string? Of(SpecPointer location)
     {

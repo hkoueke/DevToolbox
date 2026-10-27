@@ -1,6 +1,6 @@
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 
-/// <summary>Ce que la vérification de la production corrigée a pu établir.</summary>
+/// <summary>Ce que la vérification de la production consolidée a pu établir.</summary>
 /// <param name="Reparsed">Le document se relit.</param>
 /// <param name="Revalidated">Il respecte la structure de la version qu'il déclare.</param>
 /// <param name="ReferencesResolved">Chacune de ses références se résout.</param>
@@ -38,14 +38,14 @@ public sealed record CorrectionVerification(
     public static CorrectionVerification NotRun { get; } =
         new(false, false, false, false, false, false, []);
 
-    /// <summary>Indique si la production corrigée peut être publiée.</summary>
+    /// <summary>Indique si la production consolidée peut être publiée.</summary>
     public bool Established =>
         Reparsed && Revalidated && ReferencesResolved && UnselectedUntouched && SelectedAsChosen
         && Marked;
 
     /// <summary>Ce qui a échoué, dit à un lecteur.</summary>
     public string Explanation => Established
-        ? "La production corrigée a été relue, revalidée, ses références résolues ; tout ce qui n'avait "
+        ? "La production consolidée a été relue, revalidée, ses références résolues ; tout ce qui n'avait "
             + "pas été retenu y est identique à l'octet, ce qui l'avait été a changé, et chaque élément "
             + "neuf dit d'où il vient."
         : "La vérification n'a pas abouti : " + string.Join(" · ", Failures());

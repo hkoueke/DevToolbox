@@ -1,4 +1,4 @@
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 

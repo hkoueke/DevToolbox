@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace DevToolbox.Tools.ApiDelta.Core.Extraction;
+namespace DevToolbox.Tools.ApiDelta.Core.Operations;
 
 /// <summary>Une opération que le développeur a désignée.</summary>
 /// <param name="Path">Le gabarit de chemin, tel que la description l'écrit.</param>

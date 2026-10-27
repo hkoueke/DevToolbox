@@ -1,6 +1,6 @@
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 
 namespace DevToolbox.Tools.ApiDelta.Core;
 
@@ -17,14 +17,11 @@ namespace DevToolbox.Tools.ApiDelta.Core;
 /// <param name="AllowedReviewRequiredRules">
 /// Les règles à revoir que le développeur a explicitement autorisées, par identifiant.
 /// </param>
-/// <param name="IncludeRemovals">Fait figurer les suppressions dans le correctif.</param>
-/// <param name="IncludeSafeOptimizationsInPatch">Mêle le nettoyage sûr au correctif fonctionnel.</param>
-/// <param name="InPlace">Réécrit la production sur place. Indisponible pour l'extraction.</param>
-/// <param name="SelectedOperations">
-/// Les opérations retenues, pour l'extraction seule : un chemin et une méthode chacune.
-/// </param>
+/// <param name="IncludeRemovals">Fait figurer les suppressions dans la production consolidée.</param>
+/// <param name="IncludeSafeOptimizationsInPatch">Mêle le nettoyage sûr à la consolidation.</param>
+/// <param name="InPlace">Réécrit la production sur place. Jamais pour une consolidation.</param>
 /// <param name="Correction">
-/// Ce que le développeur a retenu pour entrer en production, pour le mode correction seul. Établi après
+/// Ce que le développeur a retenu du fichier compagnon, pour la consolidation seule. Établi après
 /// la comparaison, parce que choisir avant elle reviendrait à choisir sans voir ce qu'elle a établi.
 /// </param>
 /// <param name="Correspondence">
@@ -50,16 +47,12 @@ public sealed record RunSelection(
     bool IncludeRemovals = false,
     bool IncludeSafeOptimizationsInPatch = false,
     bool InPlace = false,
-    IReadOnlyList<OperationSelector>? SelectedOperations = null,
     CorrectionSelection? Correction = null,
     Correspondence.OperationCorrespondence? Correspondence = null)
 {
     /// <summary>Les règles à revoir autorisées, jamais nulles.</summary>
     public IReadOnlyList<string> AllowedReviewRequiredRules { get; init; } =
         AllowedReviewRequiredRules ?? [];
-
-    /// <summary>Les opérations retenues, jamais nulles.</summary>
-    public IReadOnlyList<OperationSelector> SelectedOperations { get; init; } = SelectedOperations ?? [];
 
     /// <summary>
     /// Crée une sauvegarde avant une écriture sur place, sauf refus explicite.
@@ -76,12 +69,9 @@ public sealed record RunSelection(
     /// <summary>La politique de référence en vigueur.</summary>
     public ReferencePolicy References { get; init; } = ReferencePolicy.Closed;
 
-    /// <summary>Indique si le mode exige une description candidate.</summary>
-    public bool NeedsCandidate => Mode is RunMode.Compare or RunMode.Correct or RunMode.Everything;
+    /// <summary>Indique si le mode exige un fichier compagnon.</summary>
+    public bool NeedsCandidate => Mode is RunMode.Consolidate;
 
-    /// <summary>Indique si le mode exige une sélection d'opérations.</summary>
-    public bool NeedsSelectedOperations => Mode is RunMode.Extract;
-
-    /// <summary>Indique si le mode écrit une production corrigée.</summary>
-    public bool NeedsCorrection => Mode is RunMode.Correct or RunMode.Everything;
+    /// <summary>Indique si le mode écrit une production consolidée.</summary>
+    public bool NeedsCorrection => Mode is RunMode.Consolidate;
 }

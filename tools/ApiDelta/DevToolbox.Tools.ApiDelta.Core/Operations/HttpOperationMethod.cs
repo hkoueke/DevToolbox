@@ -1,4 +1,4 @@
-namespace DevToolbox.Tools.ApiDelta.Core.Extraction;
+namespace DevToolbox.Tools.ApiDelta.Core.Operations;
 
 /// <summary>Une méthode d'opération OpenAPI.</summary>
 /// <remarks>

@@ -8,7 +8,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Abstractions;
 /// <para>
 /// Les trois confirmations sont distinctes et non un seul « êtes-vous sûr » paramétré, parce qu'elles ne
 /// protègent pas de la même chose. Écrire dans un dossier qui n'existe pas encore se défait en supprimant
-/// le dossier ; remplacer un artefact se défait en relançant ; réécrire le fichier en service ne se défait
+/// le dossier ; remplacer un artefact se défait en relançant ; réécrire le fichier de production ne se défait
 /// pas. Une invite unique les aurait rendues interchangeables à l'œil du lecteur.
 /// </para>
 /// </remarks>

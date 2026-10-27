@@ -3,7 +3,7 @@ using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Correspondence;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation;
@@ -86,9 +86,6 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
                 ApiDeltaSelectionKinds.Ruleset, selection.RulesetPath, selection.RulesetPath));
         }
 
-        entries.AddRange(selection.SelectedOperations.Select(operation => new PersistedSelectionEntry(
-            ApiDeltaSelectionKinds.Operation, operation.Display, operation.Display)));
-
         if (selection.Correction is { } correction)
         {
             entries.AddRange(correction.Routes.Select(route => new PersistedSelectionEntry(
@@ -146,17 +143,6 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
             return null;
         }
 
-        IReadOnlyList<OperationSelector> operations =
-        [
-            .. run.Selection
-                .Where(entry => string.Equals(
-                    entry.Kind, ApiDeltaSelectionKinds.Operation, StringComparison.Ordinal))
-                .Select(entry => OperationSelector.TryParse(entry.Key, out OperationSelector? selector)
-                    ? selector
-                    : null)
-                .OfType<OperationSelector>(),
-        ];
-
         IReadOnlyList<OperationSelector> corrected =
         [
             .. Of(run, ApiDeltaSelectionKinds.CorrectedRoute)
@@ -188,10 +174,7 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
             Correction: corrected.Count > 0 || reported.Count > 0
                 ? new CorrectionSelection(corrected, reported)
                 : null,
-            Correspondence: Paired(run))
-        {
-            SelectedOperations = operations,
-        };
+            Correspondence: Paired(run));
     }
 
     /// <summary>

@@ -176,7 +176,7 @@ public sealed class WriteStep : IToolStep
 
         if (run.Audit is not null)
         {
-            // Un rapport à part : l'examen du fichier en service ne se mêle pas aux changements de
+            // Un rapport à part : l'examen du fichier de production ne se mêle pas aux changements de
             // contrat, parce qu'un relecteur n'a jamais les deux questions en tête en même temps.
             yield return Written(
                 ArtifactKind.AuditReport,
@@ -207,15 +207,6 @@ public sealed class WriteStep : IToolStep
             }
         }
 
-        if (run.Extract is { } attempted)
-        {
-            foreach (Publication publication in Extracted(
-                run, attempted, selection, cancellationToken))
-            {
-                yield return publication;
-            }
-        }
-
         if (run.Candidate is not null)
         {
             foreach (Publication publication in Compared(context, run, selection, cancellationToken))
@@ -225,7 +216,7 @@ public sealed class WriteStep : IToolStep
         }
     }
 
-    /// <summary>Ce qu'une comparaison produit : son rapport, et la production corrigée si on l'a voulue.</summary>
+    /// <summary>Ce qu'une comparaison produit : son rapport, et la production consolidée si on l'a voulue.</summary>
     private IEnumerable<Publication> Compared(
         ToolRunContext context,
         ApiDeltaRun run,
@@ -239,11 +230,11 @@ public sealed class WriteStep : IToolStep
             selection,
             cancellationToken);
 
-        if (context.Get<BuiltCorrection>(ApiDeltaContextKeys.CorrectedDocument) is { } corrected)
+        if (context.Get<BuiltCorrection>(ApiDeltaContextKeys.ConsolidatedDocument) is { } corrected)
         {
             yield return Written(
-                ArtifactKind.CorrectedDocument,
-                ArtifactNames.CorrectedDocument,
+                ArtifactKind.ConsolidatedDocument,
+                ArtifactNames.ConsolidatedDocument,
                 corrected.Serialized,
                 selection,
                 cancellationToken);
@@ -260,39 +251,6 @@ public sealed class WriteStep : IToolStep
         new(
             fileName,
             () => _artifacts.PublishAsync(kind, fileName, content, selection, cancellationToken));
-
-    /// <summary>
-    /// L'extrait, publié seulement si les cinq épreuves ont abouti.
-    /// </summary>
-    /// <remarks>
-    /// Un extrait non vérifié ne sort pas. Il est indiscernable d'un extrait correct — il se relit, il se
-    /// valide — jusqu'au jour où quelqu'un s'en sert pour écrire un client.
-    /// </remarks>
-    private IEnumerable<Publication> Extracted(
-        ApiDeltaRun run,
-        Extraction.ExtractResult extract,
-        RunSelection selection,
-        CancellationToken cancellationToken)
-    {
-        // Le rapport même quand la vérification a échoué : c'est lui qui dira pourquoi. Un refus sans
-        // explication est la pire forme de refus.
-        yield return Written(
-            ArtifactKind.Extract,
-            ArtifactNames.ExtractReport,
-            MarkdownReportWriter.WriteExtract(run),
-            selection,
-            cancellationToken);
-
-        if (extract.Publishable)
-        {
-            yield return Written(
-                ArtifactKind.Extract,
-                ArtifactNames.Extract,
-                extract.Serialized,
-                selection,
-                cancellationToken);
-        }
-    }
 
     /// <summary>
     /// La copie optimisée et son manifeste, dans cet ordre et dans la même étape.
@@ -343,9 +301,7 @@ public sealed class WriteStep : IToolStep
         SpecDocument production,
         RunSelection selection,
         CancellationToken cancellationToken) =>
-        // Jamais sur place pour une extraction : un extrait est une vue, et il n'existe aucun chemin d'ici
-        // vers la réécriture de la source.
-        selection.InPlace && selection.Mode != RunMode.Extract
+        selection.InPlace
             ? await _inPlace.WriteAsync(
                 production, optimization.Serialized, selection.Backup, cancellationToken)
                 .ConfigureAwait(false)
@@ -421,7 +377,6 @@ public sealed class WriteStep : IToolStep
             context.Get<Audit.AuditResult>(ApiDeltaContextKeys.Audit),
             context.Get<Optimization.OptimizationPlan>(ApiDeltaContextKeys.Plan),
             optimization,
-            context.Get<Extraction.ExtractResult>(ApiDeltaContextKeys.Extract),
             Corrected(context),
             context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting));
 
@@ -444,6 +399,6 @@ public sealed class WriteStep : IToolStep
             plan,
             context.Get<CorrectionVerification>(ApiDeltaContextKeys.CorrectionVerification)
                 ?? CorrectionVerification.NotRun,
-            context.Get<BuiltCorrection>(ApiDeltaContextKeys.CorrectedDocument) is not null);
+            context.Get<BuiltCorrection>(ApiDeltaContextKeys.ConsolidatedDocument) is not null);
     }
 }

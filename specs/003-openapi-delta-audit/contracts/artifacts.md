@@ -15,17 +15,21 @@ temporary name that is moved into place only once the bytes are complete.
 
 | Kind | Default name | Written when |
 |---|---|---|
-| `DeltaReport` | `openapi-delta-report.md` | a candidate was supplied |
-| `Patch` | `openapi-delta-patch.yaml` | mode is patch or everything |
+| `DeltaReport` | `openapi-delta-report.md` | a companion file was supplied |
+| `ConsolidatedDocument` | `openapi-production.consolidated.yaml` | mode is consolidate *and* verification passed |
 | `DeltaJson` | `openapi-delta.json` | always |
-| `AuditReport` | `openapi-audit-report.md` | mode includes an audit |
-| `OptimizationPlan` | `openapi-optimization-plan.yaml` | mode includes optimization analysis |
+| `AuditReport` | `openapi-audit-report.md` | mode is analyse |
+| `OptimizationPlan` | `openapi-optimization-plan.yaml` | mode is analyse |
 | `OptimizedDocument` | `openapi-production.optimized.yaml` | application was requested *and* verification passed |
 | `Manifest` | `openapi-optimization-manifest.yaml` | an optimization was applied |
-| `Extract` | `openapi-extract.yaml` | mode is extract *and* verification passed |
 
 An existing file of the same name is overwritten only after confirmation; the production file itself is
 never one of these names unless an in-place write was explicitly requested and confirmed (FR-550).
+
+Two rows were corrected on 2026-10-27 rather than only added to. `Patch` / `openapi-delta-patch.yaml` had
+outlived the clarification of 2026-10-21 that replaced the fragment with the complete consolidated
+description: this contract went on naming an artifact the code had stopped writing, which is the drift a
+contract exists to prevent. `Extract` / `openapi-extract.yaml` is withdrawn with FR-900 to FR-913.
 
 ---
 
@@ -173,24 +177,25 @@ pattern, never the value (FR-607).
 
 ---
 
-## 5. The patch
+## 5. The consolidated production file
 
-A plain OpenAPI fragment (FR-500), valid for the production document's declared version, carrying:
+The production file itself, with the chosen content already in it (FR-500), written beside the original and
+never over it (FR-515):
 
+- the production bytes, untouched everywhere the selection did not name — comments, indentation and key
+  order survive, because the writer splices the original bytes instead of re-emitting the file;
 - the recommended `info.version`;
-- added paths and operations;
-- complete modified objects wherever a field-level fragment would be ambiguous;
+- the chosen routes and the chosen single differences, each carrying its origin mark (FR-512);
 - every component the above depend on, transitively closed (FR-200);
-- removals **only** when they were requested (FR-502), and then under a clearly marked
-  `# --- removals ---` section, because a removal in a mergeable fragment is a comment to a human, not an
-  instruction to a machine;
-- nothing from the audit unless cleanup was explicitly combined in (FR-503).
+- removals **only** when they were requested, and nothing from the cleanup unless it was explicitly
+  combined in.
 
-**Guaranteed**: the patch reparses as a valid fragment and contains no unresolved internal reference
-(FR-202, FR-504, SC-006). A patch that cannot satisfy that is not written, and the run fails with
-`outputFailure`.
+**Guaranteed before the file exists**: it reparses, revalidates against its declared version, every
+reference resolves, what the selection did not name is byte-identical, and what it did name differs only
+as chosen (FR-506, FR-514). Failing any of those, nothing is written and the report says which.
 
-The overlay format is out of scope for this release (spec Assumptions).
+This section replaced *The patch* on 2026-10-27, three sections after the requirement it describes had
+already changed. The fragment it documented stopped being written on 2026-10-21.
 
 ---
 
@@ -222,62 +227,8 @@ manifest is not a state this tool can produce.
 
 ---
 
-## 7. The extract
+## 7. L'extrait, retiré
 
-A standalone OpenAPI description of the chosen operations, in the source's declared version, written only
-once verification passed (FR-910). The developer may name it; the default is `openapi-extract.yaml`.
-
-What it contains, and nothing else:
-
-- the version field and `info`, with **`info.version` exactly as the source wrote it** (FR-908);
-- the selected paths, each path item carrying only the selected methods **and the parameters those methods
-  inherit from it** (FR-905, FR-907);
-- the servers in force for those operations, at document and path level;
-- the global security requirement where it applies, and only the security schemes it names;
-- the tag definitions the selected operations use (FR-906);
-- the transitive closure of every component they reference, each appearing once (FR-904);
-- every vendor extension, carried unchanged, document-level ones included (FR-909).
-
-### The provenance stamp
-
-On by default, one extension at the document root, nothing else touched (FR-911):
-
-```yaml
-x-apidelta-extract:
-  source: production.yaml
-  sourceSha256: 3f9a7c21b0d4e8…
-  extractedAt: 2026-10-16T09:14:22Z
-  operations:
-    - POST /documents
-    - GET /documents/{id}
-  note: >-
-    Description partielle : seules les opérations listées ci-dessus sont présentes.
-```
-
-It exists because a description trimmed to three routes is indistinguishable from the description of an API
-that has three routes, and that difference matters the first time one is reviewed or published in the
-belief that it is complete. `extract.stampProvenance: false` turns it off for a team that would rather have
-the bytes untouched.
-
-### Reported alongside it
-
-The delta report gains an **Extract** section — the source and its hash, each selected operation, what each
-inherited (path parameters, servers, security requirement), the closure that came with them, and the
-verification verdict. The JSON report carries the same under `extract`:
-
-```json
-"extract": {
-  "source": { "path": "…", "sha256": "…" },
-  "operations": [ { "path": "/documents", "method": "post",
-                    "inherited": { "pathParameters": [ "X-serviceEmetteur" ],
-                                   "servers": [ "…" ], "security": [ "bearerAuth" ] } } ],
-  "closure": { "components": 37, "externalPreserved": [] },
-  "carriedTags": [ "Documents" ],
-  "danglingExtensionReferences": [],
-  "verification": { "reparsed": true, "revalidated": true, "referencesResolved": true,
-                    "containsNothingUnselected": true, "operationsEquivalent": true, "differences": [] }
-}
-```
-
-**Guaranteed**: the source file is byte-identical afterwards, always — there is no in-place path for this
-mode (FR-912) — and an unverified extract is never published.
+Retiré le 2026-10-27 avec FR-900 à FR-913 : ni `openapi-extract.yaml`, ni son rapport propre, ni la
+section d'extrait des deux rapports ne sont plus écrits. Le journal de clarifications de
+[spec.md](../spec.md) dit pourquoi.

@@ -1,6 +1,6 @@
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Correspondence;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 

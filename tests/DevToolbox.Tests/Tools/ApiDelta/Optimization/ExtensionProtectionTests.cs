@@ -69,7 +69,7 @@ public sealed class ExtensionProtectionTests : IDisposable
             plan,
             document,
             new RunSelection(
-                RunMode.Optimize, "p.yaml", string.Empty, "s", ApplySafeOptimizations: true),
+                RunMode.Analyse, "p.yaml", string.Empty, "s", ApplySafeOptimizations: true),
             Ruleset.Default);
 
         outcome.Applied.Should().NotBeEmpty();

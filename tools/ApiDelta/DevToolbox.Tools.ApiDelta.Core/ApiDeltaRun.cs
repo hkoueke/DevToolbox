@@ -14,18 +14,17 @@ namespace DevToolbox.Tools.ApiDelta.Core;
 /// <param name="Differences">Ce qui a changé, dans un ordre stable.</param>
 /// <param name="Steps">L'état de chaque étape, pour que le rapport dise ce qui n'a pas été fait.</param>
 /// <param name="Version">La version recommandée, quand le mode en comportait une.</param>
-/// <param name="Audit">Ce que l'examen du fichier en service a constaté, quand le mode en comportait un.</param>
+/// <param name="Audit">Ce que l'examen du fichier de production a constaté, quand le mode en comportait un.</param>
 /// <param name="Plan">Ce que le nettoyage rapporterait, quand le mode le chiffrait.</param>
 /// <param name="Optimization">Ce que l'application a produit, quand le développeur l'a demandée.</param>
-/// <param name="Extract">L'extrait des opérations retenues, quand le mode en demandait un.</param>
 /// <param name="Correction">
-/// Ce qui est entré en production, et ce qui a été écarté, quand le mode écrivait une production corrigée.
+/// Ce qui est entré en production, et ce qui a été écarté, quand le mode écrivait une production consolidée.
 /// </param>
 /// <param name="Footing">
 /// Ce sur quoi la sélection reposait, quand le candidat était projeté depuis un contrat de service.
 /// </param>
 /// <remarks>
-/// Cet agrégat grandit avec les tranches : l'extraction y ajoutera son extrait, l'application sa
+/// Cet agrégat grandit avec les tranches, et rétrécit quand l'une est retirée : l'application y met sa
 /// vérification et son manifeste. Il porte aujourd'hui ce qui existe, et rien de plus — un membre sans
 /// producteur serait de l'inventaire.
 /// </remarks>
@@ -43,7 +42,6 @@ public sealed record ApiDeltaRun(
     Audit.AuditResult? Audit = null,
     Optimization.OptimizationPlan? Plan = null,
     Optimization.OptimizationOutcome? Optimization = null,
-    Extraction.ExtractResult? Extract = null,
     Correction.CorrectionOutcome? Correction = null,
     Correction.WsdlFooting? Footing = null)
 {

@@ -3,7 +3,7 @@ using DevToolbox.Tools.ApiDelta.Core.Correction;
 
 namespace DevToolbox.Tools.ApiDelta.Core.Abstractions;
 
-/// <summary>Établit qu'une production corrigée dit ce qu'on lui a demandé de dire, et rien de plus.</summary>
+/// <summary>Établit qu'une production consolidée dit ce qu'on lui a demandé de dire, et rien de plus.</summary>
 /// <remarks>
 /// Sur les octets qui seront écrits, et non sur l'arbre modifié : vérifier l'arbre laisserait passer
 /// exactement les défauts que l'écriture introduit. C'est la leçon que la copie optimisée de cet outil
@@ -11,7 +11,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Abstractions;
 /// </remarks>
 public interface ICorrectionVerifier
 {
-    /// <summary>Vérifie la production corrigée.</summary>
+    /// <summary>Vérifie la production consolidée.</summary>
     /// <param name="serialized">Les octets qui seraient publiés.</param>
     /// <param name="production">La production telle qu'elle a été lue.</param>
     /// <param name="built">Ce que la construction a produit : son plan et ses traces.</param>

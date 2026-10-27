@@ -2,7 +2,7 @@ using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Metamodel;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
 
-namespace DevToolbox.Tools.ApiDelta.Core.Extraction;
+namespace DevToolbox.Tools.ApiDelta.Core.Operations;
 
 /// <summary>
 /// Parcourt les chemins une fois et rend ce qu'il faut pour choisir.

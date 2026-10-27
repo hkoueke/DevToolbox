@@ -11,7 +11,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Reporting;
 /// <remarks>
 /// La disposition des champs est un contrat : un champ présent ici n'est jamais renommé ni détourné, et
 /// <c>schemaVersion</c> dit à un consommateur ce qu'il peut attendre. Les champs à venir — l'audit, le
-/// plan, l'extrait — s'ajouteront sans déplacer ceux-ci.
+/// plan — s'ajouteront sans déplacer ceux-ci.
 /// <para>
 /// Construit en <c>JsonNode</c> plutôt que par sérialisation de types annotés : la sortie doit être une
 /// forme stable que l'on relit en la regardant, non le reflet d'une hiérarchie de classes qui évoluerait
@@ -46,7 +46,6 @@ public static class JsonReportWriter
             ["ruleOutcomes"] = Outcomes(run),
             ["findings"] = Findings(run),
             ["redundancyGroups"] = RedundancyGroups(run),
-            ["extract"] = Extracted(run),
             ["suppressions"] = Suppressions(run),
             ["optimization"] = Planned(run),
             ["sizes"] = Sizes(run),
@@ -199,14 +198,6 @@ public static class JsonReportWriter
     }
 
     /// <summary>
-    /// L'extrait : d'où il vient, ce que chaque opération a hérité, et ce que la vérification a établi.
-    /// </summary>
-    /// <remarks>
-    /// L'héritage est publié opération par opération parce que c'est ce qu'un consommateur ne peut pas
-    /// reconstituer depuis l'extrait seul : un paramètre remonté au niveau du chemin y est indiscernable
-    /// d'un paramètre qui y était déjà.
-    /// </remarks>
-    /// <summary>
     /// L'appariement, entrée par entrée.
     /// </summary>
     /// <remarks>
@@ -307,69 +298,6 @@ public static class JsonReportWriter
             ["carriedPercent"] = examined == 0 ? null : (figures.Carried * 100) / examined,
             ["notCarriedByReason"] = grouped,
         };
-    }
-
-    private static JsonObject? Extracted(ApiDeltaRun run)
-    {
-        if (run.Extract is not { } extract)
-        {
-            return null;
-        }
-
-        JsonArray operations = [];
-
-        foreach (Extraction.InheritanceRecord record in extract.InheritedContext)
-        {
-            operations.Add(new JsonObject
-            {
-                ["path"] = record.Selector.Path,
-                ["method"] = record.Selector.MethodKey,
-                ["inherited"] = new JsonObject
-                {
-                    ["pathParameters"] = Words(record.PathParameters),
-                    ["servers"] = Words(record.Servers),
-                    ["security"] = Words(record.Security),
-                },
-            });
-        }
-
-        return new JsonObject
-        {
-            ["source"] = new JsonObject
-            {
-                ["path"] = extract.Provenance.SourcePath,
-                ["sha256"] = extract.Provenance.SourceHash,
-            },
-            ["operations"] = operations,
-            ["closure"] = new JsonObject
-            {
-                ["components"] = extract.Closure.Required.Count,
-                ["externalPreserved"] = extract.Closure.ExternalPreserved.Count,
-            },
-            ["carriedTags"] = Words(extract.CarriedTags),
-            ["danglingExtensionReferences"] = Dangling(extract),
-            ["verification"] = new JsonObject
-            {
-                ["reparsed"] = extract.Verification.Reparsed,
-                ["revalidated"] = extract.Verification.Revalidated,
-                ["referencesResolved"] = extract.Verification.ReferencesResolved,
-                ["containsNothingUnselected"] = extract.Verification.ContainsNothingUnselected,
-                ["operationsEquivalent"] = extract.Verification.OperationsEquivalent,
-                ["differences"] = Words(extract.Verification.Differences),
-            },
-        };
-    }
-
-    private static JsonArray Dangling(Extraction.ExtractResult extract)
-    {
-        JsonArray array = [];
-
-        foreach (Audit.Finding finding in extract.DanglingExtensionReferences)
-        {
-            array.Add(Entry(finding));
-        }
-
-        return array;
     }
 
     private static JsonArray Words(IEnumerable<string> words)

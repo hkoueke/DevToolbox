@@ -34,69 +34,41 @@ otherwise — it must not name a server this tool never contacts.
 
 In order, each step skippable backwards:
 
-1. **Production description** — a path prompt with validation: the file exists, is readable, is within the
-   size limit, and its format is detected and shown (`YAML, OpenAPI 3.0.3`). A path that does not resolve
-   is re-prompted, never accepted and failed later.
-2. **Mode** — a `SelectionPrompt`: *Comparer*, *Comparer et produire un correctif*, *Auditer*,
-   *Optimiser*, *Extraire des opérations choisies*, *Tout*. The chosen mode decides whether step 3 is asked
-   at all, and whether the operation picker of §2b appears (FR-701).
-3. **Candidate description** — same validation. Asked only for compare, patch and everything.
+1. **Mode** — a `SelectionPrompt` of exactly two entries, each naming what the person came to do rather
+   than what the tool does inside (FR-700):
+
+   - *Consolider ma production avec un autre fichier* — « vous donnez votre fichier de production et un
+     fichier compagnon ; vous recevez un fichier de production consolidé, écrit à côté. »
+   - *Analyser un fichier en vue d'un nettoyage* — « vous donnez un fichier ; vous recevez ce qu'il a
+     accumulé et ce qu'un nettoyage lui gagnerait. »
+
+   The mode is asked **first**, because it decides what else is asked. Asking for files before knowing what
+   for is how the old six-entry menu came to ask for a companion file it would then ignore.
+2. **Production file** — a path prompt with validation: the file exists, is readable, is within the size
+   limit, and its format is detected and shown (`YAML, OpenAPI 3.0.3`). A path that does not resolve is
+   re-prompted, never accepted and failed later.
+3. **Companion file** — same validation, and asked only when consolidating (FR-701). It may be an OpenAPI
+   description or a WSDL contract; which one it is is detected from its content, never from its extension.
 4. **Output directory** — defaults to the production file's directory; confined, and a directory outside
    it is confirmed (FR-709). Existing artifacts of the same names are listed, and overwriting them is
    confirmed.
 5. **Ruleset and suppressions** — optional paths, each defaulting to a conventionally named file beside the
    production description when one exists, and to the shipped defaults otherwise.
-6. **Optimization intent** — only when the mode includes optimization: *proposer seulement* or *appliquer
-   ce qui est sûr*. Applying is never the default.
+6. **Cleanup intent** — only when analysing: *chiffrer seulement* or *appliquer ce qui est sûr*. Applying
+   is never the default, and the figures come first (FR-701a).
 7. **Summary and confirmation** — what will be read, what will be written, what will not be touched. The
-   sentence that matters is rendered explicitly: *« Le fichier de production n'est pas modifié. »*
+   sentence that matters is rendered explicitly: *« Votre fichier de production n'est pas modifié. »*
 
-Both inputs being the same file is accepted with a warning, because auditing a file against itself is a
-reasonable way to see the audit and produces an empty comparison, not an error.
-
----
-
-## 2b. Choosing operations, in the extract mode
-
-Shown after the production description is read and validated, because the list comes from the document
-(FR-902). A four-hundred-operation description is not a list to scroll, so narrowing comes first:
-
-```text
-Extraire quelles opérations ?   412 opérations dans production.yaml
-
-  Filtrer par étiquette      ▸ Documents (84) · Dossiers (131) · Pièces (97) · … 
-  Filtrer par chemin         ▸ saisir une partie du chemin
-  Tout parcourir
-
-┌ Documents ───────────────────────────────────────────────────────────────┐
-│ [ ] POST   /documents                  Dépose un document               │
-│ [x] GET    /documents/{id}             Lit un document                   │
-│ [ ] DELETE /documents/{id}             Supprime un document   obsolète   │
-│ [x] POST   /ajouterDocument            Ajoute un document                │
-└──────────────────────────────────────────────────────────────────────────┘
-  2 opérations choisies · Espace pour cocher · Entrée pour valider · Retour
-```
-
-- A `MultiSelectionPrompt` grouped by tag, paged, with the filter applied first. Selection is **per
-  operation**, so one method of a path can be taken without its siblings (FR-901).
-- Each row shows path, method, summary and whether it is deprecated — enough to choose without opening the
-  file. Confirm whether `MultiSelectionPrompt` in Spectre.Console 0.57.2 offers built-in search; the filter
-  step above is required regardless, and makes the answer a convenience rather than a dependency.
-- Choosing nothing and confirming is refused with an explanation rather than producing an empty extract
-  (FR-701).
-- Before building, a confirmation states what will be carried along: *« 2 opérations, 37 composants, les
-  paramètres de chemin hérités et l'exigence de sécurité globale. Le fichier source n'est pas modifié. »*
-
-After the build, the result screen replaces the comparison summary with the extract's own: the operations
-taken, what each inherited, the closure size, the verification verdict, and the file that was written.
-A verification that failed names the operation and what differed, and no file exists (FR-910).
+Both files being the same file is accepted with a warning, because consolidating a file with itself
+produces an empty comparison, not an error.
 
 ---
 
 ## 3. While it runs
 
-Ten named steps (R9), rendered through the shared Spectre `Progress`, each with its own line and its own
-outcome. The run below is a compare, so `Extract` never appears:
+Named steps (R9), rendered through the shared Spectre `Progress`, each with its own line and its own
+outcome. The run below is an analysis, so the steps that need a companion file are shown as skipped with
+their reason — never as a tick, and never hidden:
 
 ```text
 ✓ Sélection                      0,1 s
@@ -187,11 +159,11 @@ labelled selection entries:
 ```text
 Reprendre une exécution interrompue ?
   apidelta · il y a 14 minutes
-    Mode        Tout
-    Production  C:\work\production.yaml   sha256:3f9a7c21b0d4
-    Candidat    C:\work\new-api.json      sha256:7c21f0a4e8b2
-    Sortie      C:\work\artifacts
-    Étapes      Sélection, Lecture de la production, Lecture du candidat
+    Ce qui était fait  Consolider une production
+    Production         C:\work\production.yaml   sha256:3f9a7c21b0d4
+    Compagnon          C:\work\new-api.json      sha256:7c21f0a4e8b2
+    Sortie             C:\work\artifacts
+    Étapes             Choix des fichiers, Lecture de la production, Lecture du compagnon
 ```
 
 **Resuming re-reads.** Both files are read again from disk; nothing is restored from the checkpoint. If

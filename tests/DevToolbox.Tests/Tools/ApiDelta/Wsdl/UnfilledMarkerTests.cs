@@ -183,7 +183,7 @@ public sealed class UnfilledMarkerTests
     /// <summary>L'exécution telle que les rapports la lisent, réduite à ce que cet essai regarde.</summary>
     private static ApiDeltaRun Run(WsdlCorrectionRun run, BuiltCorrection built) => new(
         Guid.Empty,
-        new RunSelection(RunMode.Correct, "production.yaml", "sans objet", "artefacts"),
+        new RunSelection(RunMode.Consolidate, "production.yaml", "sans objet", "artefacts"),
         DateTimeOffset.UnixEpoch,
         TimeSpan.Zero,
         run.Production,

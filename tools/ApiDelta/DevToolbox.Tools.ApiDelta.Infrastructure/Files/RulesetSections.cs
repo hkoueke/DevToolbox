@@ -149,24 +149,6 @@ internal static class RulesetSections
                 : reader.Ruleset.KnownPlaceholders,
         };
 
-    /// <summary>Les réglages de l'extraction.</summary>
-    internal static Ruleset Extract(Reader reader, SpecNode node)
-    {
-        ExtractSettings settings = reader.Ruleset.Extract;
-
-        return reader.Ruleset with
-        {
-            Extract = settings with
-            {
-                StampProvenance = reader.Flag(
-                    node, "extract", "stampProvenance", settings.StampProvenance),
-                DefaultName = Reader.Text(node, "defaultName") ?? settings.DefaultName,
-                CarryDocumentExtensions = reader.Flag(
-                    node, "extract", "carryDocumentExtensions", settings.CarryDocumentExtensions),
-            },
-        };
-    }
-
     /// <summary>
     /// La lecture et la projection d'un contrat de service : budget, imports, table de verbes.
     /// </summary>

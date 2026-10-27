@@ -37,10 +37,20 @@ public sealed class ReadSourceStep : IToolStep
 
         RunSelection? selection = context.Get<RunSelection>(ApiDeltaContextKeys.Selection);
 
+        if (context.Get<Wsdl.WsdlContract>(ApiDeltaContextKeys.WsdlContract) is not null)
+        {
+            // Le compagnon est un contrat de service : l'étape précédente l'a lu, et l'appariement qui
+            // suit en produira le document que la comparaison lira. Le lire ici comme une description
+            // OpenAPI échouerait sur la première balise — et c'est ce qui arrivait tant que les deux
+            // étapes du contrat n'étaient pas dans la chaîne.
+            return Result.Success();
+        }
+
         if (selection?.CandidatePath is not { } candidate)
         {
             return Result.Fail(
-                FailureReason.InvalidInput, "Ce mode compare deux descriptions, et la candidate manque.");
+                FailureReason.InvalidInput,
+                "Consolider demande un fichier compagnon, et il manque.");
         }
 
         SpecReadResult result = await _reader

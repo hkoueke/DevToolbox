@@ -24,7 +24,7 @@ n'ont pas besoin d'être écrites ici : la génération échoue toute seule.
   `Environment.GetFolderPath` ignore `LOCALAPPDATA`, ce qui explique qu'`AppPaths` prenne des racines
   explicites.
 - **Rien de ce que nous publions n'est jamais sérialisé depuis le modèle sémantique.** Les correctifs, les
-  copies optimisées et les extraits sont écrits depuis l'arbre de syntaxe, qui est fidèle au sens *et* à
+  copies optimisées et les documents engendrés sont écrits depuis l'arbre de syntaxe, qui est fidèle au sens *et* à
   l'écriture. Microsoft.OpenApi sert à valider, jamais à réémettre : son modèle ne porte pas ce qu'il ne
   comprend pas, si bien qu'un aller-retour par lui ferait disparaître en silence toute extension de
   fournisseur — exactement la donnée que l'outil promet de ne pas toucher.
@@ -79,7 +79,7 @@ forme des URL d'un serveur, encodages compris.
 
 La projection produit un document OpenAPI que rien ne réémet tant qu'il n'entre pas en production. Tant
 qu'on se contente de le relire, ses défauts restent invisibles : un `$comment` posé par la règle du choix
-se relisait parfaitement, et la revalidation de la production corrigée le refusait — OpenAPI 3.0 ne
+se relisait parfaitement, et la revalidation de la production consolidée le refusait — OpenAPI 3.0 ne
 connaît pas ce mot-clé. Le défaut n'était visible qu'au bout de la chaîne, là où le document est *inséré
 puis revalidé*.
 

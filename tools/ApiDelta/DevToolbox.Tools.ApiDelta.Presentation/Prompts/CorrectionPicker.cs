@@ -2,7 +2,7 @@ using System.Globalization;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
-using DevToolbox.Tools.ApiDelta.Core.Extraction;
+using DevToolbox.Tools.ApiDelta.Core.Operations;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
@@ -57,7 +57,7 @@ public sealed class CorrectionPicker
 
         if (chosen.Count == 0)
         {
-            _console.MarkupLine("[yellow]Rien n'a été retenu : aucune production corrigée ne sera écrite.[/]");
+            _console.MarkupLine("[yellow]Rien n'a été retenu : aucune production consolidée ne sera écrite.[/]");
 
             return new CorrectionSelection();
         }
@@ -116,10 +116,10 @@ public sealed class CorrectionPicker
         }
 
         _console.MarkupLine(
-            "La production ne sera [bold]pas[/] modifiée : un document distinct sera écrit à côté des "
-            + "rapports.");
+            "Votre fichier de production ne sera [bold]pas[/] modifié : un fichier consolidé distinct "
+            + "sera écrit à côté des rapports.");
 
-        return _console.Confirm("Écrire la production corrigée de ces éléments ?", defaultValue: false);
+        return _console.Confirm("Écrire la production consolidée de ces éléments ?", defaultValue: false);
     }
 
     /// <summary>

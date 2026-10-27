@@ -209,7 +209,7 @@ public sealed class WsdlSecretsTests : IDisposable
 
         return new ApiDeltaRun(
             Guid.Empty,
-            new RunSelection(RunMode.Correct, "production.yaml", "sans objet", "artefacts"),
+            new RunSelection(RunMode.Consolidate, "production.yaml", "sans objet", "artefacts"),
             DateTimeOffset.UnixEpoch,
             TimeSpan.Zero,
             production,
