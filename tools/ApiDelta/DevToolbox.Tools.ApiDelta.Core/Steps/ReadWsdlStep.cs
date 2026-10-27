@@ -91,7 +91,7 @@ public sealed class ReadWsdlStep : IToolStep
             Confined(settings, candidate),
             cancellationToken).ConfigureAwait(false);
 
-        DiagnosticCollector.Add(context, read.Diagnostics);
+        DiagnosticCollector.Add(context, read.Diagnostics, candidate);
 
         if (!read.IsFaithful)
         {

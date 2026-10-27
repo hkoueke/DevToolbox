@@ -739,8 +739,10 @@ public static class MarkdownReportWriter
 
         builder.AppendLine(correction.Written
             ? "La production consolidée a été écrite dans « " + ArtifactNames.ConsolidatedDocument
-                + " ». La production elle-même n'a pas été touchée."
+                + " ». Votre fichier de production n'a pas été touché."
             : "Aucune production consolidée n'a été écrite.").AppendLine();
+
+        Terminator(builder, run);
 
         builder.AppendLine("| Ce qui a été retenu | Effet |");
         builder.AppendLine("|---------------------|-------|");
@@ -860,6 +862,36 @@ public static class MarkdownReportWriter
         }
 
         builder.AppendLine();
+    }
+
+    /// <summary>
+    /// Prévient quand la production ne finissait pas par une fin de ligne.
+    /// </summary>
+    /// <remarks>
+    /// Une phrase qui a coûté une matinée à quelqu'un. Un fichier dont la dernière ligne n'a pas de fin
+    /// de ligne en gagne une dès qu'on écrit après elle, et <em>tout</em> outil de comparaison affiche
+    /// alors cette ligne comme modifiée. Son contenu ne l'est pas — le vérificateur l'établit à l'octet
+    /// avant que le fichier n'existe — mais le relecteur lit « ligne supprimée » et cherche ce qu'il a
+    /// perdu.
+    /// <para>
+    /// Rien à corriger dans l'écriture : écrire après la dernière ligne la termine, et placer la
+    /// déclaration ailleurs serait arbitraire. Ce qui manquait, c'était de le dire.
+    /// </para>
+    /// </remarks>
+    private static void Terminator(StringBuilder builder, ApiDeltaRun run)
+    {
+        ReadOnlySpan<byte> bytes = run.Production.Source.Span;
+
+        if (bytes.Length == 0 || bytes[^1] == (byte)'\n')
+        {
+            return;
+        }
+
+        builder.AppendLine(
+            "**Votre fichier de production ne finissait pas par une fin de ligne.** La consolidation "
+            + "écrit après sa dernière ligne, qui en gagne donc une. Un outil de comparaison affichera "
+            + "cette ligne comme modifiée : son contenu ne l'est pas, et la vérification l'a établi à "
+            + "l'octet avant que le fichier ne soit écrit.").AppendLine();
     }
 
     /// <summary>

@@ -10,10 +10,20 @@ namespace DevToolbox.Tools.ApiDelta.Core.Loading;
 /// </remarks>
 public static class DiagnosticCollector
 {
-    /// <summary>Ajoute des diagnostics à ceux de l'exécution.</summary>
+    /// <summary>
+    /// Ajoute des diagnostics à ceux de l'exécution, en nommant le fichier dont ils parlent.
+    /// </summary>
     /// <param name="context">Le contexte de l'exécution.</param>
     /// <param name="diagnostics">Ce qu'il y a à ajouter.</param>
-    public static void Add(ToolRunContext context, IEnumerable<Diagnostic> diagnostics)
+    /// <param name="document">Le fichier que l'étape lisait, quand elle en lisait un.</param>
+    /// <remarks>
+    /// Le timbre est posé ici plutôt que chez chaque producteur, et c'est le bon endroit : seul l'appelant
+    /// sait <em>lequel</em> des deux fichiers il était en train de lire, là où un lecteur ne connaît que
+    /// le flux d'octets qu'on lui a tendu. Celui qui sait déjà — le lecteur de contrat, qui ouvre vingt
+    /// documents — le dit lui-même, et son timbre n'est pas écrasé.
+    /// </remarks>
+    public static void Add(
+        ToolRunContext context, IEnumerable<Diagnostic> diagnostics, string? document = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(diagnostics);
@@ -21,7 +31,11 @@ public static class DiagnosticCollector
         List<Diagnostic> all =
             context.Get<List<Diagnostic>>(ApiDeltaContextKeys.Diagnostics) ?? [];
 
-        all.AddRange(diagnostics);
+        all.AddRange(document is null
+            ? diagnostics
+            : diagnostics.Select(diagnostic => diagnostic.Document is null
+                ? diagnostic with { Document = document }
+                : diagnostic));
 
         context.Set(ApiDeltaContextKeys.Diagnostics, all);
     }

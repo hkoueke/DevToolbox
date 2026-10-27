@@ -52,24 +52,37 @@ public sealed class ValidateStep : IToolStep
                 FailureReason.InvalidInput, "Aucune description lue : il n'y a rien à valider."));
         }
 
-        List<Diagnostic> found = [];
+        List<Diagnostic> onProduction = [];
 
-        Inspect(production, selection, found, context);
+        Inspect(production, selection, onProduction, context);
+
+        List<Diagnostic> onCompanion = [];
 
         if (context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument) is { } candidate)
         {
-            Inspect(candidate, selection, found, null);
+            Inspect(candidate, selection, onCompanion, null);
         }
 
-        DiagnosticCollector.Add(context, found);
+        DiagnosticCollector.Add(context, onProduction);
+        DiagnosticCollector.Add(context, onCompanion);
 
-        List<Diagnostic> blocking = [.. found.Where(diagnostic => diagnostic.IsBlocking)];
+        List<Diagnostic> blocking = [.. onProduction.Where(diagnostic => diagnostic.IsBlocking)];
 
+        // Seuls les verdicts sur la production arrêtent l'exécution, et la raison est celle de tout cet
+        // outil : on ne répond que de ce qu'on écrit. La production est recopiée puis republiée, donc
+        // elle doit tenir. Le fichier compagnon, lui, n'est jamais publié — on y prend ce que le
+        // développeur désigne, et le document consolidé fait l'objet de sa propre vérification.
+        //
+        // Les refuser ensemble rendait l'outil inutilisable sur les fichiers qui existent vraiment : un
+        // export Swagger dont « info » est vide est le cas ordinaire, et aucune comparaison de routes ne
+        // dépend de « info.title ». Les plaintes sur le compagnon sont consignées, nommées sous son
+        // propre nom à l'écran, et portées au rapport — elles ne sont ni perdues ni fatales.
         if (blocking.Count > 0)
         {
             return Task.FromResult(Result.Fail(
                 FailureReason.InvalidInput,
-                "La validation a refusé la description : " + DiagnosticCollector.Summarise(blocking)));
+                "La validation a refusé votre fichier de production : "
+                    + DiagnosticCollector.Summarise(blocking)));
         }
 
         return Task.FromResult(Result.Success());
@@ -90,12 +103,21 @@ public sealed class ValidateStep : IToolStep
         List<Diagnostic> found,
         ToolRunContext? context)
     {
-        IReadOnlyList<Diagnostic> verdicts = _validator.Validate(document);
+        // Chaque verdict est timbré du document qu'il regarde. Les deux fichiers sont inspectés dans la
+        // même liste, et sans ce timbre une plainte sur le compagnon ressortait sous le nom de la
+        // production : « le champ "title" est requis » affiché sous un fichier qui avait un titre.
+        IReadOnlyList<Diagnostic> verdicts =
+        [
+            .. _validator.Validate(document)
+                .Select(verdict => verdict with { Document = document.Path }),
+        ];
+
         found.AddRange(verdicts);
 
         List<Diagnostic> resolution = [];
         ReferenceGraphResult graph = _references.Resolve(document, selection.References, resolution);
-        found.AddRange(resolution);
+
+        found.AddRange(resolution.Select(one => one with { Document = document.Path }));
 
         context?.Set(ApiDeltaContextKeys.StructuralVerdicts, verdicts);
         context?.Set(ApiDeltaContextKeys.ReferenceGraph, graph);

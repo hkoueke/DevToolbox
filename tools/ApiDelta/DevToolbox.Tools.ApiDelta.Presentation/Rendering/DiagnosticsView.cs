@@ -27,9 +27,20 @@ public sealed class DiagnosticsView
         _console = console;
     }
 
-    /// <summary>Affiche des diagnostics, les plus graves d'abord.</summary>
+    /// <summary>
+    /// Affiche des diagnostics, groupés par fichier, les plus graves d'abord.
+    /// </summary>
     /// <param name="diagnostics">Ce qu'il y a à dire.</param>
-    /// <param name="path">Le fichier concerné, pour en-tête.</param>
+    /// <param name="path">Le fichier auquel rattacher ce qui n'en nomme aucun.</param>
+    /// <remarks>
+    /// Groupés par le fichier que chaque diagnostic nomme, et non tous sous un seul en-tête. L'en-tête
+    /// unique était celui de la production : une plainte portant sur le fichier compagnon envoyait donc
+    /// chercher un défaut dans un fichier parfaitement sain, et c'est arrivé.
+    /// <para>
+    /// Ce qui ne nomme aucun fichier reste rattaché à celui qu'on passe ici — un refus de configuration,
+    /// par exemple, qui porte déjà son fichier dans son message.
+    /// </para>
+    /// </remarks>
     public void Render(IReadOnlyList<Diagnostic> diagnostics, string path)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
@@ -40,17 +51,29 @@ public sealed class DiagnosticsView
             return;
         }
 
-        _console.Write(new Rule("[bold]" + Markup.Escape(Path.GetFileName(path)) + "[/]").LeftJustified());
-
-        foreach (Diagnostic diagnostic in diagnostics
-            .OrderBy(diagnostic => diagnostic.Severity)
-            .ThenBy(diagnostic => diagnostic.Position?.Line ?? 0))
+        foreach (IGrouping<string, Diagnostic> document in diagnostics
+            .GroupBy(diagnostic => diagnostic.Document ?? path, StringComparer.Ordinal)
+            .OrderBy(group => Worst(group), Comparer<DiagnosticSeverity>.Default)
+            .ThenBy(group => group.Key, StringComparer.Ordinal))
         {
-            Render(diagnostic);
-        }
+            _console.Write(
+                new Rule("[bold]" + Markup.Escape(Path.GetFileName(document.Key)) + "[/]")
+                    .LeftJustified());
 
-        _console.WriteLine();
+            foreach (Diagnostic diagnostic in document
+                .OrderBy(diagnostic => diagnostic.Severity)
+                .ThenBy(diagnostic => diagnostic.Position?.Line ?? 0))
+            {
+                Render(diagnostic);
+            }
+
+            _console.WriteLine();
+        }
     }
+
+    /// <summary>La pire gravité d'un groupe, pour que le fichier le plus en cause passe en premier.</summary>
+    private static DiagnosticSeverity Worst(IEnumerable<Diagnostic> diagnostics) =>
+        diagnostics.Min(diagnostic => diagnostic.Severity);
 
     private void Render(Diagnostic diagnostic)
     {
