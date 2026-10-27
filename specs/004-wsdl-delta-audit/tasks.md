@@ -415,12 +415,12 @@ before it has read anything.
 - [X] T092 [P] Report every import left unresolved by policy and every projection that could not be established, in the limitations section of `Core/Reporting/MarkdownReportWriter.cs` (WR-604)
 - [X] T093 Register the contract, the retrieved origin and the projection gap with `RedactionRegistry` in `Infra/ServiceCollectionExtensions.cs`, so no retrieved value can reach a log sink (WR-605)
 - [X] T094 [P] Create `Tests/Wsdl/WsdlSecretsTests.cs` — across every file a run writes, no credential, token or secret-shaped value appears, including a contract whose `soap:address` carries one (SC-015)
-- [ ] T095 [P] Create `Tests/Wsdl/WsdlResumeTests.cs` — a run interrupted after confirmation resumes without asking again, retrieves nothing, and reaches identical artifacts outside the metadata block (SC-014)
-- [ ] T096 [P] Create `Tests/Wsdl/WsdlPerformanceTests.cs` — 200 operations and 5,000 types across 20 documents under thirty seconds, **measured per phase**: 003's performance test found a stack overflow rather than a slowdown, and only the per-phase curve showed where (SC-002)
+- [X] T095 [P] Create `Tests/Wsdl/WsdlResumeTests.cs` — a run interrupted after confirmation resumes without asking again, retrieves nothing, and reaches identical artifacts outside the metadata block (SC-014)
+- [X] T096 [P] Create `Tests/Wsdl/WsdlPerformanceTests.cs` — 200 operations and 5,000 types across 20 documents under thirty seconds, **measured per phase**: 003's performance test found a stack overflow rather than a slowdown, and only the per-phase curve showed where (SC-002)
 - [X] T097 [P] Create `Tests/Wsdl/WsdlLimitTests.cs` — every configured limit, when reached, reported with the limit named (SC-013)
-- [ ] T098 Create `Tests/Wsdl/WsdlOfflineTests.cs` — no outbound call when the inputs are files, established by observation and not by inspecting configuration (SC-012)
-- [ ] T099 [P] Update `README.md` — apidelta accepts a WSDL candidate, and what the new report sections say
-- [ ] T100 [P] Update `CONCEPTION.md` with the rules this feature adds, if any survive the implementation — a rule earns its place by having been broken once
+- [X] T098 Create `Tests/Wsdl/WsdlOfflineTests.cs` — no outbound call when the inputs are files, established by observation and not by inspecting configuration (SC-012)
+- [X] T099 [P] Update `README.md` — apidelta accepts a WSDL candidate, and what the new report sections say
+- [X] T100 [P] Update `CONCEPTION.md` with the rules this feature adds, if any survive the implementation — a rule earns its place by having been broken once
 - [ ] T101 Run the full gate on `DevToolbox.slnx`: `dotnet build` with zero warnings, `dotnet test` green, then clone the pushed branch into an empty directory and run both there — **a fresh clone is the only thing that catches it**, as version 1.2.0 nearly proved
 
 ---

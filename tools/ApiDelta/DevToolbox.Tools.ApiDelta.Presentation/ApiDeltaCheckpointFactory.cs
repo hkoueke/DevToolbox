@@ -2,6 +2,7 @@ using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
+using DevToolbox.Tools.ApiDelta.Core.Correspondence;
 using DevToolbox.Tools.ApiDelta.Core.Extraction;
 using DevToolbox.Tools.ApiDelta.Core.Steps;
 
@@ -186,10 +187,49 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
             RulesetPath: Key(run, ApiDeltaSelectionKinds.Ruleset),
             Correction: corrected.Count > 0 || reported.Count > 0
                 ? new CorrectionSelection(corrected, reported)
-                : null)
+                : null,
+            Correspondence: Paired(run))
         {
             SelectedOperations = operations,
         };
+    }
+
+    /// <summary>
+    /// L'appariement mémorisé, relu confirmé.
+    /// </summary>
+    /// <remarks>
+    /// Confirmé, parce que l'écriture ne retient que des entrées confirmées : les relire autrement
+    /// ferait reposer la question à un développeur qui y avait déjà répondu, ce qui est précisément ce
+    /// que la mémorisation existe pour éviter. Écrire sans relire était le trou — une mémorisation dont
+    /// personne ne se sert coûte le même code et ne rend aucun service.
+    /// <para>
+    /// La séparation est celle que l'écriture a posée : « opération → route ». Une entrée illisible est
+    /// écartée en silence plutôt que de faire échouer la reprise, car une reprise qui refuse vaut moins
+    /// qu'une reprise qui repose une question.
+    /// </para>
+    /// </remarks>
+    private static OperationCorrespondence? Paired(PersistedRun run)
+    {
+        List<CorrespondenceEntry> entries = [];
+
+        foreach (string key in Of(run, ApiDeltaSelectionKinds.Correspondence))
+        {
+            int separator = key.IndexOf('→', StringComparison.Ordinal);
+
+            if (separator <= 0 || separator == key.Length - 1)
+            {
+                continue;
+            }
+
+            entries.Add(new CorrespondenceEntry(
+                key[..separator].Trim(),
+                key[(separator + 1)..].Trim(),
+                CorrespondenceOrigin.Confirmed));
+        }
+
+        return entries.Count > 0
+            ? new OperationCorrespondence(entries, IsConfirmed: true)
+            : null;
     }
 
     /// <summary>Les clés d'une sorte donnée, dans l'ordre où elles ont été écrites.</summary>

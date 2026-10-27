@@ -92,6 +92,40 @@ public sealed class CorrespondStep : IToolStep
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// L'appariement qu'une exécution interrompue avait déjà fait confirmer, s'il y en a un.
+    /// </summary>
+    /// <remarks>
+    /// Employé tel quel, et c'est tout l'intérêt de l'avoir mémorisé : reposer la question obligerait le
+    /// développeur à refaire, opération par opération, un travail qu'il a déjà fait — et c'est au moment
+    /// de reprendre qu'il a le moins envie de le refaire.
+    /// <para>
+    /// Seul un appariement <em>confirmé</em> revient : c'est la seule forme que le point de reprise
+    /// accepte d'écrire, et une proposition non confirmée n'est pas une décision qu'on puisse restituer
+    /// à la place de quelqu'un.
+    /// </para>
+    /// </remarks>
+    private static OperationCorrespondence? Resumed(ToolRunContext context) =>
+        context.Get<RunSelection>(ApiDeltaContextKeys.Selection)?.Correspondence
+            is { IsConfirmed: true } confirmed
+            ? confirmed
+            : null;
+
+    /// <summary>Propose l'appariement, et le fait confirmer.</summary>
+    private Task<OperationCorrespondence> Confirm(
+        IReadOnlyList<string> operations,
+        SpecDocumentRoutes production,
+        ToolRunContext context,
+        CancellationToken cancellationToken)
+    {
+        OperationCorrespondence proposed = _proposer.Propose(
+            operations,
+            production.Routes,
+            context.Get<IReadOnlyDictionary<string, string>>(ApiDeltaContextKeys.DeclaredCorrespondence));
+
+        return _prompt.ConfirmAsync(proposed, production.Routes, cancellationToken);
+    }
+
     /// <summary>Propose, fait confirmer, puis établit la couverture — dans cet ordre.</summary>
     private async Task<Result> ConfirmAsync(
         ToolRunContext context,
@@ -101,14 +135,8 @@ public sealed class CorrespondStep : IToolStep
     {
         IReadOnlyList<string> operations = [.. contract.Operations.Select(operation => operation.Name)];
 
-        OperationCorrespondence proposed = _proposer.Propose(
-            operations,
-            production.Routes,
-            context.Get<IReadOnlyDictionary<string, string>>(ApiDeltaContextKeys.DeclaredCorrespondence));
-
-        OperationCorrespondence settled = await _prompt
-            .ConfirmAsync(proposed, production.Routes, cancellationToken)
-            .ConfigureAwait(false);
+        OperationCorrespondence settled = Resumed(context) ?? await Confirm(
+            operations, production, context, cancellationToken).ConfigureAwait(false);
 
         context.Set(ApiDeltaContextKeys.Correspondence, settled);
 

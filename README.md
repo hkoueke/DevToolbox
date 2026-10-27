@@ -16,8 +16,9 @@ corriger soi-même.
 
 ## apidelta
 
-Compare deux fichiers OpenAPI (Swagger), dit ce qui casse pour les applications qui appellent, puis **vous
-rend le fichier de production avec les routes que vous choisissez déjà dedans**. Il examine aussi celui qui
+Compare deux fichiers OpenAPI (Swagger) — ou un contrat de service WSDL en face d'une production
+OpenAPI —, dit ce qui casse pour les applications qui appellent, puis **vous rend le fichier de
+production avec les routes que vous choisissez déjà dedans**. Il examine aussi celui qui
 est en service, chiffre ce qu'un nettoyage rapporterait, et sort une route dans une description autonome.
 
 Ce qu'il promet, et ce qu'il refuse :
@@ -37,7 +38,35 @@ Ce qu'il promet, et ce qu'il refuse :
   est identique à l'octet et que ce que vous avez choisi ne diffère que comme demandé. Faute de quoi rien
   n'est écrit, et le rapport dit pourquoi.
 
-Onglet **OpenAPI** → **apidelta**. Aucun serveur, aucun identifiant, aucun réseau.
+### Le nouveau fichier peut aussi être un WSDL
+
+`apidelta` accepte un contrat de service WSDL 1.1 comme nouveau fichier, en face d'une production OpenAPI.
+Il suit les imports — schémas voisins compris — dans un périmètre qu'il annonce, puis **projette** le
+contrat dans la forme qu'il sait déjà comparer. Le document d'entrée peut être un chemin ou une adresse ;
+dans le second cas l'outil écrit d'abord sur le disque tout ce qu'il a obtenu, et ne lit que ces fichiers.
+
+Trois choses à savoir avant de s'en servir :
+
+- **Rien n'est comparé avant que vous ayez validé l'appariement.** Aucune convention ne fait le pont entre
+  une opération WSDL et une route REST : l'outil propose une paire par opération, dit sur quoi il s'est
+  fondé, et attend. Renoncer est une réponse — la séance réussit, n'ayant rien comparé. L'appariement
+  validé est mémorisé : une séance reprise ne vous le redemande pas.
+- **Ce que la traduction ne porte pas est recensé, jamais deviné.** Un attribut XSD, un contenu mixte, un
+  groupe de substitution n'ont pas de contrepartie en OpenAPI. Le document engendré porte à ces
+  endroits-là un marqueur `x-apidelta-unfilled` qui dit quoi et pourquoi, en déclare le nombre à son
+  propre niveau, et chaque élément dérivé nomme le document du contrat, la ligne et ce que la projection
+  valait. Un schéma plausible serait la seule sortie dont vous ne pourriez pas récupérer le fait que
+  personne ne sait.
+- **Le rapport chiffre ce qui était comparable.** Couverture du contrat par la production, part portée
+  exactement, et ce qui n'a pas de contrepartie groupé par motif. « La projection s'est bien passée » ne
+  veut rien dire ; « 62 % des constructions portées » se recoupe et se discute.
+
+La lecture, les budgets et la table de verbes qui dérive les itinéraires se règlent sous la section
+`wsdl` du jeu de règles. Une clé inconnue y est refusée en nommant son fichier, sa ligne et sa colonne :
+l'outil ne retombe jamais en silence sur ses propres valeurs.
+
+Onglet **OpenAPI** → **apidelta**. Aucun serveur, aucun identifiant, aucun réseau — sauf si vous donnez
+vous-même l'adresse d'un contrat, et le seul appel sortant est alors celui-là.
 
 ## Prérequis
 

@@ -74,3 +74,48 @@ de les reproposer. Réécrire les `schemaLocation` dans les fichiers écrits ren
 elle ne désignerait plus ce que le serveur a servi, et c'est tout ce qu'une empreinte sert à dire.
 Reproduire l'arborescence des adresses sur le disque fonctionnerait, mais ferait dépendre les chemins de la
 forme des URL d'un serveur, encodages compris.
+
+## Un document projeté doit être valide, et pas seulement relisible
+
+La projection produit un document OpenAPI que rien ne réémet tant qu'il n'entre pas en production. Tant
+qu'on se contente de le relire, ses défauts restent invisibles : un `$comment` posé par la règle du choix
+se relisait parfaitement, et la revalidation de la production corrigée le refusait — OpenAPI 3.0 ne
+connaît pas ce mot-clé. Le défaut n'était visible qu'au bout de la chaîne, là où le document est *inséré
+puis revalidé*.
+
+C'est pourquoi l'épreuve de bout en bout vaut d'exister en plus des épreuves d'unité : elle ne vérifie pas
+ce qu'elles vérifient déjà, elle prend les défauts qui n'existent qu'au bout.
+
+## Une trace d'origine ne dit jamais « non portée »
+
+Un élément *écrit* a forcément été porté, exactement ou à peu près. Ce qui n'a pas été porté n'est pas un
+élément : c'est une absence, et une absence se dit par un marqueur de non-remplissage, jamais par une
+trace d'origine. Annoncer « non portée » sur un élément présent dirait au lecteur le contraire de ce qu'il
+a sous les yeux.
+
+Le corollaire tient la promesse entière : un champ scalaire ne peut pas porter de membre `x-`, si bien que
+sa trace figure dans la déclaration du document, qui le nomme. Sans cela, un champ dérivé d'une traduction
+serait indiscernable d'un champ recopié des octets d'un candidat.
+
+## Ce qui sort de la projection est trié, et ce tri n'est pas cosmétique
+
+Les attributs d'un type compilé arrivent dans l'ordre d'une table de hachage, qui n'est l'ordre de
+personne. Les opérations sortent dans l'ordre où le contrat les déclare, qui est une façon d'écrire. Les
+schémas d'un jeu compilé sortent dans l'ordre où les documents y ont été versés, donc dans l'ordre du
+découpage en fichiers.
+
+Trois ordres qu'une seconde livraison du même service peut changer sans rien changer au contrat. Non
+triés, ils feraient apparaître des différences à chaque relance de l'intégration continue, et l'outil
+annoncerait des changements que personne n'a faits — ce qu'un brouillon ne peut se permettre qu'une fois.
+
+## Deux schémas dans un même `wsdl:types` ne partagent pas une URI
+
+`XmlSchemaSet` reconnaît un doublon à l'URI d'où le schéma vient. Deux `xs:schema` écrits dans le même
+document en partagent une : le second est écarté **sans exception, sans diagnostic et sans que `Add`
+échoue**. Un contrat dont les schémas sont écrits dans le WSDL perdait ainsi la moitié de ses types tout
+en se déclarant lu fidèlement.
+
+Un fragment d'URI ne les distingue pas — il est retiré. `SchemaCompiler` analyse donc chaque schéma en
+ligne avec `XmlSchema.Read` avant de l'ajouter, ce qui donne deux instances distinctes. Au passage :
+`Add(espace, lecteur)` applique l'espace de noms donné à *tout* ce que l'appel charge, imports compris, et
+refuse alors l'import d'un autre espace de noms. Les deux chemins passent `null`.

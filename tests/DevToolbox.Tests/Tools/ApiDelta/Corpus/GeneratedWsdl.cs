@@ -54,6 +54,151 @@ internal static class GeneratedWsdl
         return entry;
     }
 
+    /// <summary>
+    /// Écrit un contrat à l'échelle d'un gros service, et rend le document d'entrée.
+    /// </summary>
+    /// <param name="directory">Le dossier où écrire. Créé s'il n'existe pas.</param>
+    /// <param name="operations">Le nombre d'opérations du type de port.</param>
+    /// <param name="types">Le nombre de types, répartis sur les schémas.</param>
+    /// <param name="documents">Le nombre de documents du graphe, WSDL d'entrée compris.</param>
+    /// <returns>Le chemin du WSDL d'entrée.</returns>
+    /// <remarks>
+    /// Large plutôt que profond : les schémas sont importés côte à côte par le document d'entrée, et
+    /// aucun n'en importe un autre. C'est la forme qu'ont les gros contrats réels — un schéma par
+    /// domaine — et c'est aussi celle qui met la pression là où elle doit l'être : sur le nombre de
+    /// documents et de types, non sur la profondeur, que la chaîne éprouve déjà.
+    /// <para>
+    /// Chaque opération reçoit ses deux messages et ses deux éléments, si bien que la projection a de
+    /// quoi produire une charge utile : une mesure faite sur des opérations vides mesurerait le coût de
+    /// ne rien faire.
+    /// </para>
+    /// </remarks>
+    internal static string Large(string directory, int operations, int types, int documents)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        ArgumentOutOfRangeException.ThrowIfLessThan(operations, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(types, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(documents, 2);
+
+        _ = Directory.CreateDirectory(directory);
+
+        int schemas = documents - 1;
+        int each = (types + schemas - 1) / schemas;
+
+        for (int at = 0; at < schemas; at++)
+        {
+            File.WriteAllText(
+                Path.Combine(directory, "domaine-" + Number(at) + ".xsd"),
+                Domain(at, Math.Min(each, types - (at * each)), operations, schemas),
+                new UTF8Encoding(false));
+        }
+
+        string entry = Path.Combine(directory, "service.wsdl");
+
+        File.WriteAllText(entry, Service(operations, schemas), new UTF8Encoding(false));
+
+        return entry;
+    }
+
+    /// <summary>Un schéma de domaine : ses types, et les éléments de message qui lui reviennent.</summary>
+    private static string Domain(int index, int types, int operations, int schemas)
+    {
+        StringBuilder builder = new();
+
+        _ = builder.AppendLine(@"<?xml version=""1.0"" encoding=""utf-8""?>")
+            .Append("<xs:schema xmlns:xs=\"").Append(XsdNamespace).AppendLine("\"")
+            .Append("           xmlns:d=\"").Append(Root).Append("/domaine/").Append(Number(index))
+            .AppendLine("\"")
+            .Append("           targetNamespace=\"").Append(Root).Append("/domaine/")
+            .Append(Number(index)).AppendLine("\">");
+
+        for (int at = 0; at < types; at++)
+        {
+            _ = builder.Append("  <xs:complexType name=\"Type").Append(Number(at)).AppendLine("\">")
+                .AppendLine("    <xs:sequence>")
+                .AppendLine("      <xs:element name=\"identifiant\" type=\"xs:string\"/>")
+                .AppendLine("      <xs:element name=\"libelle\" type=\"xs:string\" minOccurs=\"0\"/>")
+                .AppendLine("      <xs:element name=\"quantite\" type=\"xs:int\"/>")
+                .AppendLine("    </xs:sequence>")
+                .AppendLine("  </xs:complexType>");
+        }
+
+        // Les éléments de message de ce domaine : une opération sur « schemas » lui revient.
+        for (int at = index; at < operations; at += schemas)
+        {
+            _ = builder.Append("  <xs:element name=\"operation").Append(Number(at))
+                .Append("Requete\" type=\"d:Type").Append(Number(at % Math.Max(types, 1)))
+                .AppendLine("\"/>")
+                .Append("  <xs:element name=\"operation").Append(Number(at))
+                .Append("Reponse\" type=\"d:Type").Append(Number(at % Math.Max(types, 1)))
+                .AppendLine("\"/>");
+        }
+
+        return builder.AppendLine("</xs:schema>").ToString();
+    }
+
+    /// <summary>Le document d'entrée : ses imports, ses messages, son type de port.</summary>
+    private static string Service(int operations, int schemas)
+    {
+        StringBuilder builder = new();
+
+        _ = builder.AppendLine(@"<?xml version=""1.0"" encoding=""utf-8""?>")
+            .Append("<wsdl:definitions xmlns:wsdl=\"").Append(WsdlNamespace).AppendLine("\"")
+            .Append("    xmlns:xs=\"").Append(XsdNamespace).AppendLine("\"")
+            .Append("    xmlns:tns=\"").Append(Root).AppendLine("/service\"");
+
+        for (int at = 0; at < schemas; at++)
+        {
+            _ = builder.Append("    xmlns:d").Append(Number(at)).Append("=\"").Append(Root)
+                .Append("/domaine/").Append(Number(at)).AppendLine("\"");
+        }
+
+        _ = builder.Append("    targetNamespace=\"").Append(Root).AppendLine("/service\">")
+            .AppendLine("  <wsdl:types>")
+            .Append("    <xs:schema targetNamespace=\"").Append(Root).AppendLine("/service\">");
+
+        for (int at = 0; at < schemas; at++)
+        {
+            _ = builder.Append("      <xs:import namespace=\"").Append(Root).Append("/domaine/")
+                .Append(Number(at)).Append("\" schemaLocation=\"domaine-").Append(Number(at))
+                .AppendLine(".xsd\"/>");
+        }
+
+        _ = builder.AppendLine("    </xs:schema>").AppendLine("  </wsdl:types>");
+
+        for (int at = 0; at < operations; at++)
+        {
+            string prefix = "d" + Number(at % schemas);
+
+            _ = builder.Append("  <wsdl:message name=\"operation").Append(Number(at))
+                .AppendLine("In\">")
+                .Append("    <wsdl:part name=\"corps\" element=\"").Append(prefix)
+                .Append(":operation").Append(Number(at)).AppendLine("Requete\"/>")
+                .AppendLine("  </wsdl:message>")
+                .Append("  <wsdl:message name=\"operation").Append(Number(at)).AppendLine("Out\">")
+                .Append("    <wsdl:part name=\"corps\" element=\"").Append(prefix)
+                .Append(":operation").Append(Number(at)).AppendLine("Reponse\"/>")
+                .AppendLine("  </wsdl:message>");
+        }
+
+        _ = builder.AppendLine("  <wsdl:portType name=\"ServicePort\">");
+
+        for (int at = 0; at < operations; at++)
+        {
+            _ = builder.Append("    <wsdl:operation name=\"lireOperation").Append(Number(at))
+                .AppendLine("\">")
+                .Append("      <wsdl:input message=\"tns:operation").Append(Number(at))
+                .AppendLine("In\"/>")
+                .Append("      <wsdl:output message=\"tns:operation").Append(Number(at))
+                .AppendLine("Out\"/>")
+                .AppendLine("    </wsdl:operation>");
+        }
+
+        return builder.AppendLine("  </wsdl:portType>").AppendLine("</wsdl:definitions>").ToString();
+    }
+
+    private static string Number(int value) => value.ToString("D4", CultureInfo.InvariantCulture);
+
     /// <summary>Un schéma portant une énumération démesurée.</summary>
     /// <param name="values">Le nombre de valeurs.</param>
     /// <returns>Le schéma, tel quel.</returns>
