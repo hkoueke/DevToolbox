@@ -421,7 +421,41 @@ before it has read anything.
 - [X] T098 Create `Tests/Wsdl/WsdlOfflineTests.cs` — no outbound call when the inputs are files, established by observation and not by inspecting configuration (SC-012)
 - [X] T099 [P] Update `README.md` — apidelta accepts a WSDL candidate, and what the new report sections say
 - [X] T100 [P] Update `CONCEPTION.md` with the rules this feature adds, if any survive the implementation — a rule earns its place by having been broken once
-- [ ] T101 Run the full gate on `DevToolbox.slnx`: `dotnet build` with zero warnings, `dotnet test` green, then clone the pushed branch into an empty directory and run both there — **a fresh clone is the only thing that catches it**, as version 1.2.0 nearly proved
+- [X] T101 Run the full gate on `DevToolbox.slnx`: `dotnet build` with zero warnings, `dotnet test` green, then clone the pushed branch into an empty directory and run both there — **a fresh clone is the only thing that catches it**, as version 1.2.0 nearly proved
+
+## Notes de la phase 8, consignées en la faisant
+
+> **Deux budgets déclarés ne mordaient pas.** La profondeur d'imbrication et le nombre de valeurs d'une
+> énumération figuraient dans `WsdlLimits`, se lisaient désormais depuis la configuration, et n'étaient
+> appliqués nulle part. Un budget qui ne s'applique pas est pire qu'absent : il donne à l'équipe la
+> preuve d'une protection qu'elle n'a pas. Les deux refusent maintenant en se nommant.
+>
+> **L'appariement était mémorisé et jamais relu.** Le point de reprise écrivait les entrées confirmées
+> depuis la phase 4 ; `ApiDeltaCheckpointFactory.TryRead` ne les restituait pas, et `CorrespondStep`
+> n'allait pas les chercher. Une reprise redemandait donc tout. Les deux moitiés sont posées, et une
+> épreuve tient chacune : la reprise ne redemande rien, une proposition jamais confirmée est redemandée.
+>
+> **La garantie sur une « soap:address » est structurelle, et c'est mieux qu'un caviardage.** La lecture
+> ne retient pas la valeur, seulement l'emplacement : un jeton qui s'y cache n'entre jamais dans le
+> modèle. L'épreuve le dit sous cette forme — elle tombera le jour où quelqu'un ajoutera un membre
+> portant l'adresse, et c'est son objet. Les types porteurs rejoignent tout de même le registre de
+> caviardage, parce que les deux protections tomberaient pour des raisons différentes.
+>
+> **La mesure à l'échelle ne mesure pas ce qu'on croit.** Deux cents opérations, cinq mille types et
+> vingt documents passent en moins d'une seconde — très loin des trente permises. Ce que l'épreuve guette
+> n'est donc pas la seconde de trop mais le changement de régime, et c'est pourquoi chaque phase est
+> bornée à part : un total qui tiendrait grâce à deux phases rapides masquerait celle qui a dérivé.
+>
+> **La porte du clone neuf, et ce qu'elle a réellement attrapé.** Le premier clone a été fait dans le
+> dossier de travail temporaire de la séance, dont le chemin fait déjà cent quarante caractères : la
+> création des fichiers de `tools/` a échoué en silence contre la limite de deux cent soixante caractères
+> de Windows, et la génération s'est plainte de projets « introuvables » qui étaient bel et bien
+> validés. Le défaut était dans le chemin du clone, non dans le dépôt — mais il vaut d'être consigné,
+> parce que la prochaine personne qui verra cette erreur croira d'abord à un fichier oublié.
+>
+> Le clone a donc été refait sous un chemin court : génération à zéro avertissement, 850 essais verts.
+> La branche n'est pas poussée — le clone est local, et c'est la seule différence avec la lettre de
+> T101.
 
 ---
 
