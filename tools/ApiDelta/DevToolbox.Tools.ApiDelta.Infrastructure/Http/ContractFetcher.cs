@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Results;
@@ -52,6 +53,20 @@ public sealed class ContractFetcher : IContractFetcher
         _clock = clock;
     }
 
+    /// <summary>Indique que le budget a expiré, et que ce n'est pas le développeur qui a annulé.</summary>
+    /// <remarks>
+    /// La distinction compte : une annulation demandée n'est pas un refus, et la présenter comme un
+    /// budget dépassé reprocherait à une configuration ce que quelqu'un vient de décider.
+    /// </remarks>
+    private static bool Expired(CancellationTokenSource budget, CancellationToken asked) =>
+        budget.IsCancellationRequested && !asked.IsCancellationRequested;
+
+    /// <summary>Le refus d'un budget de récupération dépassé, la limite nommée.</summary>
+    private static string Overrun(WsdlLimits limits) =>
+        "La récupération du contrat a dépassé son budget de "
+        + limits.FetchTimeoutSeconds.ToString(CultureInfo.InvariantCulture)
+        + " seconde(s). La limite se règle, et elle se nomme : « wsdl.limits.fetchTimeoutSeconds ».";
+
     /// <inheritdoc />
     public async Task<Result<WsdlContract>> FetchAsync(
         Uri entry,
@@ -68,9 +83,36 @@ public sealed class ContractFetcher : IContractFetcher
         Materialiser materialiser = new();
         Dictionary<Uri, string> correspondence = [];
 
-        Result<MaterialisedDocument> entered = await WalkAsync(
-            entry, materialiser, correspondence, outputDirectory, limits, policy, cancellationToken)
-            .ConfigureAwait(false);
+        // Le budget de récupération que l'équipe a écrit s'applique ici, à la récupération du graphe
+        // entier. Le gestionnaire de résilience du client porte, lui, un délai figé à l'enregistrement :
+        // il borne une requête, et il ne pouvait pas connaître une configuration lue bien après. Un
+        // budget qui ne mord pas est pire qu'absent — il donne la preuve d'une protection qu'on n'a pas,
+        // et un graphe de vingt imports consommait vingt fois le délai d'une seule requête.
+        using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+
+        budget.CancelAfter(TimeSpan.FromSeconds(limits.FetchTimeoutSeconds));
+
+        Result<MaterialisedDocument> entered;
+
+        try
+        {
+            entered = await WalkAsync(
+                entry, materialiser, correspondence, outputDirectory, limits, policy, budget.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (Expired(budget, cancellationToken))
+        {
+            // Le dépassement remonte en exception depuis le client, et doit ressortir en refus nommé :
+            // une pile d'appels dirait « opération annulée » sans dire par qui ni pourquoi, et le
+            // développeur chercherait un défaut de réseau au lieu de régler une limite.
+            return Result.Fail<WsdlContract>(FailureReason.ServiceUnavailable, Overrun(limits));
+        }
+
+        if (Expired(budget, cancellationToken))
+        {
+            return Result.Fail<WsdlContract>(FailureReason.ServiceUnavailable, Overrun(limits));
+        }
 
         if (!entered.IsSuccess)
         {
@@ -196,8 +238,16 @@ public sealed class ContractFetcher : IContractFetcher
                     FailureReason.PermissionDenied, Said(check.Refusal!.Message, chain));
             }
 
+            // La requête emporte les adresses que le garde vient de valider, et la connexion s'ouvrira
+            // sur l'une d'elles. Sans cet épinglage, le client résolvait le nom une seconde fois : un
+            // hôte autorisé dont la réponse DNS bascule entre les deux atteignait une adresse que le
+            // garde n'avait jamais vue, et le contrôle d'adresse interne tombait sans être touché.
+            using HttpRequestMessage request = new(HttpMethod.Get, current);
+
+            PinnedAddress.Pin(request, check.Resolved);
+
             using HttpResponseMessage response = await _client
-                .GetAsync(current, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
 
             if (Redirected(response) is { } next)

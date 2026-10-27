@@ -102,6 +102,35 @@ document must be **valid**, and not merely re-readable.
   opposite of a choice, asserted with the confidence of a carried rule. Both defects were invisible until
   a projected schema had to be spliced into a production description and revalidated.
 
+### Session 2026-10-27, raised by a review of the release pull request
+
+- **Q: Does the tool follow a `wsdl:import`?** → **No, and it refuses the contract rather than read part
+  of it.** The sentence above names `wsdl:import` among the directives that bind a contract's documents,
+  and the implementation followed only `xsd:import`, `xsd:include` and `xsd:redefine` — those live inside
+  an `xs:schema`, where the import walker descends. A `wsdl:import` sits on the `wsdl:definitions` root
+  and was therefore neither followed **nor refused**: the contract was built from the entry document
+  alone, its imported operations, messages and bindings vanished without a word, and the read declared
+  itself faithful. That is precisely what WR-008 forbids. Following it is a feature for a later slice;
+  naming the refusal is the only honest answer meanwhile, and a refused read produces no contract, so
+  nothing is compared on half of one.
+- **Q: Was the confinement of WR-005 actually enforced?** → **It was enforced by a string prefix, which
+  is not enough**, and this is recorded as a defect rather than a change: under a root `…/contracts`, an
+  import `../contracts-secret/types.xsd` normalises to a path whose *string* starts with the root, so the
+  traversal refusal accepted a sibling directory. The check is now path-component aware. WR-005 already
+  required traversal to be "refused and named"; it simply was not, and that refusal is what pays for the
+  open-by-default local resolution.
+- **Q: Does a retrieval connect to the address the guard validated?** → **It does now.** The guard
+  resolved and validated a host's addresses, then the client resolved the host a second time to connect:
+  a permitted host whose DNS answer changed between the two reached an address the guard had never seen,
+  which defeated the internal-address check of WR-015 without touching it. The connection is now pinned
+  to a validated address, and the request keeps its hostname so that name indication and certificate
+  validation still bear on the name. A request carrying no validated address does not connect at all.
+- **Q: Did `wsdl.limits.fetchTimeoutSeconds` bite?** → **No, and now it does.** The budget lived in the
+  typed client's resilience handler, fixed when the client was registered, so a value a team wrote had no
+  effect and a graph of twenty imports could spend that budget twenty times over. It now bounds the whole
+  graph retrieval, and the refusal names the key. Third of its kind in this feature, after the nesting
+  depth and the enumeration budget: a declared limit that is never applied is worse than an absent one.
+
 ### Session 2026-10-27, while building User Story 4
 
 - **Q: "Byte-identical generated documents" across three deliveries — including the origin traces?** →

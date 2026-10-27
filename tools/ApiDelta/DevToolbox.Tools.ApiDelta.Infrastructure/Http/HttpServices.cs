@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +42,13 @@ internal static class HttpServices
                 // négocie en NTLM obtiendrait sinon un jeton que personne n'a voulu lui donner.
                 Credentials = null,
                 PreAuthenticate = false,
+
+                // La connexion est ouverte sur l'adresse que le garde a validée, et non sur une
+                // seconde résolution du nom. Sans cela, un hôte autorisé dont la réponse DNS bascule
+                // entre le contrôle et la connexion atteignait une adresse que le garde n'avait jamais
+                // vue. Le nom reste celui de la requête : l'indication de nom et la validation du
+                // certificat portent donc toujours sur lui.
+                ConnectCallback = ConnectToValidatedAddress,
             })
             .AddStandardResilienceHandler(resilience =>
             {
@@ -57,5 +66,43 @@ internal static class HttpServices
                 resilience.CircuitBreaker.SamplingDuration =
                     TimeSpan.FromSeconds(WsdlLimits.Default.FetchTimeoutSeconds);
             });
+    }
+
+    /// <summary>
+    /// Ouvre la connexion sur une adresse que le garde a validée, et sur aucune autre.
+    /// </summary>
+    /// <remarks>
+    /// Une requête qui n'en porte aucune ne se connecte pas. Le refus est bruyant parce qu'il doit
+    /// l'être : un second chemin vers le réseau contournerait tous les contrôles de ce dossier, et il
+    /// vaut mieux l'apprendre à la première tentative qu'après coup.
+    /// </remarks>
+    private static async ValueTask<Stream> ConnectToValidatedAddress(
+        SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        if (PinnedAddress.Of(context.InitialRequestMessage) is not { Count: > 0 } pinned)
+        {
+            throw new HttpRequestException(
+                "Cette requête ne porte aucune adresse validée : l'outil n'ouvre pas de connexion "
+                + "qui n'est pas passée par le garde d'adresses.");
+        }
+
+        Socket socket = new(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+
+        try
+        {
+            await socket.ConnectAsync(
+                    [.. pinned.Select(IPAddress.Parse)],
+                    context.DnsEndPoint.Port,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+
+            throw;
+        }
     }
 }

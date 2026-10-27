@@ -49,6 +49,13 @@ internal sealed class DefinitionsReader
             return null;
         }
 
+        if (Imported(root) is { } imported)
+        {
+            RefuseImport(imported);
+
+            return null;
+        }
+
         return new Definitions(
             root.Attribute("targetNamespace")?.Value,
             [.. Messages(root)],
@@ -57,6 +64,37 @@ internal sealed class DefinitionsReader
             [.. Services(root)],
             [.. InlineSchemas(root)]);
     }
+
+    /// <summary>
+    /// Le premier <c>wsdl:import</c> du document, s'il y en a un.
+    /// </summary>
+    /// <remarks>
+    /// Distinct d'un <c>xs:import</c>, et c'est tout le piège : celui-ci répartit les messages, les types
+    /// de port et les liaisons sur plusieurs documents WSDL, là où l'autre ne répartit que des schémas.
+    /// Le suiveur d'imports ne descend que dans les <c>xs:schema</c>, si bien qu'un <c>wsdl:import</c>
+    /// n'était ni suivi ni refusé : le contrat était bâti sur le seul document d'entrée, ses opérations
+    /// importées disparaissaient sans un mot, et la lecture se déclarait fidèle.
+    /// </remarks>
+    private static XElement? Imported(XElement root) =>
+        root.Elements(Wsdl + "import").FirstOrDefault();
+
+    /// <summary>
+    /// Le message de refus d'un contrat réparti sur plusieurs documents WSDL.
+    /// </summary>
+    /// <remarks>
+    /// Refusé, et non lu à moitié. Un contrat dont les opérations importées manquent se comparerait
+    /// contre une production en annonçant absentes des routes que le service expose bel et bien — et la
+    /// consolidation en tirerait des conclusions sur un contrat que personne ne lui a donné en entier.
+    /// Suivre un <c>wsdl:import</c> est une fonctionnalité ; le refuser en le nommant est la seule
+    /// réponse honnête en attendant.
+    /// </remarks>
+    private static string Split(XElement imported) =>
+        "Ce contrat est réparti sur plusieurs documents WSDL : il porte un « wsdl:import » de « "
+        + (imported.Attribute("namespace")?.Value ?? "(sans espace de noms)")
+        + " », à « " + (imported.Attribute("location")?.Value ?? "(sans emplacement)")
+        + " ». L'outil ne suit pas encore un « wsdl:import » — distinct d'un « xs:import », qui répartit "
+        + "des schémas et qui lui est suivi. Le lire sans l'import donnerait un contrat amputé de ses "
+        + "opérations importées, et le dirait lu fidèlement : il est donc refusé.";
 
     /// <summary>Le message de refus d'une version non prise en charge.</summary>
     private static string Unsupported(string observed) =>
@@ -254,6 +292,15 @@ internal sealed class DefinitionsReader
             _document, path, info.HasLineInfo() ? info.LineNumber : 0,
             info.HasLineInfo() ? info.LinePosition : 0);
     }
+
+    /// <summary>Refuse un contrat réparti, sous le code qui dit qu'un import n'a pas été résolu.</summary>
+    private void RefuseImport(XElement imported) =>
+        _diagnostics.Add(new Diagnostic(
+            WsdlDiagnosticCodes.ImportUnresolved,
+            DiagnosticSeverity.Error,
+            Split(imported) + " (" + At(imported, "import").Display + ")",
+            Position: new Core.Syntax.SourcePosition(
+                ((IXmlLineInfo)imported).LineNumber, ((IXmlLineInfo)imported).LinePosition)));
 
     private void Refuse(XElement root, string message) =>
         _diagnostics.Add(new Diagnostic(

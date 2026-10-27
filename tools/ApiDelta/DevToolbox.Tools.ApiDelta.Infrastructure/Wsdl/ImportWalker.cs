@@ -331,9 +331,36 @@ internal sealed class ImportWalker
             WsdlDiagnosticCodes.ImportUnresolved);
     }
 
-    private bool Inside(string candidate) =>
-        Path.GetFullPath(candidate)
-            .StartsWith(Path.GetFullPath(_policy.ConfinementRoot), StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Indique qu'un chemin est bien à l'intérieur de la racine de confinement.
+    /// </summary>
+    /// <remarks>
+    /// Par composant de chemin, et non par préfixe de chaîne. Le préfixe seul laissait passer un dossier
+    /// <em>voisin</em> dont le nom prolonge celui de la racine : sous une racine « …\contrats », un
+    /// import « ../contrats-secrets/types.xsd » se normalise en « …\contrats-secrets\types.xsd », dont la
+    /// chaîne commence bel et bien par la racine. Le refus de traversée était donc contournable d'un
+    /// trait d'union.
+    /// <para>
+    /// C'est ce refus qui paie l'ouverture par défaut de la résolution locale, et il n'a de valeur que
+    /// s'il tient. La racine elle-même reste acceptée : le document d'entrée y vit.
+    /// </para>
+    /// </remarks>
+    private bool Inside(string candidate)
+    {
+        string root = Path.GetFullPath(_policy.ConfinementRoot);
+        string full = Path.GetFullPath(candidate);
+
+        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string boundary = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+
+        return full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase);
+    }
 
     private void Decline(
         string targeted, string where, WsdlLocation location, string why, string code)
