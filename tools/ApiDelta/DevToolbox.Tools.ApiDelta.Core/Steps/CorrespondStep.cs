@@ -79,7 +79,11 @@ public sealed class CorrespondStep : IToolStep
 
         context.Set(ApiDeltaContextKeys.ProductionRoutes, production);
 
-        ProjectionResult projected = _projector.Project(contract, production.Version);
+        ProjectionResult projected = _projector.Project(
+            contract,
+            production.Version,
+            (context.Get<Configuration.Ruleset>(ApiDeltaContextKeys.Ruleset)
+                ?? Configuration.Ruleset.Default).Wsdl.Table);
 
         context.Set(ApiDeltaContextKeys.WsdlProjection, projected);
         context.Set(ApiDeltaContextKeys.WsdlProjectionGaps, projected.Gaps);

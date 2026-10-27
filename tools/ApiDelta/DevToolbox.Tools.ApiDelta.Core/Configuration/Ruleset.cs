@@ -78,6 +78,9 @@ public sealed record Ruleset
     /// <summary>Les réglages de l'extraction.</summary>
     public ExtractSettings Extract { get; init; } = ExtractSettings.Default;
 
+    /// <summary>Ce que l'équipe décide de la lecture et de la projection d'un contrat de service.</summary>
+    public WsdlSettings Wsdl { get; init; } = WsdlSettings.Default;
+
     /// <summary>Le seuil d'échec.</summary>
     public FailureThreshold Threshold { get; init; } = FailureThreshold.Never;
 

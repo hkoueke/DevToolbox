@@ -375,17 +375,35 @@ allows one host; then supply an unknown key and confirm the run does not start.
 
 ### Tests for User Story 5
 
-- [ ] T084 [P] [US5] Create `Tests/Configuration/WsdlRulesetTests.cs` — an unknown key names its file, line and column and the run does not start; no configuration at all still produces usable results; remote resolution with an empty host list is refused rather than read as allowing everything
+- [X] T084 [P] [US5] Create `Tests/Configuration/WsdlRulesetTests.cs` — an unknown key names its file, line and column and the run does not start; no configuration at all still produces usable results; remote resolution with an empty host list is refused rather than read as allowing everything
 
 ### Implementation for User Story 5
 
-- [ ] T085 [US5] Add the WSDL sections to `Core/Configuration/Ruleset.cs` — limits, import policy, URL policy, and the verb table of the route derivation
-- [ ] T086 [US5] Read them through the existing tree-based reader in `Infra/Files/RulesetSections.cs`, so every diagnostic carries a line and a column and an unknown key is **named** (WR-704)
-- [ ] T087 [US5] Refuse remote resolution enabled with an empty host allow-list, in `Infra/Files/RulesetSections.cs` (WR-007)
-- [ ] T088 [US5] Read and validate the configuration before any document is read, in `Core/Steps/SelectStep.cs` (WR-704)
+- [X] T085 [US5] Add the WSDL sections to `Core/Configuration/Ruleset.cs` — limits, import policy, URL policy, and the verb table of the route derivation
+- [X] T086 [US5] Read them through the existing tree-based reader in `Infra/Files/RulesetSections.cs`, so every diagnostic carries a line and a column and an unknown key is **named** (WR-704)
+- [X] T087 [US5] Refuse remote resolution enabled with an empty host allow-list, in `Infra/Files/RulesetSections.cs` (WR-007)
+- [X] T088 [US5] Read and validate the configuration before any document is read, in `Core/Steps/SelectStep.cs` (WR-704)
 
 **Checkpoint**: the defaults are the team's rather than the tool's, and a bad configuration stops the run
 before it has read anything.
+
+## Notes de la phase 7, consignées en la faisant
+
+> **Un repli silencieux retiré au passage.** Le répartiteur des sections lisait *toute* section inconnue
+> comme si c'était « extract » : la branche par défaut y menait, et « extract » n'avait pas de cas à
+> elle. Le contrôle des clés de haut niveau refusait déjà une clé inconnue en la nommant, si bien que le
+> repli n'était atteint par rien — mais il n'attendait qu'une clé ajoutée à la liste sans l'être au
+> répartiteur. « extract » a maintenant son cas, et la branche par défaut ne lit plus rien.
+>
+> **T088 était déjà tenue, à un fil près.** `SelectStep` lit et valide le jeu de règles avant toute
+> lecture de document, et refuse de démarrer s'il n'est pas applicable. Ce qui manquait était en aval :
+> `ReadWsdlStep` et `CorrespondStep` employaient les valeurs livrées au lieu de celles qu'on venait de
+> lire. Une configuration validée que personne ne consulte est pire qu'absente — elle donne à l'équipe
+> la preuve que l'outil l'a lue.
+>
+> **Une table de verbes écrite remplace celle qui est livrée, elle ne s'y ajoute pas.** Une équipe qui
+> écrit trois verbes veut ses trois verbes ; les ajouter aux trente-six d'origine lui ferait produire
+> des itinéraires qu'elle n'a pas demandés, et elle ne saurait pas d'où ils viennent.
 
 ---
 

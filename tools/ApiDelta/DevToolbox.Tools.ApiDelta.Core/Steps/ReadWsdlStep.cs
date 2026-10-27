@@ -62,15 +62,20 @@ public sealed class ReadWsdlStep : IToolStep
             return Result.Success();
         }
 
+        WsdlSettings settings =
+            (context.Get<Ruleset>(ApiDeltaContextKeys.Ruleset) ?? Ruleset.Default).Wsdl;
+
         return Uri.TryCreate(candidate, UriKind.Absolute, out Uri? address) && !address.IsFile
-            ? await FetchAsync(context, selection, address, cancellationToken).ConfigureAwait(false)
-            : await ReadAsync(context, candidate, cancellationToken).ConfigureAwait(false);
+            ? await FetchAsync(context, selection, address, settings, cancellationToken)
+                .ConfigureAwait(false)
+            : await ReadAsync(context, candidate, settings, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Lit un candidat donné par chemin, s'il s'agit bien d'un WSDL.</summary>
     private async Task<Result> ReadAsync(
         ToolRunContext context,
         string candidate,
+        WsdlSettings settings,
         CancellationToken cancellationToken)
     {
         if (!await _reader.IsWsdlAsync(candidate, cancellationToken).ConfigureAwait(false))
@@ -82,8 +87,8 @@ public sealed class ReadWsdlStep : IToolStep
 
         WsdlReadResult read = await _reader.ReadAsync(
             candidate,
-            WsdlLimits.Default,
-            Confined(candidate),
+            settings.Limits,
+            Confined(settings, candidate),
             cancellationToken).ConfigureAwait(false);
 
         DiagnosticCollector.Add(context, read.Diagnostics);
@@ -107,15 +112,25 @@ public sealed class ReadWsdlStep : IToolStep
         ToolRunContext context,
         RunSelection selection,
         Uri address,
+        WsdlSettings settings,
         CancellationToken cancellationToken)
     {
         string directory = Path.Combine(selection.OutputDirectory, "contrat-recupere");
 
+        // L'hôte de l'adresse donnée rejoint les hôtes autorisés : le développeur a nommé cette
+        // adresse-là en la tapant, et exiger qu'il la redise dans une configuration pour que l'outil
+        // accepte de la lire n'ajouterait rien à ce qu'il a déjà dit.
         Result<WsdlContract> fetched = await _fetcher.FetchAsync(
             address,
             directory,
-            WsdlLimits.Default,
-            ImportPolicy.ConfinedTo(directory) with { AllowRemote = true, AllowedHosts = [address.Host] },
+            settings.Limits,
+            settings.Imports with
+            {
+                ConfinementRoot = directory,
+                AllowRemote = true,
+                AllowedHosts = [.. settings.Imports.AllowedHosts.Append(address.Host).Distinct(
+                    StringComparer.OrdinalIgnoreCase)],
+            },
             cancellationToken).ConfigureAwait(false);
 
         if (!fetched.IsSuccess)
@@ -137,6 +152,10 @@ public sealed class ReadWsdlStep : IToolStep
     /// confinement empêche reste l'essentiel — un import qui remonterait pour lire ailleurs sur le
     /// disque — et le périmètre retenu est annoncé par le contrat lui-même.
     /// </remarks>
-    private static ImportPolicy Confined(string candidate) =>
-        ImportPolicy.ConfinedTo(Path.GetDirectoryName(Path.GetFullPath(candidate)) ?? ".");
+    /// <remarks>
+    /// La racine que l'équipe a écrite l'emporte, quand elle en a écrit une : c'est tout l'objet de la
+    /// rendre configurable, et le dossier du candidat n'est qu'un défaut utilisable.
+    /// </remarks>
+    private static ImportPolicy Confined(WsdlSettings settings, string candidate) =>
+        settings.ConfinedTo(Path.GetDirectoryName(Path.GetFullPath(candidate)) ?? ".");
 }
