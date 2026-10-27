@@ -317,19 +317,51 @@ coverage, identical findings and, under the same selection, byte-identical gener
 
 ### Tests for User Story 4
 
-- [ ] T077 [P] [US4] Create `Tests/Corpus/Wsdl/catalogue-inline.wsdl` — the same contract with its schemas inlined
-- [ ] T078 [P] [US4] Create `Tests/Corpus/Wsdl/catalogue-prefixes.wsdl` — the same contract with other namespace prefixes, other attribute order and other element form
-- [ ] T079 [US4] Create `Tests/Projection/ProjectionStabilityTests.cs` — the three deliveries produce identical trees, gaps and figures, and byte-identical generated documents under the same selection (SC-001)
+- [X] T077 [P] [US4] Create `Tests/Corpus/Wsdl/catalogue-inline.wsdl` — the same contract with its schemas inlined
+- [X] T078 [P] [US4] Create `Tests/Corpus/Wsdl/catalogue-prefixes.wsdl` — the same contract with other namespace prefixes, other attribute order and other element form
+- [X] T079 [US4] Create `Tests/Projection/ProjectionStabilityTests.cs` — the three deliveries produce identical trees, gaps and figures, and byte-identical generated documents under the same selection (SC-001)
 
 ### Implementation for User Story 4
 
-- [ ] T080 [US4] Resolve prefixes to namespace URIs before anything is projected, in `Infra/Wsdl/WsdlReader.cs`, so the prefix affects no result (WR-100)
-- [ ] T081 [US4] Make the projection insensitive to writing and decomposition — attribute order, element form, whitespace, comments, CDATA, top-level declaration order, distribution across documents — in `Core/Projection/Projector.cs` (WR-102)
-- [ ] T082 [US4] Carry particle order inside a sequence and ignore it inside `xsd:all` and a choice, in `Core/Projection/Projector.cs` (WR-103)
-- [ ] T083 [US4] Order gaps and figures deterministically in `Core/Projection/ProjectionResult.cs`, so two runs cannot differ by enumeration order (SC-001)
+- [X] T080 [US4] Resolve prefixes to namespace URIs before anything is projected, in `Infra/Wsdl/WsdlReader.cs`, so the prefix affects no result (WR-100)
+- [X] T081 [US4] Make the projection insensitive to writing and decomposition — attribute order, element form, whitespace, comments, CDATA, top-level declaration order, distribution across documents — in `Core/Projection/Projector.cs` (WR-102)
+- [X] T082 [US4] Carry particle order inside a sequence and ignore it inside `xsd:all` and a choice, in `Core/Projection/Projector.cs` (WR-103)
+- [X] T083 [US4] Order gaps and figures deterministically in `Core/Projection/ProjectionResult.cs`, so two runs cannot differ by enumeration order (SC-001)
 
 **Checkpoint**: a second delivery of one contract proposes nothing new. Without this the tool would propose
 changes nobody made, and a draft that did that once would never be trusted again.
+
+## Notes de la phase 6, consignées en la faisant
+
+> **Un contrat sur deux était lu à moitié, en silence.** Un jeu de schémas reconnaît un doublon à l'URI
+> d'où le schéma vient, et deux `xs:schema` écrits dans le même `wsdl:types` en partagent une : le second
+> était écarté sans qu'`Add` échoue, sans exception et sans diagnostic. La livraison en ligne perdait donc
+> ses cinq types et ses neuf éléments de message, et le contrat se déclarait lu fidèlement. Un fragment
+> d'URI ne distingue pas les deux — il est retiré ; deux instances analysées à part, si. `SchemaCompiler`
+> analyse maintenant chaque schéma en ligne avec `XmlSchema.Read` avant de l'ajouter.
+>
+> Trouvé parce que la phase 6 est la première à lire un contrat dont les schémas sont écrits dans le WSDL.
+> Aucun essai antérieur ne pouvait le voir : le corpus ordinaire importe ses schémas, et un contrat lu à
+> moitié qui ne s'en plaint pas ne se distingue d'un contrat lu en entier que si l'on a l'autre moitié
+> sous la main pour comparer. C'est tout l'objet de cette tranche.
+>
+> **Un second piège du même appel, écarté en chemin.** `XmlSchemaSet.Add(espace, lecteur)` applique
+> l'espace de noms donné à *tout* ce que l'appel charge, imports compris : un schéma en ligne qui en
+> importe un autre se faisait refuser au motif que l'espace de noms de l'importé n'était pas celui de
+> l'importateur. Le chemin des fichiers passait déjà `null` ; celui des schémas en ligne le passe
+> désormais aussi.
+>
+> **Ce que « document engendré identique » peut vouloir dire, et ce qu'il ne peut pas.** Une trace
+> d'origine nomme la livraison réellement lue, avec sa ligne et sa colonne. Trois livraisons sont trois
+> fichiers : exiger la même trace pour les trois serait exiger qu'elle soit fausse pour deux d'entre
+> elles. SC-001 se vérifie donc hors de ce qui nomme la livraison, comme SC-014 se vérifie hors du bloc
+> de métadonnées — et un essai de plus établit que chaque livraison nomme bien ses propres documents,
+> pour que la neutralisation ne devienne pas une permission.
+>
+> **Une règle candidate de plus pour [CONCEPTION.md](../../CONCEPTION.md) à la phase 8 (T100).** Ce qui
+> sort de la projection est trié, et le tri n'est pas cosmétique : les attributs d'un type compilé
+> arrivent dans l'ordre d'une table de hachage, et un rapport dont les lignes changent de place d'une
+> exécution à l'autre fait apparaître des différences à chaque relance de l'intégration continue.
 
 ---
 

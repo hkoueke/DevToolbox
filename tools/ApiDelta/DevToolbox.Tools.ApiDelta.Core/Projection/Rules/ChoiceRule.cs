@@ -40,7 +40,11 @@ public sealed class ChoiceRule : ProjectionRule
         ArgumentNullException.ThrowIfNull(subject);
         ArgumentNullException.ThrowIfNull(into);
 
-        foreach (Wsdl.XsdParticle particle in subject.Type!.Particles)
+        // Par nom : l'ordre des membres d'un choix n'est pas porté. Une branche n'est pas « la
+        // première » ou « la troisième » — elle est celle qui porte tel élément, et deux livraisons qui
+        // les auraient écrites dans un autre ordre disent le même contrat.
+        foreach (Wsdl.XsdParticle particle in subject.Type!.Particles.OrderBy(
+            particle => particle.Name, StringComparer.Ordinal))
         {
             SchemaDraft branch = new();
 

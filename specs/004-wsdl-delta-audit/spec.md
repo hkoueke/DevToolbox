@@ -102,6 +102,16 @@ document must be **valid**, and not merely re-readable.
   opposite of a choice, asserted with the confidence of a carried rule. Both defects were invisible until
   a projected schema had to be spliced into a production description and revalidated.
 
+### Session 2026-10-27, while building User Story 4
+
+- **Q: "Byte-identical generated documents" across three deliveries — including the origin traces?** →
+  **Outside what names the delivery.** WR-300 has every derived element name the WSDL document it came
+  from, with its line and column. Three deliveries are three files: requiring one trace for all three
+  would require it to be false for two of them. SC-001 is therefore verified with the document name and
+  the position neutralised, exactly as SC-014 is verified outside the run-metadata block — and a separate
+  check establishes that each delivery does name its own documents, so that neutralising never becomes a
+  licence to name the wrong one.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read the WSDL and its imports, or refuse to pretend (Priority: P1)

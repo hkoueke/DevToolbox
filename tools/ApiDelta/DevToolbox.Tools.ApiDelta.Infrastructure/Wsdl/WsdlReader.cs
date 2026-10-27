@@ -244,7 +244,14 @@ public sealed class WsdlReader : IWsdlReader
 
         foreach (WsdlMessage message in definitions.Messages)
         {
-            messages[Local(message.Name)] = message;
+            // Sous son nom qualifié d'abord : c'est la forme que la lecture produit maintenant pour
+            // tout nom écrit avec un préfixe, et deux espaces de noms peuvent porter le même nom local.
+            if (definitions.TargetNamespace is { Length: > 0 } space)
+            {
+                messages[space + ":" + message.Name] = message;
+            }
+
+            messages.TryAdd(Local(message.Name), message);
         }
 
         foreach (OperationDeclaration declaration in definitions.Operations)
@@ -263,10 +270,27 @@ public sealed class WsdlReader : IWsdlReader
         }
     }
 
-    private static WsdlMessage? Find(Dictionary<string, WsdlMessage> messages, string? qualified) =>
-        qualified is not null && messages.TryGetValue(Local(qualified), out WsdlMessage? message)
-            ? message
-            : null;
+    /// <summary>
+    /// Le message qu'un nom désigne : par son nom qualifié, ou par son nom local à défaut.
+    /// </summary>
+    /// <remarks>
+    /// Le repli sur le nom local sert le document qui écrit un nom sans préfixe et sans espace de noms
+    /// par défaut. Il est tenté <em>après</em> le nom qualifié, et non à sa place : l'inverse ferait
+    /// apparier deux messages de même nom local dans deux espaces de noms différents, ce qui est
+    /// exactement ce que la résolution des préfixes vient d'écarter.
+    /// </remarks>
+    private static WsdlMessage? Find(Dictionary<string, WsdlMessage> messages, string? qualified)
+    {
+        if (qualified is null)
+        {
+            return null;
+        }
+
+        return messages.TryGetValue(qualified, out WsdlMessage? message)
+            || messages.TryGetValue(Local(qualified), out message)
+                ? message
+                : null;
+    }
 
     /// <summary>Le nom local d'un nom qualifié : ce qui suit le dernier deux-points.</summary>
     private static string Local(string qualified)

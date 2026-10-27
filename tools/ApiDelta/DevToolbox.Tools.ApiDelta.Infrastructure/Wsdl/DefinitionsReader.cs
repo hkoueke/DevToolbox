@@ -74,9 +74,50 @@ internal sealed class DefinitionsReader
 
     private WsdlPart Part(XElement part) => new(
         part.Attribute("name")?.Value ?? "(sans nom)",
-        part.Attribute("element")?.Value,
-        part.Attribute("type")?.Value,
+        Qualified(part, part.Attribute("element")?.Value),
+        Qualified(part, part.Attribute("type")?.Value),
         At(part, "part[" + (part.Attribute("name")?.Value ?? "?") + "]"));
+
+    /// <summary>
+    /// Résout le préfixe d'un nom qualifié en l'espace de noms qu'il désigne.
+    /// </summary>
+    /// <param name="carrier">L'élément qui porte le nom, et dont les déclarations sont en portée.</param>
+    /// <param name="value">Le nom tel qu'il est écrit, préfixe compris.</param>
+    /// <returns>« espace:local », ou le nom local si aucun espace de noms ne s'applique.</returns>
+    /// <remarks>
+    /// Résolu ici, une fois, et jamais plus bas. Un préfixe est une commodité d'écriture locale au
+    /// document : deux livraisons du même contrat peuvent le choisir différemment, et tout ce qui
+    /// comparerait des noms préfixés les verrait différer. La forme produite est celle que
+    /// <c>XmlQualifiedName.ToString()</c> donne, afin qu'un nom lu dans le WSDL et un nom
+    /// lu dans le jeu de schémas compilé soient la même chaîne.
+    /// <para>
+    /// Le repli sur le nom local n'est pas une négligence : un nom sans préfixe, dans un document sans
+    /// espace de noms par défaut, <em>est</em> un nom local, et en inventer un espace de noms dirait plus
+    /// que le document.
+    /// </para>
+    /// </remarks>
+    private static string? Qualified(XElement carrier, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        int colon = value.IndexOf(':', StringComparison.Ordinal);
+        string local = colon < 0 ? value : value[(colon + 1)..];
+
+        XNamespace? space = colon < 0
+            ? carrier.GetDefaultNamespace()
+            : carrier.GetNamespaceOfPrefix(value[..colon]);
+
+        return space is null || space == XNamespace.None
+            ? local
+            : space.NamespaceName + ":" + local;
+    }
+
+    /// <summary>Le message qu'un flux désigne, son préfixe résolu.</summary>
+    private static string? Message(XElement? flow) =>
+        flow is null ? null : Qualified(flow, flow.Attribute("message")?.Value);
 
     /// <summary>Les opérations de tous les types de port, avec leur schéma d'échange.</summary>
     private IEnumerable<OperationDeclaration> Operations(XElement root) =>
@@ -100,11 +141,11 @@ internal sealed class DefinitionsReader
         return new OperationDeclaration(
             name,
             Pattern(flow),
-            flow.FirstOrDefault(child => child.Name == Wsdl + "input")?.Attribute("message")?.Value,
-            flow.FirstOrDefault(child => child.Name == Wsdl + "output")?.Attribute("message")?.Value,
+            Message(flow.FirstOrDefault(child => child.Name == Wsdl + "input")),
+            Message(flow.FirstOrDefault(child => child.Name == Wsdl + "output")),
             [
                 .. operation.Elements(Wsdl + "fault")
-                    .Select(fault => fault.Attribute("message")?.Value)
+                    .Select(Message)
                     .OfType<string>(),
             ],
             Text(operation, "documentation"),

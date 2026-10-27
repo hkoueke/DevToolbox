@@ -36,7 +36,7 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Wsdl;
 /// </remarks>
 internal sealed class WsdlCorrectionRun : IDisposable
 {
-    private static readonly string[] Documents =
+    private static readonly string[] Ordinary =
         ["catalogue.wsdl", "catalogue-types.xsd", "commun.xsd"];
 
     private readonly SpecReader _reader = new(NullLogger<SpecReader>.Instance);
@@ -46,8 +46,14 @@ internal sealed class WsdlCorrectionRun : IDisposable
     private readonly string _root = Path.Combine(
         Path.GetTempPath(), "devtoolbox-wsdl-correction-" + Guid.NewGuid().ToString("N"));
 
-    private WsdlCorrectionRun()
+    private readonly string _entry;
+    private readonly IReadOnlyList<string> _documents;
+
+    private WsdlCorrectionRun(string entry, IReadOnlyList<string> documents)
     {
+        _entry = entry;
+        _documents = documents;
+
         Directory.CreateDirectory(_root);
 
         Contract = Read();
@@ -75,9 +81,20 @@ internal sealed class WsdlCorrectionRun : IDisposable
     /// <summary>Ce sur quoi la sélection repose : dérivation, appariement, couverture.</summary>
     public WsdlFooting Footing { get; }
 
-    /// <summary>Monte la chaîne.</summary>
+    /// <summary>Monte la chaîne sur la livraison ordinaire du corpus : trois documents.</summary>
     /// <returns>L'exécution, à libérer.</returns>
-    public static WsdlCorrectionRun Establish() => new();
+    public static WsdlCorrectionRun Establish() => new("catalogue.wsdl", Ordinary);
+
+    /// <summary>Monte la chaîne sur une autre livraison du même contrat.</summary>
+    /// <param name="entry">Le document d'entrée.</param>
+    /// <param name="documents">Les documents à écrire, le point d'entrée compris.</param>
+    /// <returns>L'exécution, à libérer.</returns>
+    /// <remarks>
+    /// Le point d'entrée et la liste des documents sont donnés à part : une livraison dont les schémas
+    /// sont écrits dans le WSDL n'a qu'un seul fichier, et c'est précisément la différence qu'on éprouve.
+    /// </remarks>
+    public static WsdlCorrectionRun Delivered(string entry, params string[] documents) =>
+        new(entry, documents);
 
     /// <summary>L'itinéraire qu'une opération a reçu de la dérivation.</summary>
     /// <param name="operation">Son nom.</param>
@@ -202,7 +219,7 @@ internal sealed class WsdlCorrectionRun : IDisposable
 
     private WsdlContract Read()
     {
-        foreach (string name in Documents)
+        foreach (string name in _documents)
         {
             File.WriteAllText(
                 Path.Combine(_root, name),
@@ -211,7 +228,7 @@ internal sealed class WsdlCorrectionRun : IDisposable
         }
 
         WsdlReadResult read = new WsdlReader().ReadAsync(
-            Path.Combine(_root, "catalogue.wsdl"),
+            Path.Combine(_root, _entry),
             WsdlLimits.Default,
             ImportPolicy.ConfinedTo(_root),
             CancellationToken.None).GetAwaiter().GetResult();

@@ -110,6 +110,14 @@ internal static class SchemaCompiler
     /// Les deux ensemble, donc : les déclarations des ancêtres sont recopiées sur une copie du schéma,
     /// celles qu'il porte déjà faisant foi.
     /// </para>
+    /// <para>
+    /// Le schéma est <em>analysé</em> puis ajouté, au lieu d'être ajouté depuis le lecteur. Un jeu de
+    /// schémas reconnaît un doublon à l'URI d'où le schéma vient : deux schémas écrits dans le même
+    /// <c>wsdl:types</c> en partagent une, et le second était alors écarté en silence — un contrat dont
+    /// les schémas sont écrits dans le WSDL perdait la moitié de ses types sans qu'aucun diagnostic ne
+    /// le dise. Un fragment d'URI ne suffit pas à les distinguer : il est retiré. Deux instances
+    /// analysées à part, si.
+    /// </para>
     /// </remarks>
     private static void Add(
         XmlSchemaSet set, InlineSchema schema, string document, List<Diagnostic> diagnostics)
@@ -121,7 +129,11 @@ internal static class SchemaCompiler
 
         try
         {
-            _ = set.Add(schema.TargetNamespace, reader);
+            if (XmlSchema.Read(reader, (_, argument) => diagnostics.Add(Complaint(argument, document)))
+                is { } parsed)
+            {
+                _ = set.Add(parsed);
+            }
         }
         catch (XmlSchemaException failure)
         {
@@ -141,6 +153,7 @@ internal static class SchemaCompiler
             diagnostics.Add(Invalid(failure, document));
         }
     }
+
 
     /// <summary>Rend une copie du schéma portant aussi les préfixes déclarés par ses ancêtres.</summary>
     private static XElement WithInheritedPrefixes(XElement schema)

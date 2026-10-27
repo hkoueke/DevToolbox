@@ -18,6 +18,30 @@ public sealed record ProjectionResult(
     IReadOnlyDictionary<string, DerivedRoute> Routes,
     ProjectionFigures Figures)
 {
+    /// <summary>
+    /// Les écarts, dans un ordre que deux exécutions ne peuvent pas se partager autrement.
+    /// </summary>
+    /// <remarks>
+    /// Rangés ici, et non par celui qui les collecte. Les attributs d'un type compilé arrivent dans
+    /// l'ordre d'une table de hachage, qui n'est l'ordre de personne : un rapport dont les lignes
+    /// changeraient de place d'une exécution à l'autre ferait apparaître des différences dans un
+    /// contrôle d'intégration à chaque fois qu'on le relance.
+    /// <para>
+    /// Le tri est total : sujet, motif, construction, puis emplacement. S'arrêter plus tôt laisserait
+    /// deux écarts égaux sur les premiers critères libres de permuter, ce qui est précisément le défaut
+    /// qu'on écarte.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<ProjectionGap> Gaps { get; init; } =
+    [
+        .. Gaps.OrderBy(gap => gap.Subject, StringComparer.Ordinal)
+            .ThenBy(gap => gap.Reason)
+            .ThenBy(gap => gap.Construct, StringComparer.Ordinal)
+            .ThenBy(gap => gap.Location.Document, StringComparer.Ordinal)
+            .ThenBy(gap => gap.Location.Line)
+            .ThenBy(gap => gap.Location.Column),
+    ];
+
     /// <summary>Les écarts groupés par motif, avec leur nombre.</summary>
     /// <remarks>
     /// Le groupement vit ici plutôt que dans la collecte : chaque occurrence garde son emplacement, et le

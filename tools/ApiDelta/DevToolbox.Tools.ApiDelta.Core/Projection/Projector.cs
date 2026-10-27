@@ -39,7 +39,12 @@ public sealed class Projector : Abstractions.IWsdlProjector
         SchemaDraft paths = new();
         SchemaDraft schemas = new();
 
-        foreach (WsdlOperation operation in contract.Operations)
+        // Par nom, et non dans l'ordre où le contrat les déclare. L'ordre des déclarations de haut
+        // niveau est une façon d'écrire, pas une partie du contrat : deux livraisons du même service
+        // qui les auraient rangées autrement produiraient sinon deux documents différents, et la
+        // comparaison annoncerait un changement là où personne n'en a fait.
+        foreach (WsdlOperation operation in contract.Operations.OrderBy(
+            one => one.Name, StringComparer.Ordinal))
         {
             DerivedRoute route = RouteDerivation.Derive(operation.Name, verbs);
 
@@ -216,18 +221,20 @@ public sealed class Projector : Abstractions.IWsdlProjector
     }
 
     /// <summary>
-    /// Le nom qualifié d'un élément désigné par un préfixe.
+    /// Le nom sous lequel la table des éléments connaît celui qu'une partie de message désigne.
     /// </summary>
     /// <remarks>
-    /// Le préfixe du document n'est pas résolu ici : la table des éléments est consultée sur le nom
-    /// local, parce que deux espaces de noms ne portent pratiquement jamais le même nom d'élément de
-    /// message, et parce que résoudre un préfixe demanderait de reporter la table des espaces de noms du
-    /// document jusqu'ici — une dépendance que la projection n'a pas besoin de prendre.
+    /// Le nom arrive déjà qualifié : la lecture résout les préfixes en espaces de noms, dans la forme
+    /// même que le jeu de schémas compilé emploie, si bien que la consultation est directe. Le repli sur
+    /// le nom local reste pour le document qui n'a pu nommer aucun espace de noms — il était autrefois
+    /// la seule voie, et une livraison écrite avec d'autres préfixes en dépendait.
     /// </remarks>
-    private static string Qualified(WsdlContract contract, string prefixed) =>
-        contract.Elements.Keys.FirstOrDefault(known =>
-            string.Equals(Local(known), Local(prefixed), StringComparison.Ordinal))
-            ?? prefixed;
+    private static string Qualified(WsdlContract contract, string name) =>
+        contract.Elements.ContainsKey(name)
+            ? name
+            : contract.Elements.Keys.FirstOrDefault(known =>
+                string.Equals(Local(known), Local(name), StringComparison.Ordinal))
+                ?? name;
 
     private static string Pointer(string type) => "#/components/schemas/" + Local(type);
 
@@ -241,7 +248,10 @@ public sealed class Projector : Abstractions.IWsdlProjector
         HashSet<string> known = new(contract.Types.Keys, StringComparer.Ordinal);
         int declined = 0;
 
-        foreach (KeyValuePair<string, XsdType> type in contract.Types)
+        // Par nom qualifié : l'ordre d'un jeu de schémas compilé dépend de l'ordre où les documents y
+        // ont été versés, donc de la façon dont le contrat est découpé en fichiers.
+        foreach (KeyValuePair<string, XsdType> type in contract.Types.OrderBy(
+            one => one.Key, StringComparer.Ordinal))
         {
             if (type.Value.UsesXsd11)
             {
@@ -281,11 +291,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
             draft,
             gaps);
 
-        // Les particules d'un choix sont projetées par la règle du choix, dans ses branches. Les
-        // projeter ici en plus poserait les mêmes propriétés au niveau du type et les déclarerait toutes
-        // obligatoires — un document affirmant que les trois branches apparaissent ensemble, soit
-        // exactement le contraire de ce que le contrat dit.
-        foreach (XsdParticle particle in type.Content == XsdContentKind.Choice ? [] : type.Particles)
+        foreach (XsdParticle particle in Particles(type))
         {
             Apply(
                 new ProjectionSubject(
@@ -317,6 +323,28 @@ public sealed class Projector : Abstractions.IWsdlProjector
 
         return draft;
     }
+
+    /// <summary>
+    /// Les particules d'un type, dans l'ordre que son mode de composition rend signifiant.
+    /// </summary>
+    /// <remarks>
+    /// L'ordre d'une séquence est porté : il fait partie du contrat, et un lecteur humain doit retrouver
+    /// la forme qu'il connaît. Celui d'un <c>xsd:all</c> ne l'est pas — les membres d'un objet JSON ne
+    /// sont pas ordonnés, et conserver l'ordre d'écriture ferait différer deux livraisons qui disent la
+    /// même chose.
+    /// <para>
+    /// Les particules d'un choix ne sortent pas ici du tout : la règle du choix les projette dans ses
+    /// branches. Les projeter ici en plus poserait les mêmes propriétés au niveau du type et les
+    /// déclarerait toutes obligatoires — un document affirmant que les trois branches apparaissent
+    /// ensemble, soit exactement le contraire de ce que le contrat dit.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<XsdParticle> Particles(XsdType type) => type.Content switch
+    {
+        XsdContentKind.Choice => [],
+        XsdContentKind.All => type.Particles.OrderBy(particle => particle.Name, StringComparer.Ordinal),
+        _ => type.Particles,
+    };
 
     private static void Apply(
         ProjectionSubject subject, SchemaDraft draft, List<ProjectionGap> gaps)
