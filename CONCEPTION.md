@@ -49,3 +49,28 @@ n'ont pas besoin d'être écrites ici : la génération échoue toute seule.
   ligne `components:`. `SplicingEmitter.ContentEnd` recule donc sur les blancs pour retrouver le dernier
   caractère écrit. Insérer au repère brut place la route neuve sous `components` — un document valide, qui
   décrit autre chose.
+
+## Le seul appel sortant d'apidelta vit dans un seul espace de noms
+
+`Infrastructure/Http` est le seul endroit d'où l'outil atteint le réseau. Le cœur et la présentation n'ont
+aucune dépendance sur `System.Net.Http`, et `LayeringTests` le vérifie assemblage par assemblage.
+
+Ce n'est pas du rangement. Les contrôles qui rendent une récupération acceptable — le modèle d'adresse,
+l'adresse résolue, la confirmation d'un service interne, le budget de réponse, le refus d'une réponse qui
+n'est pas du XML — sont tous posés sur ce chemin. Un second chemin, même bien intentionné, les
+contournerait tous sans qu'aucun essai ne s'en aperçoive.
+
+La règle a été resserrée, et non levée, quand la récupération par adresse est apparue : elle disait
+« aucun appel sortant » du temps où apidelta ne lisait que des fichiers.
+
+## Récupérer ne change pas le sens des imports
+
+Un document récupéré est écrit tel quel, octet pour octet, et son `schemaLocation` relatif se résout
+contre l'**adresse** d'où ce document vient — jamais contre le dossier où il a été écrit.
+`RetrievalMap` traduit ensuite cette adresse en chemin local.
+
+Les deux autres manières de s'en sortir ont été écartées pour une raison qu'il faut garder en tête avant
+de les reproposer. Réécrire les `schemaLocation` dans les fichiers écrits rendrait l'empreinte mensongère :
+elle ne désignerait plus ce que le serveur a servi, et c'est tout ce qu'une empreinte sert à dire.
+Reproduire l'arborescence des adresses sur le disque fonctionnerait, mais ferait dépendre les chemins de la
+forme des URL d'un serveur, encodages compris.

@@ -4,6 +4,8 @@ using DevToolbox.Tools.ApiDelta.Core.Syntax;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Emitting;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Files;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Semantic;
+using DevToolbox.Tools.ApiDelta.Infrastructure.Http;
+using DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DevToolbox.Tools.ApiDelta.Infrastructure;
@@ -35,6 +37,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IInPlaceWriter, InPlaceWriter>();
         services.AddSingleton<IRulesetStore, RulesetStore>();
         services.AddSingleton<ISuppressionStore, SuppressionStore>();
+
+        services.AddSingleton<IWsdlReader, WsdlReader>();
+        services.AddSingleton<AddressGuard>();
+
+        HttpServices.Add(services);
 
         return services;
     }

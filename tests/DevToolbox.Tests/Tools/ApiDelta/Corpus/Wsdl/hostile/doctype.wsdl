@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE definitions [
+  <!ENTITY secret SYSTEM "file:///etc/passwd">
+]>
+<!-- Une définition de type de document, avec une entité externe pour faire bonne mesure.
+     Doit être refusée AVANT que quoi que ce soit ne soit résolu : si l'outil a lu le fichier référencé
+     pour pouvoir le refuser, il a déjà perdu. -->
+<wsdl:definitions name="Hostile"
+    targetNamespace="http://entreprise.local/hostile"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:documentation>&secret;</wsdl:documentation>
+</wsdl:definitions>

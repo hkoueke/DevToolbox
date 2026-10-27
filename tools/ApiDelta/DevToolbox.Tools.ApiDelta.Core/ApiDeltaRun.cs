@@ -21,6 +21,9 @@ namespace DevToolbox.Tools.ApiDelta.Core;
 /// <param name="Correction">
 /// Ce qui est entré en production, et ce qui a été écarté, quand le mode écrivait une production corrigée.
 /// </param>
+/// <param name="Footing">
+/// Ce sur quoi la sélection reposait, quand le candidat était projeté depuis un contrat de service.
+/// </param>
 /// <remarks>
 /// Cet agrégat grandit avec les tranches : l'extraction y ajoutera son extrait, l'application sa
 /// vérification et son manifeste. Il porte aujourd'hui ce qui existe, et rien de plus — un membre sans
@@ -41,7 +44,8 @@ public sealed record ApiDeltaRun(
     Optimization.OptimizationPlan? Plan = null,
     Optimization.OptimizationOutcome? Optimization = null,
     Extraction.ExtractResult? Extract = null,
-    Correction.CorrectionOutcome? Correction = null)
+    Correction.CorrectionOutcome? Correction = null,
+    Correction.WsdlFooting? Footing = null)
 {
     /// <summary>Les différences qui cassent les appelants existants.</summary>
     public IEnumerable<Difference> Breaking =>

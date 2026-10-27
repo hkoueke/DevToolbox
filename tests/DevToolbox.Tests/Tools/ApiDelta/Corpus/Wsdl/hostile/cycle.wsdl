@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Un cycle d'imports parfaitement légal : a importe b, b réimporte a. Doit être lu, consigné, et jamais
+     suivi indéfiniment. Le refuser serait aussi faux que boucler : XSD autorise cela. -->
+<wsdl:definitions name="Cycle"
+    targetNamespace="http://entreprise.local/cycle/wsdl"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <wsdl:types>
+    <xs:schema targetNamespace="http://entreprise.local/cycle/wsdl">
+      <xs:import namespace="http://entreprise.local/cycle/a" schemaLocation="cycle-a.xsd"/>
+    </xs:schema>
+  </wsdl:types>
+</wsdl:definitions>

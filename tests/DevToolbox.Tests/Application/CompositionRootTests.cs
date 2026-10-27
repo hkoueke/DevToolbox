@@ -1,4 +1,10 @@
 using DevToolbox.Application.Abstractions;
+using DevToolbox.Tools.ApiDelta.Core.Configuration;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
+using System.Net.Http;
+using DevToolbox.Tools.ApiDelta.Core.Abstractions;
+using DevToolbox.Tools.ApiDelta.Infrastructure.Http;
 using DevToolbox.Console;
 using DevToolbox.Infrastructure.Logging;
 using DevToolbox.Infrastructure.Platform;
@@ -42,6 +48,62 @@ public sealed class CompositionRootTests
         provider.GetRequiredService<ITargetAnnouncer>().Should().NotBeNull();
         provider.GetRequiredService<IResumedSelectionReconciler>().Should().NotBeNull();
     }
+
+    [Fact]
+    public void Pairing_the_operations_resolves_from_the_real_graph()
+    {
+        // Comme pour la lecture : cet essai ne résout que ce qu'on lui nomme, et une étape absente du
+        // fil ne serait jamais construite par la résolution d'ITool. Un enregistrement oublié aurait
+        // attendu l'après-midi d'un développeur.
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetRequiredService<IWsdlProjector>().Should().NotBeNull();
+        provider.GetRequiredService<ICorrespondenceProposer>().Should().NotBeNull();
+        provider.GetRequiredService<ICorrespondencePrompt>().Should().NotBeNull();
+        provider.GetRequiredService<CorrespondStep>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Reading_a_service_contract_resolves_from_the_real_graph()
+    {
+        // Ces quatre services n'étaient couverts par rien : cet essai ne résout que ce qu'on lui nomme,
+        // et une étape absente de la liste du fil ne serait jamais construite par la résolution d'ITool.
+        // Un enregistrement oublié aurait donc attendu l'après-midi d'un développeur, qui est exactement
+        // ce que ce fichier existe pour empêcher.
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetRequiredService<IWsdlReader>().Should().NotBeNull();
+        provider.GetRequiredService<AddressGuard>().Should().NotBeNull();
+        provider.GetRequiredService<ReadWsdlStep>().Should().NotBeNull();
+
+        // Le récupérateur est le seul à dépendre d'un client typé : s'il se résout, c'est que la fabrique
+        // est en place et que le gestionnaire configuré lui est bien remis.
+        provider.GetRequiredService<IContractFetcher>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void The_retrieval_budget_is_set_where_it_actually_applies()
+    {
+        // Le délai avait d'abord été posé sur « HttpClient.Timeout », où le gestionnaire de résilience le
+        // remplace par l'infini. Il ne valait 30 secondes que parce que le défaut du gestionnaire vaut
+        // 30 secondes : un budget qui n'avait aucun effet et dont rien ne l'aurait dit.
+        using ServiceProvider provider = BuildProvider();
+
+        HttpStandardResilienceOptions resilience = provider
+            .GetRequiredService<IOptionsMonitor<HttpStandardResilienceOptions>>()
+            .Get(nameof(IContractFetcher) + "-standard");
+
+        resilience.TotalRequestTimeout.Timeout.Should().Be(
+            TimeSpan.FromSeconds(WsdlLimits.Default.FetchTimeoutSeconds),
+            "c'est là que le budget de récupération décide de quelque chose");
+
+        // Le budget vaut délibérément autre chose que les 30 secondes du gestionnaire : à valeur égale,
+        // cet essai aurait passé sans qu'aucune configuration ne soit faite, comme ce fut le cas.
+        WsdlLimits.Default.FetchTimeoutSeconds.Should().NotBe(30);
+
+        provider.GetRequiredService<IContractFetcher>().Should().BeOfType<ContractFetcher>();
+    }
+
 
     [Fact]
     public void The_shell_announcer_wins_over_the_silent_observer_the_http_client_falls_back_to()

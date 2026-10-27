@@ -39,6 +39,11 @@
   <ItemGroup>
     <EmbeddedResource Include="Tools\ApiDelta\Corpus\*.yaml" />
     <EmbeddedResource Include="Tools\ApiDelta\Corpus\*.json" />
+    <!-- Le corpus WSDL, sous-dossiers compris : un contrat est un graphe de documents, et la moitié
+         hostile de ce graphe est ce qui doit exister avant le lecteur. -->
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.wsdl" />
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.xsd" />
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.yaml" />
   </ItemGroup>
 
   <ItemGroup>

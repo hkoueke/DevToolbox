@@ -101,7 +101,8 @@ public sealed class CorrectStep : IToolStep
         IReadOnlyList<Difference> differences,
         CancellationToken cancellationToken)
     {
-        CorrectionSelection chosen = Chosen(selection, production, candidate, differences);
+        WsdlFooting? footing = context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting);
+        CorrectionSelection chosen = Chosen(selection, production, candidate, differences, footing);
 
         if (chosen.IsEmpty)
         {
@@ -128,7 +129,8 @@ public sealed class CorrectStep : IToolStep
             closure.Value,
             context.Get<VersionRecommendation>(ApiDeltaContextKeys.VersionRecommendation),
             _options.DefaultRuleset.Formatting,
-            selection.IncludeRemovals);
+            selection.IncludeRemovals,
+            footing);
 
         return Announce(context, request, Ruleset(context));
     }
@@ -191,14 +193,16 @@ public sealed class CorrectStep : IToolStep
         RunSelection selection,
         SpecDocument production,
         SpecDocument candidate,
-        IReadOnlyList<Difference> differences)
+        IReadOnlyList<Difference> differences,
+        WsdlFooting? footing)
     {
         if (selection.Correction is { IsEmpty: false } resumed)
         {
             return resumed;
         }
 
-        return _prompt.Ask(CorrectionCatalog.Build(production, candidate, differences, _catalog));
+        return _prompt.Ask(
+            CorrectionCatalog.Build(production, candidate, differences, _catalog, footing));
     }
 
     /// <summary>Les emplacements dont il faut fermer les dépendances.</summary>

@@ -10,7 +10,10 @@ namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 /// <param name="SelectedAsChosen">
 /// Chaque endroit que la sélection avait nommé a changé, et aucun autre n'a changé.
 /// </param>
-/// <param name="Marked">Chaque élément ajouté ou modifié porte sa trace d'origine.</param>
+/// <param name="Marked">
+/// Chaque élément ajouté ou modifié porte sa trace d'origine, et chaque endroit que la projection n'a pas
+/// pu remplir porte son marqueur.
+/// </param>
 /// <param name="Complaints">Ce qui a été trouvé à dire, nommé.</param>
 /// <remarks>
 /// Les deux épreuves du milieu sont la raison d'être de ce type, et elles vont par paire. « Rien d'autre
@@ -71,7 +74,7 @@ public sealed record CorrectionVerification(
         }
         else if (!Marked)
         {
-            yield return "un élément neuf ne dit pas d'où il vient";
+            yield return "un élément neuf ne dit pas d'où il vient, ou un endroit non rempli ne le dit pas";
         }
 
         foreach (string complaint in Complaints)

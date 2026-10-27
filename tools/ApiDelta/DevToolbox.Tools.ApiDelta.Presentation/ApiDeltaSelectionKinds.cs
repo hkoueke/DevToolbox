@@ -33,4 +33,7 @@ public static class ApiDeltaSelectionKinds
 
     /// <summary>Une différence retenue pour entrer en production.</summary>
     public const string CorrectedDifference = "différence à reporter";
+
+    /// <summary>Un appariement entre une opération du contrat de service et une route.</summary>
+    public const string Correspondence = "appariement";
 }

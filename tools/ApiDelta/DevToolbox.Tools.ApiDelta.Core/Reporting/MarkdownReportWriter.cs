@@ -178,8 +178,21 @@ public static class MarkdownReportWriter
             .Append(" | ").Append(document.Format)
             .Append(" | ").Append(document.DeclaredVersion)
             .Append(" | ").Append(document.ByteLength.ToString(CultureInfo.InvariantCulture))
-            .Append(" | ").Append(document.ContentHash[..12])
+            .Append(" | ").Append(Fingerprint(document))
             .AppendLine(" |");
+
+    /// <summary>
+    /// L'empreinte d'un document lu, ou ce qui en tient lieu quand il n'y en a pas.
+    /// </summary>
+    /// <remarks>
+    /// Un document projeté depuis un contrat de service n'a pas d'empreinte : il n'est le contenu d'aucun
+    /// fichier, et lui en inventer une désignerait quelque chose qui n'existe pas. Le dire est la seule
+    /// réponse honnête — et la seule qui ne fasse pas tomber le rapport, ce que la découpe des douze
+    /// premiers caractères faisait sur une chaîne vide.
+    /// </remarks>
+    private static string Fingerprint(SpecDocument document) => document.ContentHash.Length >= 12
+        ? document.ContentHash[..12]
+        : "sans empreinte : document projeté, et non lu d'un fichier";
 
     private static void Validation(StringBuilder builder, ApiDeltaRun run)
     {
@@ -835,6 +848,7 @@ public static class MarkdownReportWriter
 
         builder.AppendLine();
 
+        Derivations(builder, run, correction);
         Declined(builder, correction);
 
         if (!correction.Verification.Established && correction.Plan.Count > 0)
@@ -842,6 +856,95 @@ public static class MarkdownReportWriter
             builder.Append("**Rien n'a été publié.** ")
                 .AppendLine(correction.Verification.Explanation).AppendLine();
         }
+    }
+
+    /// <summary>
+    /// D'où vient chaque route proposée depuis un contrat de service, et ce qui y reste non rempli.
+    /// </summary>
+    /// <remarks>
+    /// La dérivation est écrite, et non laissée à déduire. Un développeur qui lit « POST /documents »
+    /// sans savoir que le chemin vient du nom de l'opération et la méthode du verbe « deposer » ne peut
+    /// que l'accepter ou la refuser ; en voyant la dérivation, il peut la corriger — et c'est tout
+    /// l'objet de la correspondance.
+    /// <para>
+    /// Le repli est annoncé comme un repli. Un chemin qu'aucun verbe n'a produit et qui serait présenté
+    /// comme « dérivé » ferait passer plus vite sur une proposition qu'il faut justement regarder.
+    /// </para>
+    /// </remarks>
+    private static void Derivations(
+        StringBuilder builder, ApiDeltaRun run, Correction.CorrectionOutcome correction)
+    {
+        if (run.Footing is not { } footing || footing.Derivation.IsEmpty)
+        {
+            return;
+        }
+
+        builder.AppendLine("### Dérivation des routes proposées").AppendLine();
+        builder.AppendLine("| Opération du contrat | Itinéraire | Comment |");
+        builder.AppendLine("|----------------------|------------|---------|");
+
+        foreach (KeyValuePair<string, Projection.DerivedRoute> derived in footing.Derivation.Derivations)
+        {
+            builder.Append("| ").Append(derived.Key).Append(" | ").Append(derived.Value.Display)
+                .Append(" | ").Append(How(derived.Value)).AppendLine(" |");
+        }
+
+        builder.AppendLine();
+
+        Unfilled(builder, correction.Plan);
+        Collisions(builder, correction.Plan);
+    }
+
+    /// <summary>Comment un itinéraire a été obtenu, en une formule qui ne promet pas plus qu'elle ne tient.</summary>
+    private static string How(Projection.DerivedRoute derived) => derived.Kind switch
+    {
+        Projection.RouteDerivationKind.Derived =>
+            "dérivé : méthode d'après le verbe « " + derived.Verb + " », chemin d'après le sujet",
+        Projection.RouteDerivationKind.Partial =>
+            "partiel : chemin d'après le sujet, aucun verbe reconnu — la méthode est « POST » par défaut",
+        _ => "repli : rien de reconnaissable dans le nom, l'itinéraire n'est pas une dérivation",
+    };
+
+    /// <summary>Ce qui reste non rempli dans le document engendré, et combien.</summary>
+    private static void Unfilled(StringBuilder builder, Correction.CorrectionPlan plan)
+    {
+        if (plan.Unfilled.Count == 0)
+        {
+            return;
+        }
+
+        builder.Append("**Endroits non remplis : ")
+            .Append(plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture))
+            .Append(".** La projection n'y a rien porté, et l'outil refuse de les deviner : chacun porte "
+                + "un « ")
+            .Append(Correction.UnfilledMarker.Member)
+            .AppendLine(" » disant ce qui manque.").AppendLine();
+
+        foreach (Correction.UnfilledMarker marker in plan.Unfilled)
+        {
+            builder.Append("- ").Append(marker.Target.Display).Append(" — ")
+                .AppendLine(marker.Display);
+        }
+
+        builder.AppendLine();
+    }
+
+    /// <summary>Les chemins dérivés qui tombent sur un chemin que la production porte déjà.</summary>
+    private static void Collisions(StringBuilder builder, Correction.CorrectionPlan plan)
+    {
+        if (plan.Collisions.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine("**Chemins déjà portés par la production.**").AppendLine();
+
+        foreach (Correction.PathCollision collision in plan.Collisions)
+        {
+            builder.Append("- ").AppendLine(collision.Display);
+        }
+
+        builder.AppendLine();
     }
 
     /// <summary>Ce qui a été retenu et écarté, avec la raison de chaque refus.</summary>

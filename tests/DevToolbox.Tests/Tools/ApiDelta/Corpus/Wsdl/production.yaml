@@ -1,0 +1,128 @@
+# La production contre laquelle le WSDL est comparé.
+#
+# Choisie pour que la couverture ait les trois états : elle répond à deux opérations du catalogue, n'en
+# répond pas trois, et porte une route dont le catalogue ne parle pas. Et la route qu'elle partage avec
+# « lireDocument » en diffère, afin qu'une différence seule soit sélectionnable.
+openapi: 3.0.3
+info:
+  title: Catalogue documentaire
+  description: La description en service, celle que le WSDL vient enrichir.
+  version: 4.2.0
+servers:
+  - url: https://api.entreprise.local/catalogue
+paths:
+  # Répond à deposerDocument.
+  /documents:
+    post:
+      tags: [Documents]
+      summary: Dépose un document
+      operationId: deposerDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '201':
+          description: Le document est déposé.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Identifiant'
+        '400':
+          $ref: '#/components/responses/Erreur'
+
+  # Répond à lireDocument, mais pas tout à fait : le paramètre « detail » y est optionnel.
+  /documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Lit un document
+      operationId: lireDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Identifiant'
+        - name: detail
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Le document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/Erreur'
+
+  # Le catalogue ne parle pas de cette route : elle n'est pas employée par cet appariement.
+  /dossiers:
+    get:
+      tags: [Dossiers]
+      summary: Liste les dossiers
+      operationId: listerDossiers
+      responses:
+        '200':
+          description: La liste des dossiers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dossier'
+components:
+  schemas:
+    Identifiant:
+      type: string
+      maxLength: 36
+      pattern: '[0-9a-fA-F-]{36}'
+    Etat:
+      type: string
+      enum: [brouillon, publie, archive]
+    Document:
+      type: object
+      required: [id, titre, etat, depose]
+      properties:
+        id:
+          $ref: '#/components/schemas/Identifiant'
+        titre:
+          type: string
+        etat:
+          $ref: '#/components/schemas/Etat'
+        priorite:
+          type: integer
+          minimum: 1
+          maximum: 9
+        motsCles:
+          type: array
+          items:
+            type: string
+        depose:
+          type: string
+          format: date-time
+    Dossier:
+      type: object
+      required: [id, libelle]
+      properties:
+        id:
+          $ref: '#/components/schemas/Identifiant'
+        libelle:
+          type: string
+  responses:
+    Erreur:
+      description: La demande a échoué.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, message]
+            properties:
+              code:
+                type: string
+              message:
+                type: string

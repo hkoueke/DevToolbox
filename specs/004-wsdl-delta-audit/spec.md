@@ -81,6 +81,27 @@ The feature was specified and then narrowed four times in one day. The record is
   projection cannot carry must be an unfilled marker rather than a plausible schema — because a plausible
   schema is the one output from which a reader cannot recover the fact that nobody knows.
 
+### Session 2026-10-27, while building User Story 3
+
+Two clarifications the implementation forced, both found at the end of the chain — where the generated
+document must be **valid**, and not merely re-readable.
+
+- **Q: Where does a derived *scalar* field say that it was derived?** → **In the document's own
+  declaration, which names the field.** WR-300 requires every derived element to carry its WSDL origin,
+  and OpenAPI allows an `x-` member only on an object: a field such as `summary` or `required` cannot hold
+  one. The origin of such a field therefore goes in the `x-apidelta-correction` declaration, under
+  `champsDerives`, naming the field, its document, its place and the confidence. Leaving it out would have
+  made a derived field indistinguishable from a copied one, which is the one thing WR-300 forbids — and
+  003's own remark already claimed this was done, without doing it.
+- **Q: What does a projected `xsd:choice` branch contain?** → **The particles of that branch, projected by
+  the ordinary particle rules.** The table row (`xsd:choice` → `oneOf`, `Approximate`) is unchanged; what
+  is now specified is the branch content. The first implementation wrote a `$comment` holding the type
+  name, which OpenAPI 3.0 does not allow — the generated document was refused by its own revalidation —
+  and which told a reader nothing about the type expected. It also left the choice's particles to be
+  projected a second time at the type level, where they were declared **all required at once**: the exact
+  opposite of a choice, asserted with the confidence of a carried rule. Both defects were invisible until
+  a projected schema had to be spliced into a production description and revalidated.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read the WSDL and its imports, or refuse to pretend (Priority: P1)

@@ -23,12 +23,14 @@ public static class CorrectionCatalog
     /// <param name="candidate">La description candidate.</param>
     /// <param name="differences">Ce que la comparaison a trouvé.</param>
     /// <param name="catalog">Énumère les routes d'une description.</param>
+    /// <param name="footing">Ce sur quoi la sélection repose, pour un candidat projeté.</param>
     /// <returns>Les routes du candidat, dans l'ordre où le candidat les écrit.</returns>
     public static IReadOnlyList<CorrectionRoute> Build(
         SpecDocument production,
         SpecDocument candidate,
         IReadOnlyList<Difference> differences,
-        IOperationCatalog catalog)
+        IOperationCatalog catalog,
+        WsdlFooting? footing = null)
     {
         ArgumentNullException.ThrowIfNull(production);
         ArgumentNullException.ThrowIfNull(candidate);
@@ -47,11 +49,15 @@ public static class CorrectionCatalog
         {
             _ = attributed.TryGetValue(operation.Selector, out List<Difference>? own);
 
+            string display = operation.Selector.Display;
+
             routes.Add(new CorrectionRoute(
                 operation.Selector,
                 State(held.Contains(operation.Selector), own),
                 operation.Summary,
-                own ?? []));
+                own ?? [],
+                footing?.StateOf(display),
+                footing?.PairedWith(display)));
         }
 
         return routes;

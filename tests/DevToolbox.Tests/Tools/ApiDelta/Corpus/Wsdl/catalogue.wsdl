@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le contrat ordinaire du corpus : trois documents, les quatre schémas d'échange de WSDL 1.1, et une
+     liaison SOAP 1.1. C'est celui qu'on lit pour établir qu'on sait lire, et celui qu'on réécrit autrement
+     pour établir que la façon de l'écrire ne change rien. -->
+<wsdl:definitions
+    name="Catalogue"
+    targetNamespace="http://entreprise.local/catalogue/wsdl"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://entreprise.local/catalogue/wsdl"
+    xmlns:t="http://entreprise.local/catalogue/types">
+
+  <wsdl:documentation>
+    Dépôt et consultation de documents. Le service en service depuis 2019.
+  </wsdl:documentation>
+
+  <wsdl:types>
+    <xs:schema targetNamespace="http://entreprise.local/catalogue/wsdl">
+      <xs:import namespace="http://entreprise.local/catalogue/types"
+                 schemaLocation="catalogue-types.xsd"/>
+    </xs:schema>
+  </wsdl:types>
+
+  <wsdl:message name="deposerDocumentIn">
+    <wsdl:part name="corps" element="t:deposerDocumentRequete"/>
+  </wsdl:message>
+  <wsdl:message name="deposerDocumentOut">
+    <wsdl:part name="corps" element="t:deposerDocumentReponse"/>
+  </wsdl:message>
+  <wsdl:message name="lireDocumentIn">
+    <wsdl:part name="corps" element="t:lireDocumentRequete"/>
+  </wsdl:message>
+  <wsdl:message name="lireDocumentOut">
+    <wsdl:part name="corps" element="t:lireDocumentReponse"/>
+  </wsdl:message>
+  <wsdl:message name="archiverDocumentIn">
+    <wsdl:part name="corps" element="t:archiverDocumentAvis"/>
+  </wsdl:message>
+  <wsdl:message name="dossierModifieOut">
+    <wsdl:part name="corps" element="t:dossierModifieAvis"/>
+  </wsdl:message>
+  <wsdl:message name="interrogerDossierOut">
+    <wsdl:part name="corps" element="t:interrogerDossierDemande"/>
+  </wsdl:message>
+  <wsdl:message name="interrogerDossierIn">
+    <wsdl:part name="corps" element="t:interrogerDossierReponse"/>
+  </wsdl:message>
+  <wsdl:message name="erreurMessage">
+    <wsdl:part name="corps" element="t:erreur"/>
+  </wsdl:message>
+
+  <wsdl:portType name="CataloguePort">
+    <!-- Requête-réponse : entrée puis sortie. -->
+    <wsdl:operation name="deposerDocument">
+      <wsdl:documentation>Dépose un document et rend son identifiant.</wsdl:documentation>
+      <wsdl:input message="tns:deposerDocumentIn"/>
+      <wsdl:output message="tns:deposerDocumentOut"/>
+      <wsdl:fault name="erreur" message="tns:erreurMessage"/>
+    </wsdl:operation>
+
+    <wsdl:operation name="lireDocument">
+      <wsdl:documentation>Lit un document par critère.</wsdl:documentation>
+      <wsdl:input message="tns:lireDocumentIn"/>
+      <wsdl:output message="tns:lireDocumentOut"/>
+      <wsdl:fault name="erreur" message="tns:erreurMessage"/>
+    </wsdl:operation>
+
+    <!-- Sens unique : entrée seule, donc aucune réponse à projeter. -->
+    <wsdl:operation name="archiverDocument">
+      <wsdl:documentation>Signale l'archivage. Rien n'est rendu.</wsdl:documentation>
+      <wsdl:input message="tns:archiverDocumentIn"/>
+    </wsdl:operation>
+
+    <!-- Notification : sortie seule. -->
+    <wsdl:operation name="dossierModifie">
+      <wsdl:documentation>Avertit qu'un dossier a changé.</wsdl:documentation>
+      <wsdl:output message="tns:dossierModifieOut"/>
+    </wsdl:operation>
+
+    <!-- Sollicitation-réponse : sortie puis entrée. -->
+    <wsdl:operation name="interrogerDossier">
+      <wsdl:documentation>Le service interroge, l'appelant répond.</wsdl:documentation>
+      <wsdl:output message="tns:interrogerDossierOut"/>
+      <wsdl:input message="tns:interrogerDossierIn"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <wsdl:binding name="CatalogueBinding" type="tns:CataloguePort">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="deposerDocument">
+      <soap:operation soapAction="http://entreprise.local/catalogue/deposerDocument"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+      <wsdl:fault name="erreur"><soap:fault name="erreur" use="literal"/></wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="lireDocument">
+      <soap:operation soapAction="http://entreprise.local/catalogue/lireDocument"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+      <wsdl:fault name="erreur"><soap:fault name="erreur" use="literal"/></wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="archiverDocument">
+      <soap:operation soapAction="http://entreprise.local/catalogue/archiverDocument"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+    </wsdl:operation>
+    <wsdl:operation name="dossierModifie">
+      <soap:operation soapAction="http://entreprise.local/catalogue/dossierModifie"/>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="interrogerDossier">
+      <soap:operation soapAction="http://entreprise.local/catalogue/interrogerDossier"/>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="Catalogue">
+    <wsdl:documentation>Le point d'entrée du catalogue documentaire.</wsdl:documentation>
+    <wsdl:port name="CataloguePort" binding="tns:CatalogueBinding">
+      <soap:address location="https://catalogue.entreprise.local/services/catalogue"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

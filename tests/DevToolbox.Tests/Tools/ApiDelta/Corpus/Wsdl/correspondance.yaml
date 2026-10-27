@@ -1,0 +1,9 @@
+# Une correspondance déclarée : ce que le développeur a déjà décidé.
+#
+# Elle prime sur toute proposition de l'outil (WR-105) : une équipe qui a écrit ce fichier a tranché, et
+# l'outil n'a pas à la contredire. Les opérations absentes d'ici restent à proposer ou à constater absentes.
+correspondances:
+  - operation: deposerDocument
+    route: POST /documents
+  - operation: lireDocument
+    route: GET /documents/{id}

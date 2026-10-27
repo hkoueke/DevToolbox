@@ -99,6 +99,17 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
                 difference.Display)));
         }
 
+        if (selection.Correspondence is { IsConfirmed: true } correspondence)
+        {
+            // Seules les entrées confirmées sont retenues. Une proposition reconduite d'une séance à
+            // l'autre serait une correspondance que l'outil se serait donnée à lui-même, et reprendre
+            // relit : seule la décision du développeur survit.
+            entries.AddRange(correspondence.Comparable.Select(entry => new PersistedSelectionEntry(
+                ApiDeltaSelectionKinds.Correspondence,
+                entry.Operation + " → " + entry.Route,
+                entry.Operation + " → " + entry.Route)));
+        }
+
         return entries;
     }
 

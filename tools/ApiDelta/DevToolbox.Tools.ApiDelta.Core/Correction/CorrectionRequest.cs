@@ -14,6 +14,14 @@ namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 /// <param name="Version">La version à inscrire, quand elle a pu être établie.</param>
 /// <param name="Formatting">La mise en forme des parties neuves seulement.</param>
 /// <param name="IncludeRemovals">Autorise les suppressions, qui ne sont jamais faites sans demande.</param>
+/// <param name="Footing">
+/// Ce sur quoi la sélection repose, quand le candidat est projeté depuis un contrat de service.
+/// </param>
+/// <remarks>
+/// La base est facultative, et son absence est ce qui distingue les deux chemins : un candidat OpenAPI
+/// donne ses propres octets, un contrat de service ne donne qu'une traduction. Aucun drapeau ne le dit,
+/// et c'est voulu — un drapeau pourrait être posé à tort, tandis qu'une base absente ne peut pas mentir.
+/// </remarks>
 public sealed record CorrectionRequest(
     SpecDocument Production,
     SpecDocument Candidate,
@@ -22,4 +30,5 @@ public sealed record CorrectionRequest(
     DependencyClosure Closure,
     VersionRecommendation? Version,
     CanonicalFormatting Formatting,
-    bool IncludeRemovals = false);
+    bool IncludeRemovals = false,
+    WsdlFooting? Footing = null);

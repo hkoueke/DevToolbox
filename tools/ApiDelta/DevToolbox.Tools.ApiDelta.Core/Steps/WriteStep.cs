@@ -422,7 +422,8 @@ public sealed class WriteStep : IToolStep
             context.Get<Optimization.OptimizationPlan>(ApiDeltaContextKeys.Plan),
             optimization,
             context.Get<Extraction.ExtractResult>(ApiDeltaContextKeys.Extract),
-            Corrected(context));
+            Corrected(context),
+            context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting));
 
         return run with { Code = OutcomeResolver.Resolve(run, Ruleset(context).Threshold) };
     }

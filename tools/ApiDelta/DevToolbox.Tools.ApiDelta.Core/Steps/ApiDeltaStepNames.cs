@@ -24,6 +24,12 @@ public static class ApiDeltaStepNames
     /// <summary>Lire la description candidate.</summary>
     public const string ReadSource = "Lecture du nouveau fichier";
 
+    /// <summary>La lecture d'un contrat de service WSDL, par chemin ou par adresse.</summary>
+    public const string ReadWsdl = "Lecture du contrat de service";
+
+    /// <summary>L'appariement des opérations du contrat avec les routes de la production.</summary>
+    public const string Correspond = "Appariement des opérations";
+
     /// <summary>Valider la structure et résoudre les références.</summary>
     public const string Validate = "Vérification des deux fichiers";
 

@@ -87,6 +87,38 @@ public static class ApiDeltaContextKeys
     /// </remarks>
     public const string Outcome = "apidelta.outcome";
 
+    /// <summary>Le contrat WSDL lu, quand le candidat en est un.</summary>
+    public const string WsdlContract = "apidelta.wsdl.contract";
+
+    /// <summary>Ce que la projection du WSDL n'a pas pu porter.</summary>
+    public const string WsdlProjectionGaps = "apidelta.wsdl.gaps";
+
+    /// <summary>Le document synthétique projeté depuis le contrat de service.</summary>
+    public const string WsdlProjection = "apidelta.wsdl.projection";
+
+    /// <summary>Les routes que la production porte, et la version qu'elle annonce.</summary>
+    public const string ProductionRoutes = "apidelta.production.routes";
+
+    /// <summary>L'appariement que le développeur a déclaré dans un fichier.</summary>
+    public const string DeclaredCorrespondence = "apidelta.correspondence.declared";
+
+    /// <summary>L'appariement retenu, confirmé ou non.</summary>
+    public const string Correspondence = "apidelta.correspondence";
+
+    /// <summary>Ce que la production couvre du contrat de service.</summary>
+    public const string Coverage = "apidelta.coverage";
+
+    /// <summary>
+    /// Ce sur quoi une sélection faite contre un contrat de service repose.
+    /// </summary>
+    /// <remarks>
+    /// Les trois choses qu'elle rassemble vivent déjà sous leurs propres clés, et l'assemblage est tout
+    /// de même déposé : l'écran de sélection, le constructeur de correction et les rapports en ont besoin
+    /// ensemble, et chacun les ayant rassemblées à sa façon, ils auraient fini par ne plus répondre la
+    /// même chose.
+    /// </remarks>
+    public const string WsdlFooting = "apidelta.wsdl.footing";
+
     /// <summary>Les artefacts écrits.</summary>
     public const string Artifacts = "apidelta.artifacts";
 }

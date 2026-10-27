@@ -27,6 +27,9 @@ namespace DevToolbox.Tools.ApiDelta.Core;
 /// Ce que le développeur a retenu pour entrer en production, pour le mode correction seul. Établi après
 /// la comparaison, parce que choisir avant elle reviendrait à choisir sans voir ce qu'elle a établi.
 /// </param>
+/// <param name="Correspondence">
+/// L'appariement confirmé entre les opérations du contrat de service et les routes de la production.
+/// </param>
 /// <remarks>
 /// Invariant : rien ici, même indirectement, ne peut atteindre le contenu d'un document. Il n'existe aucun
 /// chemin d'ici vers un nœud, une différence ou un constat — c'est ce qui permet de projeter cette
@@ -48,7 +51,8 @@ public sealed record RunSelection(
     bool IncludeSafeOptimizationsInPatch = false,
     bool InPlace = false,
     IReadOnlyList<OperationSelector>? SelectedOperations = null,
-    CorrectionSelection? Correction = null)
+    CorrectionSelection? Correction = null,
+    Correspondence.OperationCorrespondence? Correspondence = null)
 {
     /// <summary>Les règles à revoir autorisées, jamais nulles.</summary>
     public IReadOnlyList<string> AllowedReviewRequiredRules { get; init; } =
