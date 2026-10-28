@@ -147,6 +147,163 @@ public sealed class AuthoredRouteEndToEndTests
         verification.ReferencesResolved.Should().BeTrue(string.Join(" · ", verification.Complaints));
     }
 
+    [Fact]
+    public void A_get_with_placed_fields_declares_parameters_and_no_body()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        // Le cas de la spécification : un champ dans le chemin, deux dans la requête, un écarté.
+        AuthoringRecord authored = new(
+        [
+            Authored("lireDocument", "/Document/{identifiant}", HttpOperationMethod.Get) with
+            {
+                Placements =
+                [
+                    Scalar("identifiant", ParameterLocation.Path),
+                    Scalar("date", ParameterLocation.Query, required: true),
+                    Scalar("groupes", ParameterLocation.Query),
+                    Scalar("categorieDossier", ParameterLocation.Nowhere),
+                ],
+            },
+        ]);
+
+        Result<BuiltCorrection> built = run.Build(
+            new CorrectionSelection([run.Route("lireDocument")]), authoring: authored);
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        SpecDocument corrected = run.Reread(built.Value.Serialized);
+        const string Operation = "/paths/~1Document~1{identifiant}/get";
+
+        SequenceNode listed = PointerNavigator.Find(corrected.Root, Operation + "/parameters")
+            .Should().BeOfType<SequenceNode>().Subject;
+
+        listed.Items.Should().HaveCount(3, "trois champs placés, le quatrième écarté");
+
+        Where(listed, "identifiant").Should().Be("path");
+        Where(listed, "date").Should().Be("query");
+        Where(listed, "groupes").Should().Be("query");
+
+        Required(listed, "identifiant").Should().Be("true", "un paramètre de chemin l'est toujours");
+        Required(listed, "date").Should().Be("true", "le développeur l'a dit");
+        Required(listed, "groupes").Should().Be("false", "le contrat ne dit rien, et il n'a rien dit");
+
+        PointerNavigator.Find(corrected.Root, Operation + "/requestBody")
+            .Should().BeNull("aucun champ ne va dans le corps");
+
+        Encoding.UTF8.GetString(built.Value.Serialized.Span)
+            .Should().NotContain("categorieDossier", "le champ écarté n'est pas écrit");
+    }
+
+    [Fact]
+    public void A_write_verb_keeps_the_body_and_its_derived_reference()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        // « archiverDocument » porte une entrée et la production ne la couvre pas, là où
+        // « dossierModifie » est une notification sans
+        // entrée — ce que la première version de cet essai a appris en échouant sur elle.
+        AuthoringRecord authored = new(
+        [
+            Authored("archiverDocument", "/Document/Archiver", HttpOperationMethod.Post) with
+            {
+                Placements = [Composite("corps", ParameterLocation.Body)],
+            },
+        ]);
+
+        Result<BuiltCorrection> built = run.Build(
+            new CorrectionSelection([run.Route("archiverDocument")]), authoring: authored);
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        SpecDocument corrected = run.Reread(built.Value.Serialized);
+
+        PointerNavigator.Find(corrected.Root, "/paths/~1Document~1Archiver/post/requestBody")
+            .Should().NotBeNull("le corps est repris, avec la référence que la projection a dérivée");
+    }
+
+    [Fact]
+    public void An_operation_whose_every_field_goes_to_the_body_is_passed_through_unchanged()
+    {
+        // La règle que l'essai précédent a révélée en échouant : quand rien n'est redistribué, l'opération
+        // projetée passe telle quelle. Réassembler pour rien changerait des octets que personne n'a
+        // demandé de changer — et une notification sans entrée n'a pas de corps à porter.
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        AuthoringRecord authored = new(
+        [
+            Authored("dossierModifie", "/Dossier/Notifier", HttpOperationMethod.Post),
+        ]);
+
+        Result<BuiltCorrection> built = run.Build(
+            new CorrectionSelection([run.Route("dossierModifie")]), authoring: authored);
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        SpecDocument corrected = run.Reread(built.Value.Serialized);
+
+        PointerNavigator.Find(corrected.Root, "/paths/~1Dossier~1Notifier/post")
+            .Should().NotBeNull("la route est portée, au chemin composé");
+
+        PointerNavigator.Find(corrected.Root, "/paths/~1Dossier~1Notifier/post/requestBody")
+            .Should().BeNull("une notification sans entrée n'a pas de corps, et rien n'en invente un");
+    }
+
+    [Fact]
+    public void A_dropped_field_is_named_in_the_record_and_absent_from_the_document()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        AuthoringRecord authored = new(
+        [
+            Authored("lireDocument", "/Document/Chercher", HttpOperationMethod.Get) with
+            {
+                Placements =
+                [
+                    Scalar("identifiant", ParameterLocation.Query),
+                    Scalar("categorieDossier", ParameterLocation.Nowhere),
+                ],
+            },
+        ]);
+
+        Result<BuiltCorrection> built = run.Build(
+            new CorrectionSelection([run.Route("lireDocument")]), authoring: authored);
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        // Consigné : un champ ne disparaît pas sans être nommé quelque part.
+        (string Operation, FieldPlacement Field) dropped =
+            authored.Dropped().Should().ContainSingle().Which;
+
+        dropped.Operation.Should().Be("lireDocument");
+        dropped.Field.Field.Should().Be("categorieDossier");
+
+        Encoding.UTF8.GetString(built.Value.Serialized.Span)
+            .Should().NotContain("categorieDossier");
+    }
+
+    private static string Where(SequenceNode listed, string name) => Member(listed, name, "in");
+
+    private static string Required(SequenceNode listed, string name) =>
+        Member(listed, name, "required");
+
+    private static string Member(SequenceNode listed, string name, string member)
+    {
+        MappingNode parameter = listed.Items
+            .OfType<MappingNode>()
+            .Single(one => one.Find("name") is ScalarNode named
+                && string.Equals(named.Text, name, StringComparison.Ordinal));
+
+        return parameter.Find(member).Should().BeOfType<ScalarNode>().Subject.Text;
+    }
+
+    private static FieldPlacement Scalar(
+        string field, ParameterLocation location, bool required = false) =>
+        new(field, "string", IsComposite: false, location, required);
+
+    private static FieldPlacement Composite(string field, ParameterLocation location) =>
+        new(field, "DossierModifieRequete", IsComposite: true, location, Required: true);
+
     private static string Pointer(OperationSelector route) =>
         SpecPointer.Root.Child("paths").Child(route.Path).Child(route.MethodKey).Json;
 

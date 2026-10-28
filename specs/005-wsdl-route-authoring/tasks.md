@@ -139,19 +139,19 @@ every field is accounted for — placed or dropped.
 field in the path, two in the query, one dropped. The written route declares one path parameter, two query
 parameters, no body, and the report names the dropped field.
 
-- [ ] T032 [US2] Add the placement question to `Presentation/Prompts/RouteAuthoringPrompt.cs` — the fields
+- [X] T032 [US2] Add the placement question to `Presentation/Prompts/RouteAuthoringPrompt.cs` — the fields
   listed with their declared type and composite flag, pre-set from `PlacementDefaults`, a refusal naming
   the field and its type (RA-010, RA-011, RA-013) (depends on T012, T014, T025)
-- [ ] T033 [US2] Add the requiredness question to `Presentation/Prompts/RouteAuthoringPrompt.cs` — asked once per placed field, never for a path parameter,
+- [X] T033 [US2] Add the requiredness question to `Presentation/Prompts/RouteAuthoringPrompt.cs` — asked once per placed field, never for a path parameter,
   default no, the question saying why it is asked (RA-012, RA-014) (depends on T032)
-- [ ] T034 [US2] Change `Core/Correction/CorrectionBuilder.cs` to assemble the operation object from the
+- [X] T034 [US2] Change `Core/Correction/CorrectionBuilder.cs` to assemble the operation object from the
   placements: `parameters` for path, query and header; `requestBody` carrying the derived reference for the
   body; nothing for a dropped field (RA-016, RA-017) (depends on T027, T032)
-- [ ] T035 [US2] Establish the placeholder/field agreement in `Core/Steps/AuthorStep.cs` before writing, naming any
+- [X] T035 [US2] Establish the placeholder/field agreement in `Core/Steps/AuthorStep.cs` before writing, naming any
   mismatch (RA-015) (depends on T014, T022)
-- [ ] T036 [P] [US2] Extend `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — the four-field `GET` case above,
+- [X] T036 [P] [US2] Extend `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — the four-field `GET` case above,
   plus a `POST` whose composite input becomes a body with its reference intact (depends on T034)
-- [ ] T037 [P] [US2] Add the dropped-field case to `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — a field placed nowhere is absent from the document, named
+- [X] T037 [P] [US2] Add the dropped-field case to `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — a field placed nowhere is absent from the document, named
   in the report, and counted (depends on T034)
 
 **Checkpoint**: user stories 1 and 2 together are the feature. An authored route is usable without hand

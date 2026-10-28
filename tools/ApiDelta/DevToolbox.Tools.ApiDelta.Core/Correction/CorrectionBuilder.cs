@@ -274,18 +274,14 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         SpecPointer item = SpecPointer.Root.Child(Paths).Child(target.Path);
         bool pathHeld = PointerNavigator.Find(request.Production.Root, item.Json) is not null;
 
-        SpecNode marked = source;
+        // L'entrée est redistribuée là où le développeur l'a placée. Sans registre, ou quand tout va
+        // dans le corps, l'opération projetée passe inchangée : réassembler pour rien changerait des
+        // octets que personne n'a demandé de changer.
+        SpecNode marked = authored is { } composed
+            ? OperationAssembly.Compose(source, composed, composed.Headers)
+            : source;
 
-        // La méthode est ajoutée sous le chemin que la production porte, et jamais à la place : c'est la
-        // forme de l'épissure qui le tient, et non une vérification qu'on pourrait oublier de faire.
-        ledger.Splices.Add(pathHeld
-            ? new Splice(SpliceKind.Add, item, target.MethodKey, marked)
-            : new Splice(
-                SpliceKind.Add,
-                SpecPointer.Root.Child(Paths),
-                target.Path,
-                TreeEdits.Mapping(item, [new MappingEntry(TreeEdits.Key(target.MethodKey), marked)]),
-                AfterKey: authored?.Insertion.AfterPath));
+        ledger.Splices.Add(Grafted(item, target, marked, pathHeld, authored));
 
         if (pathHeld && origin is { } derived)
         {
@@ -296,6 +292,26 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         ledger.Marks.Add(new CorrectionMark(operation, operation.Json, Derived: origin));
         ledger.Routes.Add(target);
     }
+
+    /// <summary>L'épissure qui greffe une route : sous un chemin porté, ou comme chemin neuf.</summary>
+    /// <remarks>
+    /// La méthode est ajoutée sous le chemin que la production porte, et jamais à la place : c'est la
+    /// forme de l'épissure qui le tient, et non une vérification qu'on pourrait oublier de faire.
+    /// </remarks>
+    private static Splice Grafted(
+        SpecPointer item,
+        OperationSelector target,
+        SpecNode marked,
+        bool pathHeld,
+        AuthoredRoute? authored) =>
+        pathHeld
+            ? new Splice(SpliceKind.Add, item, target.MethodKey, marked)
+            : new Splice(
+                SpliceKind.Add,
+                SpecPointer.Root.Child(Paths),
+                target.Path,
+                TreeEdits.Mapping(item, [new MappingEntry(TreeEdits.Key(target.MethodKey), marked)]),
+                AfterKey: authored?.Insertion.AfterPath);
 
     /// <summary>La route composée pour l'opération dont une route projetée vient, s'il y en a une.</summary>
     /// <remarks>

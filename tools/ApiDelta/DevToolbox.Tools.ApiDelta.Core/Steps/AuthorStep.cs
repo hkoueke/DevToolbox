@@ -138,12 +138,20 @@ public sealed class AuthorStep : IToolStep
             .. SpecDocumentRoutes.From(production).Routes,
         ];
 
-        IReadOnlyList<string> collisions = settled.Collisions(held);
+        List<string> refusals = [.. settled.Collisions(held)];
 
-        return collisions.Count == 0
+        // L'accord entre les marqueurs du chemin et les champs placés dedans, établi ici et pas plus
+        // tard : un chemin portant « {identifiant} » que nul champ ne remplit donnerait un document
+        // invalide, et le découvrir à l'écriture aurait déjà fait perdre la séance.
+        foreach (AuthoredRoute route in settled.Routes)
+        {
+            refusals.AddRange(PlacementRules.Check(route));
+        }
+
+        return refusals.Count == 0
             ? Result.Success()
             : Result.Fail(
                 FailureReason.InvalidInput,
-                "Les routes composées se heurtent à ce qui existe : " + string.Join(" · ", collisions));
+                "Les routes composées ne se tiennent pas : " + string.Join(" · ", refusals));
     }
 }

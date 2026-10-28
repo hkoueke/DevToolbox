@@ -116,12 +116,101 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
             subject.Operation,
             path,
             method.Value,
-            PlacementDefaults.For(method.Value, subject.Fields),
+            AskForPlacements(subject, method.Value, path),
             [],
             AskForPlace(productionPaths, already),
             subject.Worth,
             TookSuggestion: string.Equals(path, subject.Suggested.Path, StringComparison.Ordinal)
                 && method.Value == subject.Suggested.Method);
+    }
+
+    /// <summary>Demande où va chaque champ, puis s'il est obligatoire.</summary>
+    /// <remarks>
+    /// Le défaut que le verbe permet est proposé d'abord, et montré : une opération de vingt champs
+    /// serait inutilisable sans lui, et un défaut appliqué sans être montré cacherait une décision.
+    /// <para>
+    /// Les marqueurs du chemin sont proposés d'emblée dans le chemin, puisque le développeur vient de les
+    /// écrire. C'est la seule déduction que l'invite se permet, et elle vient de sa propre réponse.
+    /// </para>
+    /// </remarks>
+    private List<FieldPlacement> AskForPlacements(
+        AuthoringSubject subject, HttpOperationMethod method, string path)
+    {
+        if (subject.HasNoFields)
+        {
+            return [];
+        }
+
+        HashSet<string> inPath = new(RouteSyntax.Placeholders(path), StringComparer.Ordinal);
+        List<FieldPlacement> settled = [];
+
+        foreach (FieldPlacement proposed in PlacementDefaults.For(method, subject.Fields))
+        {
+            ParameterLocation where = inPath.Contains(proposed.Field)
+                ? ParameterLocation.Path
+                : AskWhere(proposed, method);
+
+            settled.Add(new FieldPlacement(
+                proposed.Field,
+                proposed.Declared,
+                proposed.IsComposite,
+                where,
+                AskIfRequired(proposed.Field, where)));
+        }
+
+        return settled;
+    }
+
+    /// <summary>Demande la destination d'un champ, en n'offrant que les possibles.</summary>
+    private ParameterLocation AskWhere(FieldPlacement proposed, HttpOperationMethod method)
+    {
+        IReadOnlyList<ParameterLocation> possible =
+        [
+            .. Enum.GetValues<ParameterLocation>()
+                .Where(location => PlacementRules.Allows(proposed.IsComposite, location)),
+        ];
+
+        if (PlacementDefaults.AwaitsDecision(method, proposed))
+        {
+            _console.MarkupLine(
+                "[yellow]« " + Markup.Escape(proposed.Field) + " » est de type "
+                + Markup.Escape(proposed.Declared) + ", qui n'est pas un scalaire : sous ce verbe, "
+                + "l'outil n'a pas de destination à proposer.[/]");
+        }
+
+        string chosen = _console.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Où va « " + Markup.Escape(proposed.Field) + " » ? [grey]("
+                    + Markup.Escape(proposed.Declared) + ")[/]")
+                .AddChoices(possible.Select(FieldPlacement.Where))
+                .UseConverter(label => label));
+
+        return possible.First(location =>
+            string.Equals(FieldPlacement.Where(location), chosen, StringComparison.Ordinal));
+    }
+
+    /// <summary>Demande si un champ placé est obligatoire, sauf dans le chemin.</summary>
+    /// <remarks>
+    /// Le contrat ne le dit pas — tout y est optionnel et nillable — et la question le dit, pour qu'un
+    /// développeur sache que ce n'est pas une information qu'on lui redemande mais une décision qu'on lui
+    /// demande. Un paramètre de chemin ne pose pas la question : OpenAPI l'exige obligatoire.
+    /// </remarks>
+    private bool AskIfRequired(string field, ParameterLocation where)
+    {
+        if (where is ParameterLocation.Path or ParameterLocation.Nowhere)
+        {
+            return where is ParameterLocation.Path;
+        }
+
+        _console.MarkupLine(
+            "[grey]Le contrat ne dit pas si « " + Markup.Escape(field)
+            + " » est obligatoire : tout y est optionnel et nillable.[/]");
+
+        return _console.Prompt(
+            new ConfirmationPrompt("« " + Markup.Escape(field) + " » est-il obligatoire ?")
+            {
+                DefaultValue = false,
+            });
     }
 
     /// <summary>Demande le chemin, en refusant ce que le cœur refuse.</summary>
