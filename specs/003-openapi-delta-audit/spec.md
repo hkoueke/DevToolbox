@@ -204,6 +204,33 @@ Six reproches, relevés en se servant de l'outil sur des fichiers réels.
   déjà. Le tri reste disponible par jeu de règles. L'invite qui propose le fichier nettoyé le dit
   désormais, ce qui rend au passage la fonctionnalité trouvable.
 
+### Session 2026-10-28 — une revue trouve le revers du budget qu'on venait d'appliquer
+
+Un commentaire de revue sur la demande #23, classé P2, et exact.
+
+- Q: Le budget de références, désormais appliqué, tronque le graphe en ne laissant qu'un avertissement.
+  `CorrectionVerifier` ignore les diagnostics non bloquants et conclut « les références se résolvent » ;
+  `UnusedComponentRule` tient le graphe pour complet et annonce des composants retirables. Que faire ? →
+  A: **L'épuisement devient une propriété du graphe, et aucun lecteur ne conclut dessus.**
+  `ReferenceGraphResult` porte `Exhausted`, en paramètre exigé — un drapeau facultatif est précisément ce
+  qu'on oublie, et il n'existe qu'un seul producteur. Les quatre lecteurs refusent : les deux
+  vérificateurs se déclarent non établis, la règle des composants inaccessibles se déclare non évaluée,
+  et la règle des références mortes rend un rapport tronqué — ses constats sont vrais et sont gardés,
+  mais son silence ne vaut plus preuve. Chacun des trois refus a été vu rougir, garde retiré.
+- Q: La règle des composants pourrait-elle se contenter de signaler l'incertitude plutôt que de
+  renoncer ? → A: **Non, elle renonce.** Son produit est une proposition de suppression. Un composant
+  atteignable seulement au-delà du budget paraît inaccessible, et le dire serait proposer de le
+  supprimer à tort — ce qui casse le document. C'est la seule des quatre dont une erreur détruit quelque
+  chose, et c'est pourquoi elle est la seule à ne rien rendre du tout.
+- Q: Le corpus de performance cesse de passer : l'audit s'y déclare incomplet. Faut-il relever la borne
+  de profondeur ? → A: **Non, l'essai avait tort.** Ce corpus porte un anneau de dix mille schémas qui se
+  désignent l'un l'autre, et la borne de quatre cents maillons a été trouvée en mesurant — une chaîne de
+  dix mille faisait déborder la pile. La troncature y était donc **déjà réelle avant ce changement**, et
+  l'audit s'y déclarait complet après avoir vu quatre cents maillons sur dix mille, avec un essai qui
+  affirmait cette complétude et passait. L'essai affirme maintenant l'inverse, et vérifie en plus que
+  chaque règle qui renonce dit pourquoi. Ce qui est éprouvé là est la tenue sous le nombre, et la tenue
+  n'a jamais voulu dire l'omniscience.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)

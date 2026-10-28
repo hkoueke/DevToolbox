@@ -70,14 +70,15 @@ internal static class AuditHarness
     }
 
     /// <summary>Examine un document déjà lu.</summary>
-    internal static AuditResult Audit(SpecDocument document, Ruleset? ruleset = null)
+    internal static AuditResult Audit(
+        SpecDocument document, Ruleset? ruleset = null, LoadLimits? limits = null)
     {
         OpenApiMetamodel metamodel = new();
         Fingerprinter fingerprinter = new(new Canonicalizer(metamodel));
 
         List<Diagnostic> resolution = [];
         ReferenceGraphResult references = new ReferenceGraph()
-            .Resolve(document, ReferencePolicy.Closed, LoadLimits.Default, resolution);
+            .Resolve(document, ReferencePolicy.Closed, limits ?? LoadLimits.Default, resolution);
 
         return new AuditEngine(Wired(), metamodel, fingerprinter)
             .Run(

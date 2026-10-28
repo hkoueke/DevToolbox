@@ -38,6 +38,18 @@ public sealed class UnusedComponentRule : AuditRule
                 "Les références n'ont pas été résolues : aucun composant ne peut être dit inaccessible.");
         }
 
+        if (references.Exhausted)
+        {
+            // Le cas qui coûte le plus cher si on le tait : un composant atteignable seulement par une
+            // référence située au-delà du budget paraît inaccessible, et cette règle l'annoncerait
+            // retirable sans risque. Supprimer un composant encore référencé casse le document. La
+            // traversée tronquée est donc une raison de ne pas évaluer, pas une donnée de travail.
+            return RuleReport.NotEvaluated(
+                "La traversée des références s'est arrêtée sur un budget : un composant atteignable "
+                + "seulement au-delà paraîtrait inaccessible, et le dire serait proposer de le "
+                + "supprimer à tort.");
+        }
+
         bool complete = !references.Unresolved.Any() && !references.ExternalPreserved.Any();
         HashSet<string> reachable = Reachable(references, Required(subject));
 

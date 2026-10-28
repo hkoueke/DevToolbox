@@ -128,6 +128,47 @@ public sealed class CorrectionVerifierTests
         verification.Explanation.Should().Contain("que personne n'avait retenu a changé");
     }
 
+    [Fact]
+    public void A_truncated_reference_walk_stops_the_verification_instead_of_passing_it()
+    {
+        // Une revue a trouvé ceci : la troncature du graphe ne valait qu'un avertissement, et cette
+        // vérification n'écoute que les diagnostics bloquants. Elle concluait donc « les références se
+        // résolvent » depuis une traversée qui s'était arrêtée en route — si bien qu'une référence morte
+        // située au-delà du budget laissait publier le document.
+        SpecDocument production = Read("baseline-30.yaml");
+        BuiltCorrection built = Build(production);
+
+        Ruleset narrow = Ruleset.Default with
+        {
+            Limits = LoadLimits.Default with { MaxReferences = 1 },
+        };
+
+        CorrectionVerification verification = _verifier.Verify(
+            built.Serialized, production, built, narrow);
+
+        verification.Reparsed.Should().BeTrue("le document se relit : ce n'est pas lui qui est en cause");
+        verification.ReferencesResolved.Should().BeFalse(
+            "ce qui n'a pas été atteint n'est ni résolu ni non résolu : c'est inconnu");
+
+        verification.Established.Should().BeFalse();
+        verification.Explanation.Should().Contain("budget");
+    }
+
+    [Fact]
+    public void A_complete_reference_walk_still_passes()
+    {
+        // L'autre moitié : un refus qui se déclenche toujours ne vaut pas mieux qu'un refus qui ne se
+        // déclenche jamais.
+        SpecDocument production = Read("baseline-30.yaml");
+        BuiltCorrection built = Build(production);
+
+        CorrectionVerification verification = _verifier.Verify(
+            built.Serialized, production, built, Ruleset.Default);
+
+        verification.ReferencesResolved.Should().BeTrue(verification.Explanation);
+        verification.Established.Should().BeTrue(verification.Explanation);
+    }
+
     private BuiltCorrection Build(SpecDocument production)
     {
         SpecDocument candidate = Read("candidate-additive.yaml", DocumentRole.Candidate);

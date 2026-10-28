@@ -74,6 +74,25 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         List<Diagnostic> resolution = [];
         ReferenceGraphResult graph = _references.Resolve(corrected, ruleset.References, ruleset.Limits, resolution);
 
+        if (graph.Exhausted)
+        {
+            // Un graphe tronqué ne permet pas d'affirmer que les références se résolvent : celles que la
+            // traversée n'a pas atteintes ne sont ni résolues ni non résolues, elles sont inconnues. La
+            // vérification refuse donc de conclure, au lieu de conclure depuis ce qu'elle a vu — sans
+            // quoi une référence morte située au-delà du budget laisserait publier le document.
+            return new CorrectionVerification(
+                true,
+                true,
+                false,
+                false,
+                false,
+                [
+                    .. Said(resolution),
+                    "la traversée des références s'est arrêtée sur un budget : ce qui se trouve au-delà "
+                        + "n'a pas été vu, et la résolution ne peut donc pas être établie",
+                ]);
+        }
+
         return resolution.Any(diagnostic => diagnostic.IsBlocking) || graph.Unresolved.Any()
             ? new CorrectionVerification(true, true, false, false, false, Said(resolution))
             : Compare(corrected, production, built);

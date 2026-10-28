@@ -166,3 +166,31 @@ Corollaire sur la forme des essais : **une assertion sous condition n'affirme ri
 peut ne jamais se produire. `if (quelque chose) { Should()… }` sans `else` est vert le jour où « quelque
 chose » cesse d'arriver — c'est-à-dire le jour où la régression survient. Si les deux cas sont légitimes,
 les deux branches affirment ; si l'un ne doit pas se produire, c'est lui qu'il faut affirmer.
+
+## Une traversée tronquée n'autorise aucune conclusion
+
+Deux budgets arrêtent la traversée des références : la chaîne de plus de quatre cents maillons, et
+`limits.maxReferences`. Chacun produisait un avertissement — non bloquant — et les quatre lecteurs du
+graphe n'écoutaient que les diagnostics bloquants. Chacun concluait donc depuis ce qu'il avait sous la
+main, sur un graphe qui, tronqué, ressemble en tout point à un graphe complet.
+
+Ce que cela donnait, du moins grave au plus :
+
+- `UnresolvedReferenceRule` ne trouvait rien au-delà du budget, et son silence se lit « aucune référence
+  morte ».
+- `CorrectionVerifier` concluait « les références se résolvent », si bien qu'une référence morte située
+  au-delà laissait publier une production consolidée.
+- `ContractEquivalenceVerifier` établissait une équivalence de contrat sans avoir regardé partout.
+- `UnusedComponentRule` tenait un composant atteignable seulement au-delà pour inaccessible, et
+  l'annonçait **retirable sans risque**. Supprimer un composant encore référencé casse le document :
+  c'est exactement la perte que cet outil existe pour empêcher.
+
+L'épuisement est donc porté par `ReferenceGraphResult`, en paramètre **exigé**, et non laissé à un
+diagnostic qu'on peut ne pas lire. Les quatre lecteurs refusent de conclure : trois se déclarent non
+établis, et la règle des références mortes rend un rapport *tronqué* — ses constats sont vrais et sont
+gardés, mais son silence ne vaut plus preuve.
+
+Le corpus de performance du dépôt porte un anneau de dix mille schémas : la troncature y était **déjà
+réelle**, et l'audit s'y déclarait complet après avoir vu quatre cents maillons sur dix mille. Un essai
+affirmait même cette complétude, et passait. C'est la forme la plus coûteuse du motif voisin — un
+garde-fou dont le signal existe, mais que personne n'écoute.

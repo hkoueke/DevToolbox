@@ -60,7 +60,7 @@ public sealed class ReferenceGraph : IReferenceGraph
 
         Report(crawl.Unresolved, document, diagnostics);
 
-        return new ReferenceGraphResult(crawl.Edges, crawl.Cycles);
+        return new ReferenceGraphResult(crawl.Edges, crawl.Cycles, crawl.Exhausted);
     }
 
     private static void Walk(SpecNode node, Crawl crawl, int depth)
@@ -72,7 +72,7 @@ public sealed class ReferenceGraph : IReferenceGraph
 
         if (depth > MaxChainDepth)
         {
-            TooDeep(node, crawl.Diagnostics);
+            crawl.TooDeep(node);
 
             return;
         }
@@ -160,25 +160,6 @@ public sealed class ReferenceGraph : IReferenceGraph
     }
 
     /// <summary>
-    /// Consigne l'épuisement de la profondeur, en nommant la limite et l'endroit.
-    /// </summary>
-    /// <remarks>
-    /// Un diagnostic plutôt qu'une exception : la traversée rend ce qu'elle a trouvé jusque-là, et les
-    /// règles qui dépendent du graphe se déclareront non évaluées. C'est la discipline de l'outil — une
-    /// analyse incomplète le dit — appliquée à sa propre limite.
-    /// </remarks>
-    private static void TooDeep(SpecNode node, ICollection<Diagnostic> diagnostics)
-    {
-        diagnostics.Add(new Diagnostic(
-            DiagnosticCodes.LimitReached,
-            DiagnosticSeverity.Warning,
-            $"Les références s'enchaînent sur plus de {MaxChainDepth} maillons : la résolution "
-            + "s'arrête ici, et ce qui se trouve au-delà n'a pas été vu.",
-            node.Location,
-            node.Position));
-    }
-
-    /// <summary>
     /// Ce qu'un parcours accumule, et le budget qu'il consomme.
     /// </summary>
     /// <remarks>
@@ -212,6 +193,35 @@ public sealed class ReferenceGraph : IReferenceGraph
 
         /// <summary>Le budget est épuisé : le parcours s'arrête, partout où il en est.</summary>
         internal bool Exhausted { get; private set; }
+
+        /// <summary>
+        /// Consigne l'épuisement de la profondeur, en nommant la limite et l'endroit.
+        /// </summary>
+        /// <param name="node">Le maillon où la traversée s'arrête.</param>
+        /// <remarks>
+        /// Un diagnostic plutôt qu'une exception : la traversée rend ce qu'elle a trouvé jusque-là. Mais
+        /// un diagnostic ne suffisait pas — il valait avertissement, et les lecteurs du graphe
+        /// n'écoutaient que les diagnostics bloquants. L'épuisement marque donc le parcours lui-même, et
+        /// le graphe rendu le dit, de sorte qu'aucune conclusion ne puisse se tirer d'une traversée
+        /// incomplète sans l'avoir su.
+        /// </remarks>
+        internal void TooDeep(SpecNode node)
+        {
+            if (Exhausted)
+            {
+                return;
+            }
+
+            Exhausted = true;
+
+            Diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.LimitReached,
+                DiagnosticSeverity.Warning,
+                $"Les références s'enchaînent sur plus de {MaxChainDepth} maillons : la résolution "
+                + "s'arrête ici, et ce qui se trouve au-delà n'a pas été vu.",
+                node.Location,
+                node.Position));
+        }
 
         /// <summary>
         /// Compte une référence et dit s'il faut la suivre.
