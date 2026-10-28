@@ -16,12 +16,18 @@ namespace DevToolbox.Presentation.Shell;
 /// l'ordre où il les a écrits. C'est ce qui lui permet de servir des sélections aussi différentes qu'une
 /// liste de groupes de variables et deux fichiers accompagnés d'un mode.
 /// </para>
+/// <para>
+/// Les trois entrées portaient des libellés qui cachaient leur différence : deux d'entre elles finissaient
+/// par « repartir de zéro » sans dire ce qu'elles faisaient de la séance mémorisée, et passaient donc pour
+/// un doublon. Elles nomment maintenant la seule chose qui les sépare — redemandera-t-on, ou non, au
+/// prochain lancement.
+/// </para>
 /// </remarks>
 public sealed class ResumePrompt
 {
-    private const string ResumeLabel = "Reprendre (la sélection sera relue)";
-    private const string DiscardLabel = "Oublier cette exécution et repartir de zéro";
-    private const string StartFreshLabel = "Repartir de zéro";
+    private const string ResumeLabel = "Reprendre là où vous en étiez";
+    private const string DiscardLabel = "Repartir de zéro, et oublier cette séance";
+    private const string StartFreshLabel = "Repartir de zéro, me la redemander au prochain lancement";
 
     private readonly IAnsiConsole _console;
 
@@ -36,8 +42,10 @@ public sealed class ResumePrompt
     /// <summary>Demande quoi faire de l'exécution interrompue la plus récente.</summary>
     /// <param name="candidates">Les exécutions reprenables, la plus récente en tête.</param>
     /// <returns>
-    /// La réponse du développeur. Noter qu'<em>oublier</em> et <em>repartir de zéro</em> diffèrent : oublier
-    /// supprime l'exécution mémorisée, tandis que repartir de zéro la laisse disponible pour un autre jour.
+    /// La réponse du développeur. <em>Oublier</em> supprime la séance mémorisée ; <em>me la redemander</em>
+    /// la laisse en place, et la question reviendra au prochain lancement de cet outil. Un seul point de
+    /// reprise existe par outil : une séance gardée est remplacée par la suivante qui s'interrompt, et le
+    /// libellé promet donc le prochain lancement, non l'éternité.
     /// </returns>
     public ResumeAnswer Ask(IReadOnlyList<PersistedRun> candidates)
     {

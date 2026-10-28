@@ -120,9 +120,20 @@ public sealed class ApiDeltaTool : ITool
 
         ToolRunContext context = new(run);
 
+        // L'écran est rendu à l'outil avant qu'il pose sa première question. La coquille nettoie au
+        // retour au choix d'onglet, et nulle part ailleurs : sans ceci, les invites s'empilaient sous le
+        // bandeau et le menu, et le développeur lisait ses questions au milieu de ce qu'il venait de
+        // quitter. Varcompare le faisait déjà ; apidelta ne le faisait nulle part.
+        _console.Clear();
+
         // Une exécution interrompue est proposée avant toute lecture. Seule la sélection revient, et
         // seulement si les fichiers sont encore ceux qui avaient été lus.
         await _resume.TryResumeAsync(Id, context, cancellationToken).ConfigureAwait(false);
+
+        // Et de nouveau après la réponse : le panneau de reprise a fait son travail, et ce qui suit est
+        // une autre conversation. Nettoyer ici évite aussi qu'une séance reprise affiche sous ses
+        // questions le descriptif de la séance qu'elle remplace.
+        _console.Clear();
 
         await _runner.RunAsync(context, _steps, cancellationToken).ConfigureAwait(false);
 

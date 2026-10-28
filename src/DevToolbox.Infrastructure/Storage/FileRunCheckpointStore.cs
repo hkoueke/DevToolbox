@@ -60,7 +60,51 @@ public sealed class FileRunCheckpointStore : IRunCheckpointStore
                 .ConfigureAwait(false);
         }
 
+        await PruneOthersAsync(run, cancellationToken).ConfigureAwait(false);
+
         Log.CheckpointSaved(_logger, run.RunId);
+    }
+
+    /// <summary>Ne garde qu'un point de reprise par outil : celui qu'on vient d'écrire.</summary>
+    /// <remarks>
+    /// L'invite de reprise n'offre que le plus récent — elle reçoit la liste entière et n'en lit que la
+    /// première entrée. Les autres dormaient donc sur le disque jusqu'au balayage des sept jours, sans
+    /// jamais être proposés, alors que l'invite promettait de laisser une séance « disponible pour un
+    /// autre jour ». Entre offrir une liste de séances périmées et n'en garder qu'une, le choix retenu est
+    /// la seconde : ce que l'outil garde est ce qu'il sait proposer.
+    /// <para>
+    /// Un échec de suppression n'empêche pas l'écriture d'aboutir : le point de reprise qui compte est
+    /// déjà en place, et un ancien fichier qui subsiste sera balayé par la péremption.
+    /// </para>
+    /// </remarks>
+    private async Task PruneOthersAsync(PersistedRun run, CancellationToken cancellationToken)
+    {
+        string keep = FileNameFor(run.RunId);
+
+        foreach (string path in Directory.EnumerateFiles(_paths.RunsDirectory, "*.json"))
+        {
+            if (string.Equals(Path.GetFileName(path), keep, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            PersistedRun? other = await TryReadAsync(path, cancellationToken).ConfigureAwait(false);
+
+            if (other is not null
+                && !string.Equals(other.ToolId, run.ToolId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Log.CheckpointSweepFailed(_logger, exception.Message);
+            }
+        }
     }
 
     /// <inheritdoc />
