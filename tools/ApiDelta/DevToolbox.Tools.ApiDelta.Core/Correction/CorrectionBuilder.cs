@@ -38,9 +38,6 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
     private const string Info = "info";
     private const string Version = "version";
 
-    /// <summary>Le membre qui déclare, au niveau du document, qu'il s'agit d'une correction proposée.</summary>
-    public const string Declaration = "x-apidelta-correction";
-
     private readonly IOperationCatalog _catalog;
     private readonly ISplicingEmitter _splicer;
 
@@ -198,18 +195,26 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         IReadOnlyList<ProjectionGap> gaps =
             request.Footing?.Derivation.UnfilledAtComponent(name) ?? [];
 
-        ledger.Splices.Add(new Splice(
-            SpliceKind.Add, family, name, Mark(source, component.Json, origin, gaps)));
+        // Le composant entre tel quel. Il portait une trace « x-apidelta-origin » ; elle est retirée du
+        // document, et son contenu se lit dans le rapport, à côté. Un fichier destiné à devenir un
+        // contrat publié ne porte que de l'OpenAPI.
+        ledger.Splices.Add(new Splice(SpliceKind.Add, family, name, source));
 
         Noted(ledger, component, gaps);
         ledger.Marks.Add(new CorrectionMark(component, component.Json, Derived: origin));
     }
 
-    /// <summary>Inscrit la version recommandée, et déclare que le document est une correction proposée.</summary>
+    /// <summary>Inscrit la version recommandée.</summary>
     /// <remarks>
-    /// La déclaration n'est pas une politesse : sans elle, une production consolidée est indistinguable
-    /// d'une production publiée, et c'est le seul endroit où cet outil pourrait laisser croire qu'un
-    /// document est un contrat alors qu'il est une proposition.
+    /// C'est désormais la seule chose que cette méthode ajoute, et c'est la plus importante : le numéro
+    /// de version est ce qui distingue le contrat consolidé de celui qui est en service, et donc ce qui
+    /// fait qu'un changement incompatible n'atteint aucun appelant existant.
+    /// <para>
+    /// Le document portait aussi un bloc <c>x-apidelta-correction</c> — fichier source, empreinte,
+    /// statut, nombre d'endroits non remplis, champs dérivés. Il a été retiré : ce qu'il disait se lit
+    /// dans le rapport écrit à côté, et un fichier destiné à devenir un contrat publié ne porte que de
+    /// l'OpenAPI. Le registre, lui, reste tenu — c'est lui qui alimente le rapport.
+    /// </para>
     /// </remarks>
     private static void Stamp(CorrectionRequest request, Ledger ledger)
     {
@@ -222,89 +227,8 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
             ledger.Splices.Add(new Splice(
                 SpliceKind.Replace, version, Value: TreeEdits.Key(next.ToString())));
         }
-
-        SpecPointer root = SpecPointer.Root;
-        List<MappingEntry> entries =
-        [
-            // Le nom du fichier et son empreinte, jamais son chemin : un chemin absolu varie d'une
-            // machine à l'autre, ce qui rendrait deux exécutions identiques distinguables, et il
-            // porterait le dossier personnel du développeur dans un document destiné à être
-            // validé. L'empreinte dit l'identité, ce que le chemin ne disait pas.
-            new MappingEntry(
-                TreeEdits.Key("source"), TreeEdits.Key(Path.GetFileName(request.Candidate.Path))),
-            new MappingEntry(
-                TreeEdits.Key("sourceHash"), TreeEdits.Key(request.Candidate.ContentHash)),
-            new MappingEntry(
-                TreeEdits.Key("statut"), TreeEdits.Key("correction proposée, non publiée")),
-            .. Unfinished(ledger),
-            .. Fields(root, ledger),
-        ];
-
-        ledger.Splices.Add(new Splice(
-            SpliceKind.Add, root, Declaration, TreeEdits.Mapping(root.Child(Declaration), entries)));
     }
 
-    /// <summary>
-    /// Déclare, au niveau du document, combien d'endroits y restent non remplis.
-    /// </summary>
-    /// <remarks>
-    /// Un document inachevé doit être reconnaissable comme inachevé depuis lui seul, et non par le
-    /// rapport posé à côté : les deux se séparent dès qu'on en transfère un. Le nombre vaut davantage
-    /// qu'un drapeau — « sept » se recoupe avec ce que le document porte, « inachevé » ne se recoupe avec
-    /// rien.
-    /// </remarks>
-    private static IEnumerable<MappingEntry> Unfinished(Ledger ledger)
-    {
-        if (ledger.Unfilled.Count == 0)
-        {
-            yield break;
-        }
-
-        yield return new MappingEntry(
-            TreeEdits.Key(UnfilledMarker.Count),
-            TreeEdits.Key(ledger.Unfilled.Count.ToString(CultureInfo.InvariantCulture)));
-    }
-
-    /// <summary>
-    /// Nomme les champs dérivés d'un contrat de service, qui ne peuvent pas porter leur trace eux-mêmes.
-    /// </summary>
-    /// <remarks>
-    /// Un champ scalaire — <c>summary</c>, <c>required</c>, <c>type</c> — ne peut pas porter un membre
-    /// <c>x-</c> : OpenAPI ne les autorise que sur des objets. Sa trace figure donc ici, et c'est le seul
-    /// endroit où elle peut figurer. Sans elle, un champ dérivé d'une traduction serait indiscernable
-    /// d'un champ recopié des octets d'un candidat — exactement ce que cette tranche promet d'éviter.
-    /// </remarks>
-    private static IEnumerable<MappingEntry> Fields(SpecPointer root, Ledger ledger)
-    {
-        List<CorrectionMark> derived =
-            [.. ledger.Marks.Where(mark => !mark.IsAddition && mark.IsDerived)];
-
-        if (derived.Count == 0)
-        {
-            yield break;
-        }
-
-        SpecPointer at = root.Child(Declaration).Child("champsDerives");
-        List<SpecNode> items = [];
-
-        for (int index = 0; index < derived.Count; index++)
-        {
-            DerivedOrigin origin = derived[index].Derived!;
-
-            items.Add(TreeEdits.Mapping(
-                at.Item(index),
-                [
-                    new MappingEntry(
-                        TreeEdits.Key("champ"), TreeEdits.Key(derived[index].Target.Json)),
-                    new MappingEntry(TreeEdits.Key("wsdl"), TreeEdits.Key(origin.Document)),
-                    new MappingEntry(TreeEdits.Key("emplacement"), TreeEdits.Key(origin.At)),
-                    new MappingEntry(TreeEdits.Key("projection"), TreeEdits.Key(origin.Worth)),
-                ]));
-        }
-
-        yield return new MappingEntry(
-            TreeEdits.Key("champsDerives"), TreeEdits.Sequence(at, items));
-    }
 
     /// <summary>Porte une route entière, quand la production ne l'a pas.</summary>
     private static void Route(
@@ -341,7 +265,7 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
             request.Footing?.Derivation.UnfilledAtRoute(route.Method.ToString(), route.Path, source)
             ?? [];
 
-        SpecNode marked = Mark(source, operation.Json, origin, gaps);
+        SpecNode marked = source;
 
         // La méthode est ajoutée sous le chemin que la production porte, et jamais à la place : c'est la
         // forme de l'épissure qui le tient, et non une vérification qu'on pourrait oublier de faire.
@@ -454,83 +378,6 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
             difference.Impact,
             difference.Confidence,
             difference.Rationale));
-    }
-
-    /// <summary>Pose la trace d'origine sur un objet, quand il peut en porter une.</summary>
-    /// <remarks>
-    /// Sur un objet seulement : OpenAPI n'autorise les membres <c>x-</c> que là. Un champ scalaire voit sa
-    /// trace figurer dans la déclaration du document, qui nomme le champ — le lecteur l'apprend donc sans
-    /// ouvrir le rapport, ce qui est ce qui était promis.
-    /// </remarks>
-    private static SpecNode Mark(
-        SpecNode node,
-        string from,
-        DerivedOrigin? derived,
-        IReadOnlyList<ProjectionGap> unfilled)
-    {
-        if (node is not MappingNode mapping)
-        {
-            return node;
-        }
-
-        List<MappingEntry> added =
-        [
-            new MappingEntry(
-                TreeEdits.Key(CorrectionMark.Member), Trace(node.Location, from, derived)),
-        ];
-
-        if (unfilled.Count > 0)
-        {
-            added.Add(new MappingEntry(
-                TreeEdits.Key(UnfilledMarker.Member), Markers(node.Location, unfilled)));
-        }
-
-        return TreeEdits.Mapping(mapping.Location, [.. mapping.Entries, .. added]);
-    }
-
-    /// <summary>La trace elle-même : d'où le contenu vient, et ce que la dérivation valait.</summary>
-    private static MappingNode Trace(SpecPointer at, string from, DerivedOrigin? derived)
-    {
-        SpecPointer location = at.Child(CorrectionMark.Member);
-        List<MappingEntry> entries = [new MappingEntry(TreeEdits.Key("from"), TreeEdits.Key(from))];
-
-        if (derived is { } origin)
-        {
-            entries.Add(new MappingEntry(TreeEdits.Key("wsdl"), TreeEdits.Key(origin.Document)));
-            entries.Add(new MappingEntry(TreeEdits.Key("emplacement"), TreeEdits.Key(origin.At)));
-            entries.Add(new MappingEntry(TreeEdits.Key("projection"), TreeEdits.Key(origin.Worth)));
-        }
-
-        return TreeEdits.Mapping(location, entries);
-    }
-
-    /// <summary>
-    /// Ce que la projection n'a pas porté ici, nommé et non rempli.
-    /// </summary>
-    /// <remarks>
-    /// Une suite, et non une phrase : un lecteur doit pouvoir compter les endroits non remplis, et un
-    /// outil ordinaire doit pouvoir les énumérer sans analyser du français.
-    /// </remarks>
-    private static SequenceNode Markers(SpecPointer at, IReadOnlyList<ProjectionGap> gaps)
-    {
-        SpecPointer location = at.Child(UnfilledMarker.Member);
-        List<SpecNode> items = [];
-
-        for (int index = 0; index < gaps.Count; index++)
-        {
-            ProjectionGap gap = gaps[index];
-
-            items.Add(TreeEdits.Mapping(
-                location.Item(index),
-                [
-                    new MappingEntry(TreeEdits.Key("construction"), TreeEdits.Key(gap.Construct)),
-                    new MappingEntry(TreeEdits.Key("dans"), TreeEdits.Key(gap.Subject)),
-                    new MappingEntry(
-                        TreeEdits.Key("raison"), TreeEdits.Key(GapReasons.Say(gap.Reason))),
-                ]));
-        }
-
-        return TreeEdits.Sequence(location, items);
     }
 
     /// <summary>Les différences, retrouvables par l'identité que porte une sélection.</summary>

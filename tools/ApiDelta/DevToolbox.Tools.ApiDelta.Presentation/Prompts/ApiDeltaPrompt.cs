@@ -21,23 +21,19 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 {
     /// <summary>
-    /// Les deux choses qu'on vient faire ici, dites du point de vue de qui les demande.
+    /// Les deux choses qu'on vient faire ici.
     /// </summary>
     /// <remarks>
-    /// Deux entrées, et leurs libellés nomment le résultat attendu plutôt que le travail de l'outil :
-    /// « vous recevez un fichier de production consolidé » se décide, « comparer deux fichiers » se
-    /// traduit d'abord. Il y en avait six, découpées selon les étapes du code — comparer, corriger,
-    /// examiner, chiffrer, extraire, tout faire — et le développeur devait savoir laquelle enveloppait
-    /// laquelle pour choisir.
+    /// Un libellé par ligne, et rien de plus : le verbe, les deux fichiers, le résultat. La version
+    /// précédente expliquait dans l'entrée de menu ce que l'outil allait faire et pourquoi, ce qui
+    /// obligeait à lire deux lignes de prose pour choisir entre deux choses — et une entrée de menu
+    /// qu'il faut déchiffrer coûte plus que le temps qu'elle croit faire gagner. Ce qu'il y a à
+    /// expliquer s'explique après le choix, quand la question est posée.
     /// </remarks>
     private static readonly (RunMode Mode, string Label)[] Modes =
     [
-        (RunMode.Consolidate,
-            "Consolider ma production avec un autre fichier — je donne les deux, je reçois ma "
-            + "production avec ce que j'ai retenu dedans"),
-        (RunMode.Analyse,
-            "Analyser un fichier en vue d'un nettoyage — je donne un fichier, je reçois ce qu'il a "
-            + "accumulé et ce qu'un nettoyage lui gagnerait"),
+        (RunMode.Consolidate, "Fusionner deux fichiers en un seul"),
+        (RunMode.Analyse, "Nettoyer un fichier"),
     ];
 
     /// <summary>
@@ -93,7 +89,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         RunMode mode = AskForMode();
 
         string production = AskForPath(
-            "Votre fichier de [bold]production[/] : celui qui est en service aujourd'hui");
+            "Votre fichier de [bold]production[/]");
 
         if (string.IsNullOrWhiteSpace(production))
         {
@@ -211,22 +207,30 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         }
 
         return (
-            Beside(directory, RulesetFileName, "jeu de règles"),
-            Beside(directory, SuppressionsFileName, "fichier de mises en sourdine"));
+            Beside(
+                directory,
+                RulesetFileName,
+                "jeu de règles",
+                "règle la sévérité des constats et les limites de lecture"),
+            Beside(
+                directory,
+                SuppressionsFileName,
+                "mises en sourdine",
+                "tait nommément des constats que vous avez déjà jugés"));
     }
 
     /// <summary>
     /// Le fichier trouvé à côté de la description, une fois confirmé — ou celui qu'on désigne.
     /// </summary>
-    private string? Beside(string directory, string fileName, string what)
+    private string? Beside(string directory, string fileName, string what, string does)
     {
         string candidate = Path.Combine(directory, fileName);
 
         if (File.Exists(candidate))
         {
             _console.MarkupLine(
-                "[grey]Un " + what + " se trouve à côté du fichier de production :[/] "
-                + Markup.Escape(fileName));
+                "[grey]Trouvé à côté de votre fichier :[/] [bold]" + Markup.Escape(fileName) + "[/]"
+                + " [grey](" + what + " : " + does + ")[/]");
 
             return _console.Prompt(
                 new ConfirmationPrompt("L'employer ?") { DefaultValue = true })
@@ -234,13 +238,22 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 : null;
         }
 
+        // Dire ce que c'est, et comment le fichier s'appelle. La question posait « Employer un jeu de
+        // règles ? » sans que rien, nulle part, ne dise ce qu'un jeu de règles est ni sous quel nom
+        // l'outil le reconnaît : on ne peut répondre oui qu'en sachant déjà, et celui qui sait déjà n'a
+        // pas besoin qu'on lui demande.
+        _console.MarkupLine(
+            "[grey]" + char.ToUpperInvariant(what[0]) + what[1..] + " : " + does
+            + ". Fichier YAML, reconnu sous le nom[/] [bold]" + Markup.Escape(fileName) + "[/]"
+            + " [grey]s'il est posé à côté de votre fichier. Aucun n'est nécessaire.[/]");
+
         if (!_console.Prompt(
-                new ConfirmationPrompt("Employer un " + what + " ?") { DefaultValue = false }))
+                new ConfirmationPrompt("En employer un ?") { DefaultValue = false }))
         {
             return null;
         }
 
-        string chosen = AskForPath("Chemin du " + what);
+        string chosen = AskForPath("Chemin du fichier");
 
         return string.IsNullOrWhiteSpace(chosen) ? null : chosen.Trim();
     }
@@ -268,7 +281,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 
         if (!_console.Prompt(
                 new ConfirmationPrompt(
-                    "Appliquer à une copie ce qui est prouvé sûr, maintenant que vous savez ce que cela gagne ?")
+                    "Écrire un fichier nettoyé ? (une copie, dans l'ordre du fichier d'origine)")
                 { DefaultValue = false }))
         {
             return selection;
@@ -280,7 +293,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
             AllowedReviewRequiredRules = AskForAllowedRules(),
             InPlace = _console.Prompt(
                 new ConfirmationPrompt(
-                    "Réécrire le fichier de production lui-même, au lieu d'écrire une copie ?")
+                    "Réécrire votre fichier plutôt qu'une copie ?")
                 { DefaultValue = false }),
             Backup = _console.Prompt(
                 new ConfirmationPrompt("Créer une sauvegarde avant d'écrire ?")
@@ -293,7 +306,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     {
         if (!_console.Prompt(
                 new ConfirmationPrompt(
-                    "Autoriser aussi certaines transformations qui demandent une relecture ?")
+                    "Autoriser aussi des transformations à relire ?")
                 { DefaultValue = false }))
         {
             return [];
@@ -349,8 +362,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     /// </remarks>
     private Companion? AskForCompanion(RunMode mode) => mode is RunMode.Consolidate
         ? new Companion(AskForPath(
-            "Le fichier [bold]compagnon[/] : la description OpenAPI ou le contrat WSDL dont vous "
-            + "voulez reprendre quelque chose"))
+            "L'autre fichier [bold].yaml, .json ou .wsdl[/]"))
         : null;
 
     private RunMode AskForMode()

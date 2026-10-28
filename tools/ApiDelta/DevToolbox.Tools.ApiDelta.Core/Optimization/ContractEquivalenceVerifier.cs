@@ -83,9 +83,27 @@ public sealed class ContractEquivalenceVerifier : IContractEquivalenceVerifier
         }
 
         List<Diagnostic> resolution = [];
-        ReferenceGraphResult graph = _references.Resolve(reparsed, ruleset.References, resolution);
+        ReferenceGraphResult graph = _references.Resolve(reparsed, ruleset.References, ruleset.Limits, resolution);
 
         IReadOnlyList<string> dangling = Dangling(reparsed);
+
+        if (graph.Exhausted)
+        {
+            // Même raison qu'ailleurs : une équivalence de contrat établie sur une traversée tronquée
+            // affirmerait d'un document qu'il dit la même chose que l'original sans avoir regardé
+            // partout. L'optimisation ne s'applique donc pas, plutôt que de s'appliquer sur une preuve
+            // partielle.
+            return new VerificationResult(
+                true,
+                true,
+                false,
+                false,
+                [
+                    .. Said(resolution),
+                    "la traversée des références s'est arrêtée sur un budget : l'équivalence ne peut "
+                        + "pas être établie sur un graphe incomplet",
+                ]);
+        }
 
         if (resolution.Any(diagnostic => diagnostic.IsBlocking)
             || graph.Unresolved.Any()

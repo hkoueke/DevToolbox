@@ -17,13 +17,19 @@ using Xunit;
 namespace DevToolbox.Tests.Tools.ApiDelta.Wsdl;
 
 /// <summary>
-/// Un élément dérivé et un élément recopié sont-ils distinguables dans le document produit ?
+/// Un élément dérivé et un élément recopié sont-ils distinguables une fois la correction bâtie ?
 /// </summary>
 /// <remarks>
 /// C'est la seule promesse que cette tranche ajoute à la précédente, et c'est aussi la seule qu'elle
 /// pourrait rompre en silence. Là où une description candidate donne ses propres octets, un contrat de
 /// service ne donne qu'une traduction : un relecteur qui ne verrait pas la différence prendrait une
 /// décision de mise en production sur une description que personne n'a écrite.
+/// <para>
+/// La distinction vivait dans le document produit, sous « x-apidelta-origin ». Elle vit maintenant dans
+/// le registre que la construction rend, et que le rapport publie : le fichier écrit est destiné à
+/// devenir un contrat publié et ne porte que de l'OpenAPI. Ces essais tiennent donc la promesse là où
+/// elle est désormais tenue, et vérifient en plus que le document n'en porte plus rien.
+/// </para>
 /// </remarks>
 public sealed class DerivedMarkTests
 {
@@ -36,8 +42,6 @@ public sealed class DerivedMarkTests
         Result<BuiltCorrection> built = run.Build(selection);
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
-
-        SpecDocument corrected = run.Reread(built.Value.Serialized);
 
         built.Value.Marks.Should().NotBeEmpty();
 
@@ -54,15 +58,12 @@ public sealed class DerivedMarkTests
             mark.IsDerived.Should().BeTrue(
                 mark.Target.Display + " vient du contrat, et doit le dire");
 
-            Trace(corrected, mark.Target).Should().Contain(
-                ["from", "wsdl", "emplacement", "projection"],
-                mark.Target.Display + " doit nommer le document, l'endroit, et ce que la projection "
-                    + "valait");
+            DerivedOrigin origin = mark.Derived!;
 
-            Value(corrected, mark.Target, "wsdl").Should().BeOneOf(
+            origin.Document.Should().BeOneOf(
                 opened, "la trace doit nommer un des documents que la lecture a ouverts");
-            Value(corrected, mark.Target, "emplacement").Should().Contain("ligne");
-            Value(corrected, mark.Target, "projection").Should().BeOneOf("portée", "approchante");
+            origin.At.Should().Contain("ligne", "une trace sans endroit ne se vérifie pas");
+            origin.Worth.Should().BeOneOf("portée", "approchante");
         }
     }
 
@@ -71,7 +72,7 @@ public sealed class DerivedMarkTests
     {
         // Un élément écrit a forcément été porté, exactement ou à peu près. Annoncer « non portée » sur
         // un élément présent dirait au lecteur le contraire de ce qu'il a sous les yeux ; ce qui n'a pas
-        // été porté est une absence, et une absence se dit par un marqueur, pas par une trace.
+        // été porté est une absence, et une absence se dit comme un endroit non rempli.
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
         Result<BuiltCorrection> built = run.Build(
@@ -85,11 +86,33 @@ public sealed class DerivedMarkTests
     }
 
     [Fact]
-    public void A_mark_names_the_document_and_never_the_path_it_was_read_from()
+    public void A_trace_names_the_document_and_never_the_path_it_was_read_from()
     {
         // Un chemin absolu rendrait deux exécutions identiques distinguables, et porterait le dossier
-        // personnel du développeur dans un document destiné à être relu. C'est la règle que la
-        // déclaration du document suivait déjà, et la trace dérivée n'y échappe pas.
+        // personnel du développeur dans ce qui sera relu et validé.
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        Result<BuiltCorrection> built = run.Build(
+            new CorrectionSelection([run.Route("dossierModifie")]));
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        built.Value.Marks.Should().Contain(mark =>
+            string.Equals(mark.Derived!.Document, "catalogue.wsdl", StringComparison.Ordinal));
+
+        foreach (CorrectionMark mark in built.Value.Marks)
+        {
+            string named = mark.Derived!.Document;
+
+            named.Should().NotContain("/", "un nom de fichier, et non un chemin");
+            named.Should().NotContain("\\");
+            named.Should().NotContain("devtoolbox-wsdl-correction-");
+        }
+    }
+
+    [Fact]
+    public void The_written_document_carries_no_trace_of_the_tool()
+    {
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
         Result<BuiltCorrection> built = run.Build(
@@ -99,17 +122,17 @@ public sealed class DerivedMarkTests
 
         string text = Encoding.UTF8.GetString(built.Value.Serialized.Span);
 
-        text.Should().Contain("catalogue.wsdl");
+        text.Should().NotContain("x-apidelta");
+        text.Should().NotContain("catalogue.wsdl", "le contrat ne nomme pas le fichier dont il est tiré");
         text.Should().NotContain(Path.GetTempPath().Replace('\\', '/'));
-        text.Should().NotContain("devtoolbox-wsdl-correction-");
     }
 
     [Fact]
-    public void A_copied_element_carries_no_derived_mark()
+    public void A_copied_element_is_recorded_as_copied()
     {
-        // Le chemin de la tranche précédente, inchangé : le contenu vient des octets du candidat, et sa
-        // trace dit cela et rien de plus. Une trace qui parlerait de WSDL là où aucun WSDL n'est entré
-        // rendrait la marque inutilisable pour distinguer les deux.
+        // Le chemin de la tranche précédente, inchangé : le contenu vient des octets du candidat, et le
+        // registre dit cela et rien de plus. Un registre qui parlerait de WSDL là où aucun WSDL n'est
+        // entré rendrait la distinction inutilisable.
         SpecReader reader = new(NullLogger<SpecReader>.Instance);
         CorrectionBuilder builder = new(
             new OperationCatalog(), new SplicingEmitter(new CanonicalEmitter()));
@@ -131,30 +154,8 @@ public sealed class DerivedMarkTests
 
         built.Value.Marks.Should().OnlyContain(mark => !mark.IsDerived);
 
-        SpecReadResult reread = reader.ReadBytes(
-            built.Value.Serialized, "corrigé", DocumentRole.Production, LoadLimits.Default);
-
-        reread.Document.Should().NotBeNull();
-
-        Trace(reread.Document, built.Value.Marks[0].Target).Should().Equal("from");
-    }
-
-    private static IEnumerable<string> Trace(SpecDocument document, SpecPointer target)
-    {
-        SpecNode? trace = PointerNavigator.Find(
-            document.Root, target.Child(CorrectionMark.Member).Json);
-
-        trace.Should().BeOfType<MappingNode>(target.Display + " doit porter sa trace d'origine");
-
-        return ((MappingNode)trace).Entries.Select(entry => entry.Key.Text);
-    }
-
-    private static string Value(SpecDocument document, SpecPointer target, string field)
-    {
-        SpecNode? node = PointerNavigator.Find(
-            document.Root, target.Child(CorrectionMark.Member).Child(field).Json);
-
-        return node.Should().BeOfType<ScalarNode>().Subject.Text;
+        Encoding.UTF8.GetString(built.Value.Serialized.Span)
+            .Should().NotContain("x-apidelta");
     }
 
     private static SpecDocument Read(SpecReader reader, string fileName, DocumentRole role)

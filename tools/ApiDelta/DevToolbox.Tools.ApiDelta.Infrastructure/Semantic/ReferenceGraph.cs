@@ -46,39 +46,33 @@ public sealed class ReferenceGraph : IReferenceGraph
     public ReferenceGraphResult Resolve(
         SpecDocument document,
         ReferencePolicy policy,
+        LoadLimits limits,
         ICollection<Diagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        List<ReferenceEdge> edges = [];
-        Dictionary<ReferenceTarget, List<SourcePosition>> unresolved = [];
-        HashSet<ReferenceTarget> visited = [];
-        List<ReferenceTarget> cycles = [];
+        Crawl crawl = new(document, policy, limits, diagnostics);
 
-        Walk(
-            document.Root, document, policy, edges, unresolved, visited, cycles, diagnostics, depth: 0);
+        Walk(document.Root, crawl, depth: 0);
 
-        Report(unresolved, document, diagnostics);
+        Report(crawl.Unresolved, document, diagnostics);
 
-        return new ReferenceGraphResult(edges, cycles);
+        return new ReferenceGraphResult(crawl.Edges, crawl.Cycles, crawl.Exhausted);
     }
 
-    private static void Walk(
-        SpecNode node,
-        SpecDocument document,
-        ReferencePolicy policy,
-        List<ReferenceEdge> edges,
-        Dictionary<ReferenceTarget, List<SourcePosition>> unresolved,
-        HashSet<ReferenceTarget> visited,
-        List<ReferenceTarget> cycles,
-        ICollection<Diagnostic> diagnostics,
-        int depth)
+    private static void Walk(SpecNode node, Crawl crawl, int depth)
     {
+        if (crawl.Exhausted)
+        {
+            return;
+        }
+
         if (depth > MaxChainDepth)
         {
-            Exhausted(node, diagnostics);
+            crawl.TooDeep(node);
 
             return;
         }
@@ -86,31 +80,14 @@ public sealed class ReferenceGraph : IReferenceGraph
         switch (node)
         {
             case MappingNode mapping when mapping.Find(ReferenceField) is ScalarNode reference:
-                Follow(
-                    reference,
-                    document,
-                    policy,
-                    edges,
-                    unresolved,
-                    visited,
-                    cycles,
-                    diagnostics,
-                    depth);
+                Follow(reference, crawl, depth);
+
                 break;
 
             case MappingNode mapping:
                 foreach (MappingEntry entry in mapping.Entries)
                 {
-                    Walk(
-                        entry.Value,
-                        document,
-                        policy,
-                        edges,
-                        unresolved,
-                        visited,
-                        cycles,
-                        diagnostics,
-                        depth + 1);
+                    Walk(entry.Value, crawl, depth + 1);
                 }
 
                 break;
@@ -118,51 +95,46 @@ public sealed class ReferenceGraph : IReferenceGraph
             case SequenceNode sequence:
                 foreach (SpecNode item in sequence.Items)
                 {
-                    Walk(
-                        item,
-                        document,
-                        policy,
-                        edges,
-                        unresolved,
-                        visited,
-                        cycles,
-                        diagnostics,
-                        depth + 1);
+                    Walk(item, crawl, depth + 1);
                 }
 
                 break;
         }
     }
 
-    private static void Follow(
-        ScalarNode reference,
-        SpecDocument document,
-        ReferencePolicy policy,
-        List<ReferenceEdge> edges,
-        Dictionary<ReferenceTarget, List<SourcePosition>> unresolved,
-        HashSet<ReferenceTarget> visited,
-        List<ReferenceTarget> cycles,
-        ICollection<Diagnostic> diagnostics,
-        int depth)
+    private static void Follow(ScalarNode reference, Crawl crawl, int depth)
     {
+        // Chaque référence rencontrée est comptée, et le budget arrête le parcours quand il est
+        // atteint. Compté ici plutôt qu'après coup : un budget vérifié à la fin aurait laissé faire tout
+        // le travail qu'il existe pour borner.
+        if (!crawl.Count(reference))
+        {
+            return;
+        }
+
         ReferenceTarget target = ReferenceTarget.Parse(reference.Text);
 
         if (target.IsExternal)
         {
-            edges.Add(new ReferenceEdge(reference.Location, target, Classify(policy, target, reference, diagnostics)));
+            crawl.Edges.Add(new ReferenceEdge(
+                reference.Location,
+                target,
+                Classify(crawl.Policy, target, reference, crawl.Diagnostics)));
+
             return;
         }
 
-        SpecNode? resolved = PointerNavigator.Find(document.Root, target.Fragment);
+        SpecNode? resolved = PointerNavigator.Find(crawl.Document.Root, target.Fragment);
 
         if (resolved is null)
         {
-            edges.Add(new ReferenceEdge(reference.Location, target, ReferenceResolution.Unresolved));
+            crawl.Edges.Add(
+                new ReferenceEdge(reference.Location, target, ReferenceResolution.Unresolved));
 
-            if (!unresolved.TryGetValue(target, out List<SourcePosition>? positions))
+            if (!crawl.Unresolved.TryGetValue(target, out List<SourcePosition>? positions))
             {
                 positions = [];
-                unresolved[target] = positions;
+                crawl.Unresolved[target] = positions;
             }
 
             positions.Add(reference.Position);
@@ -170,49 +142,128 @@ public sealed class ReferenceGraph : IReferenceGraph
             return;
         }
 
-        edges.Add(new ReferenceEdge(
+        crawl.Edges.Add(new ReferenceEdge(
             reference.Location, target, ReferenceResolution.Resolved, resolved.Location));
 
-        if (!visited.Add(target))
+        if (!crawl.Visited.Add(target))
         {
             // Déjà traversée : c'est un cycle, et entre schémas c'est légal. Consigné, non signalé.
-            if (!cycles.Contains(target))
+            if (!crawl.Cycles.Contains(target))
             {
-                cycles.Add(target);
+                crawl.Cycles.Add(target);
             }
 
             return;
         }
 
-        Walk(
-            resolved,
-            document,
-            policy,
-            edges,
-            unresolved,
-            visited,
-            cycles,
-            diagnostics,
-            depth + 1);
+        Walk(resolved, crawl, depth + 1);
     }
 
     /// <summary>
-    /// Consigne l'épuisement de la profondeur, en nommant la limite et l'endroit.
+    /// Ce qu'un parcours accumule, et le budget qu'il consomme.
     /// </summary>
     /// <remarks>
-    /// Un diagnostic plutôt qu'une exception : la traversée rend ce qu'elle a trouvé jusque-là, et les
-    /// règles qui dépendent du graphe se déclareront non évaluées. C'est la discipline de l'outil — une
-    /// analyse incomplète le dit — appliquée à sa propre limite.
+    /// Réuni en un porteur parce que le parcours passait neuf paramètres, puis onze dès qu'un budget s'y
+    /// est ajouté : la liste de paramètres était devenue le véritable obstacle à l'application de la
+    /// limite, et une limite qu'il est pénible d'appliquer est une limite qui ne s'applique pas.
     /// </remarks>
-    private static void Exhausted(SpecNode node, ICollection<Diagnostic> diagnostics)
+    private sealed class Crawl(
+        SpecDocument document,
+        ReferencePolicy policy,
+        LoadLimits limits,
+        ICollection<Diagnostic> diagnostics)
     {
-        diagnostics.Add(new Diagnostic(
-            DiagnosticCodes.LimitReached,
-            DiagnosticSeverity.Warning,
-            $"Les références s'enchaînent sur plus de {MaxChainDepth} maillons : la résolution "
-            + "s'arrête ici, et ce qui se trouve au-delà n'a pas été vu.",
-            node.Location,
-            node.Position));
+        private int _seen;
+
+        internal SpecDocument Document { get; } = document;
+
+        internal ReferencePolicy Policy { get; } = policy;
+
+        internal LoadLimits Limits { get; } = limits;
+
+        internal ICollection<Diagnostic> Diagnostics { get; } = diagnostics;
+
+        internal List<ReferenceEdge> Edges { get; } = [];
+
+        internal Dictionary<ReferenceTarget, List<SourcePosition>> Unresolved { get; } = [];
+
+        internal HashSet<ReferenceTarget> Visited { get; } = [];
+
+        internal List<ReferenceTarget> Cycles { get; } = [];
+
+        /// <summary>Le budget est épuisé : le parcours s'arrête, partout où il en est.</summary>
+        internal bool Exhausted { get; private set; }
+
+        /// <summary>
+        /// Consigne l'épuisement de la profondeur, en nommant la limite et l'endroit.
+        /// </summary>
+        /// <param name="node">Le maillon où la traversée s'arrête.</param>
+        /// <remarks>
+        /// Un diagnostic plutôt qu'une exception : la traversée rend ce qu'elle a trouvé jusque-là. Mais
+        /// un diagnostic ne suffisait pas — il valait avertissement, et les lecteurs du graphe
+        /// n'écoutaient que les diagnostics bloquants. L'épuisement marque donc le parcours lui-même, et
+        /// le graphe rendu le dit, de sorte qu'aucune conclusion ne puisse se tirer d'une traversée
+        /// incomplète sans l'avoir su.
+        /// </remarks>
+        internal void TooDeep(SpecNode node)
+        {
+            if (Exhausted)
+            {
+                return;
+            }
+
+            Exhausted = true;
+
+            Diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.LimitReached,
+                DiagnosticSeverity.Warning,
+                $"Les références s'enchaînent sur plus de {MaxChainDepth} maillons : la résolution "
+                + "s'arrête ici, et ce qui se trouve au-delà n'a pas été vu.",
+                node.Location,
+                node.Position));
+        }
+
+        /// <summary>
+        /// Compte une référence et dit s'il faut la suivre.
+        /// </summary>
+        /// <param name="node">La référence rencontrée, pour situer un refus.</param>
+        /// <returns><see langword="false" /> quand le budget est épuisé.</returns>
+        /// <remarks>
+        /// Ce budget était déclaré, documenté, réglable par <c>limits.maxReferences</c>, et appliqué
+        /// nulle part : le graphe ne recevait même pas les limites. Une équipe qui écrivait
+        /// <c>maxReferences: 500</c> obtenait la preuve d'une protection qu'elle n'avait pas, et l'essai
+        /// qui prétendait le vérifier plaçait son assertion sous une condition que rien ne rendait
+        /// jamais vraie.
+        /// <para>
+        /// Un avertissement, et non une erreur, comme pour la chaîne trop longue : la traversée rend ce
+        /// qu'elle a vu, et les règles qui en dépendent se déclareront non évaluées. Dit une fois, et
+        /// non une fois par référence — vingt mille plaintes identiques enseignent la même chose au
+        /// prix de vingt mille lignes.
+        /// </para>
+        /// </remarks>
+        internal bool Count(SpecNode node)
+        {
+            if (++_seen <= Limits.MaxReferences)
+            {
+                return true;
+            }
+
+            if (!Exhausted)
+            {
+                Exhausted = true;
+
+                Diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.LimitReached,
+                    DiagnosticSeverity.Warning,
+                    $"Le budget de références est atteint : ce document en porte plus de "
+                    + $"{Limits.MaxReferences}. La résolution s'arrête ici, ce qui se trouve au-delà "
+                    + "n'a pas été vu, et la limite se règle — elle se nomme « limits.maxReferences ».",
+                    node.Location,
+                    node.Position));
+            }
+
+            return false;
+        }
     }
 
     /// <summary>

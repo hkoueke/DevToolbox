@@ -31,13 +31,24 @@ public sealed class UnresolvedReferenceRule : AuditRule
                 "Les références n'ont pas été résolues : la règle ne peut pas dire qu'elles aboutissent.");
         }
 
-        return RuleReport.Evaluated(
+        IReadOnlyList<Finding> found =
         [
             .. references.Unresolved
                 .GroupBy(edge => edge.To.ToString(), StringComparer.Ordinal)
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => Dangling(group.Key, [.. group])),
-        ]);
+        ];
+
+        // Les constats trouvés sont vrais, et sont rendus. Mais le silence de cette règle se lit
+        // « aucune référence morte », et sur une traversée arrêtée par un budget ce serait faux : ce qui
+        // n'a pas été atteint n'est ni mort ni vivant. D'où le rapport tronqué — il garde ce qui a été
+        // vu sans laisser conclure sur ce qui ne l'a pas été.
+        return references.Exhausted
+            ? RuleReport.Truncated(
+                found,
+                "La traversée des références s'est arrêtée sur un budget : les références situées "
+                + "au-delà n'ont pas été vérifiées.")
+            : RuleReport.Evaluated(found);
     }
 
     private Finding Dangling(string target, IReadOnlyList<ReferenceEdge> uses)

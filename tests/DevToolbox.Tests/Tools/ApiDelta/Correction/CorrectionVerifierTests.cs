@@ -105,20 +105,68 @@ public sealed class CorrectionVerifierTests
     }
 
     [Fact]
-    public void A_carried_element_stripped_of_its_origin_is_refused()
+    public void A_document_carrying_anything_the_selection_did_not_ask_for_is_refused()
     {
+        // Cet essai en remplace un qui vérifiait qu'un élément dépouillé de sa trace d'origine était
+        // refusé. Les traces ne sont plus écrites, et leur retrait a resserré la vérification plutôt que
+        // de l'affaiblir : la liste des emplacements autorisés à changer ne contient plus que la version
+        // et ce que la sélection a nommé. Un membre ajouté à la racine — ce que le bloc
+        // « x-apidelta-correction » était — est donc désormais refusé comme n'importe quelle dérive.
         SpecDocument production = Read("baseline-30.yaml");
         BuiltCorrection built = Build(production);
 
-        string stripped = Encoding.UTF8.GetString(built.Serialized.Span)
-            .Replace(CorrectionMark.Member + ":", "x-autre-chose:", StringComparison.Ordinal);
+        string tampered = Encoding.UTF8.GetString(built.Serialized.Span).TrimEnd('\n')
+            + "\nx-autre-chose: vrai\n";
 
         CorrectionVerification verification = _verifier.Verify(
-            Encoding.UTF8.GetBytes(stripped), production, built, Ruleset.Default);
+            Encoding.UTF8.GetBytes(tampered), production, built, Ruleset.Default);
 
-        verification.Marked.Should().BeFalse();
+        verification.UnselectedUntouched.Should().BeFalse(
+            "personne n'avait retenu ce membre : il n'a pas le droit d'être là");
+
         verification.Established.Should().BeFalse();
-        verification.Explanation.Should().Contain("d'où il vient");
+        verification.Explanation.Should().Contain("que personne n'avait retenu a changé");
+    }
+
+    [Fact]
+    public void A_truncated_reference_walk_stops_the_verification_instead_of_passing_it()
+    {
+        // Une revue a trouvé ceci : la troncature du graphe ne valait qu'un avertissement, et cette
+        // vérification n'écoute que les diagnostics bloquants. Elle concluait donc « les références se
+        // résolvent » depuis une traversée qui s'était arrêtée en route — si bien qu'une référence morte
+        // située au-delà du budget laissait publier le document.
+        SpecDocument production = Read("baseline-30.yaml");
+        BuiltCorrection built = Build(production);
+
+        Ruleset narrow = Ruleset.Default with
+        {
+            Limits = LoadLimits.Default with { MaxReferences = 1 },
+        };
+
+        CorrectionVerification verification = _verifier.Verify(
+            built.Serialized, production, built, narrow);
+
+        verification.Reparsed.Should().BeTrue("le document se relit : ce n'est pas lui qui est en cause");
+        verification.ReferencesResolved.Should().BeFalse(
+            "ce qui n'a pas été atteint n'est ni résolu ni non résolu : c'est inconnu");
+
+        verification.Established.Should().BeFalse();
+        verification.Explanation.Should().Contain("budget");
+    }
+
+    [Fact]
+    public void A_complete_reference_walk_still_passes()
+    {
+        // L'autre moitié : un refus qui se déclenche toujours ne vaut pas mieux qu'un refus qui ne se
+        // déclenche jamais.
+        SpecDocument production = Read("baseline-30.yaml");
+        BuiltCorrection built = Build(production);
+
+        CorrectionVerification verification = _verifier.Verify(
+            built.Serialized, production, built, Ruleset.Default);
+
+        verification.ReferencesResolved.Should().BeTrue(verification.Explanation);
+        verification.Established.Should().BeTrue(verification.Explanation);
     }
 
     private BuiltCorrection Build(SpecDocument production)

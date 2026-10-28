@@ -58,7 +58,7 @@ canonicalFormatting:
   lineEndings: lf           # lf | crlf | preserve
   quoteResponseCodes: true
   finalNewline: true
-  keyOrder: canonical       # canonical | preserve
+  keyOrder: preserve        # preserve (défaut) | canonical
 
 references:
   allowLocal: false

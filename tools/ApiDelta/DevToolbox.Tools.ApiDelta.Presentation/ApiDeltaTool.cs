@@ -92,7 +92,7 @@ public sealed class ApiDeltaTool : ITool
 
     /// <inheritdoc />
     public string Description =>
-        "comparer deux fichiers OpenAPI (Swagger) et dire ce qui casse pour les applis qui appellent";
+        "fusionner ou nettoyer un fichier OpenAPI (Swagger)";
 
     /// <inheritdoc />
     /// <remarks>

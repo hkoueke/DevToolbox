@@ -86,16 +86,40 @@ puis revalidé*.
 C'est pourquoi l'épreuve de bout en bout vaut d'exister en plus des épreuves d'unité : elle ne vérifie pas
 ce qu'elles vérifient déjà, elle prend les défauts qui n'existent qu'au bout.
 
+## Le fichier que l'outil écrit ne porte que de l'OpenAPI
+
+Un fichier consolidé portait trois sortes de notes de l'outil : un bloc `x-apidelta-correction` à la
+racine — fichier source, empreinte, statut, nombre d'endroits non remplis, champs dérivés — une trace
+`x-apidelta-origin` sur chaque élément dérivé, et un `x-apidelta-unfilled` partout où une projection
+n'avait rien porté.
+
+Elles sont retirées. Ce fichier n'est pas un rapport : il est destiné à **remplacer** le contrat en
+service, dans un dépôt, après relecture. Les notes y survivaient à la publication, et la plus trompeuse
+annonçait `statut: correction proposée, non publiée` dans un document sur le point de l'être.
+
+Ce qu'elles disaient se lit dans le rapport posé à côté, qui en devient le seul porteur — d'où les
+épreuves qui comparent son compte d'endroits non remplis à celui du plan, et qui vérifient que chaque
+élément dérivé s'y retrouve. **Le registre que la construction rend reste tenu** : c'est lui qui alimente
+le rapport, et c'est lui que le vérificateur consulte pour savoir quels emplacements avaient le droit de
+changer.
+
+Corollaire, qui est la raison de tenir cette règle ici : le retrait du bloc de racine a découvert que la
+vérification ne regardait que dans un sens. Elle parcourait l'arbre de la production pour établir que
+chaque valeur s'y retrouvait inchangée — donc elle voyait ce qui disparaît et ce qui change, **jamais ce
+qui apparaît**. Le seul ajout de l'outil étant son propre bloc, nommé dans la liste des emplacements
+permis, le trou ne pouvait pas se voir. Un membre ajouté à la racine d'une production consolidée passait
+la vérification sans un mot.
+
 ## Une trace d'origine ne dit jamais « non portée »
 
 Un élément *écrit* a forcément été porté, exactement ou à peu près. Ce qui n'a pas été porté n'est pas un
-élément : c'est une absence, et une absence se dit par un marqueur de non-remplissage, jamais par une
-trace d'origine. Annoncer « non portée » sur un élément présent dirait au lecteur le contraire de ce qu'il
-a sous les yeux.
+élément : c'est une absence, et une absence se dit comme un endroit non rempli, jamais comme une origine.
+Annoncer « non portée » sur un élément présent dirait au lecteur le contraire de ce qu'il a sous les yeux.
 
-Le corollaire tient la promesse entière : un champ scalaire ne peut pas porter de membre `x-`, si bien que
-sa trace figure dans la déclaration du document, qui le nomme. Sans cela, un champ dérivé d'une traduction
-serait indiscernable d'un champ recopié des octets d'un candidat.
+La règle a survécu au déplacement des traces hors du document : `DerivedOrigin.Confidence` ne vaut jamais
+`NotCarried` pour un élément inscrit au registre, et c'est là que l'épreuve la tient désormais. Sans
+cela, un élément dérivé d'une traduction serait indiscernable d'un élément recopié des octets d'un
+candidat — et c'est dans le rapport, maintenant, que cette distinction se lit.
 
 ## Ce qui sort de la projection est trié, et ce tri n'est pas cosmétique
 
@@ -119,3 +143,54 @@ Un fragment d'URI ne les distingue pas — il est retiré. `SchemaCompiler` anal
 ligne avec `XmlSchema.Read` avant de l'ajouter, ce qui donne deux instances distinctes. Au passage :
 `Add(espace, lecteur)` applique l'espace de noms donné à *tout* ce que l'appel charge, imports compris, et
 refuse alors l'import d'un autre espace de noms. Les deux chemins passent `null`.
+
+## Un budget déclaré doit mordre, et un essai doit le prouver
+
+Six budgets de ce dépôt ont été déclarés, documentés et réglables sans être appliqués : la profondeur
+d'imbrication et les valeurs d'énumération d'un XSD, le délai de récupération, le confinement vérifié par
+préfixe de chaîne, `wsdl:import` ni suivi ni refusé, et `limits.maxReferences`. Tous passaient la
+génération, et quatre passaient aussi une revue.
+
+Un budget non appliqué est pire qu'un budget absent : une équipe qui écrit `maxReferences: 500` obtient la
+preuve d'une protection qu'elle n'a pas. L'absence se voit ; la protection imaginaire se croit.
+
+Deux obligations, donc, pour tout seuil nouveau :
+
+- **Il est appliqué à l'endroit où le travail se fait**, et non vérifié après coup. Un budget contrôlé à
+  la fin a déjà laissé faire tout ce qu'il existe pour borner.
+- **Un essai le franchit et constate le refus.** L'essai doit avoir été vu rougir une fois, garde-fou
+  retiré. Sans cela il n'atteste rien : celui de `maxReferences` plaçait son assertion sous une condition
+  que rien ne rendait jamais vraie, et il est resté vert pendant toute la vie du défaut.
+
+Corollaire sur la forme des essais : **une assertion sous condition n'affirme rien** quand la condition
+peut ne jamais se produire. `if (quelque chose) { Should()… }` sans `else` est vert le jour où « quelque
+chose » cesse d'arriver — c'est-à-dire le jour où la régression survient. Si les deux cas sont légitimes,
+les deux branches affirment ; si l'un ne doit pas se produire, c'est lui qu'il faut affirmer.
+
+## Une traversée tronquée n'autorise aucune conclusion
+
+Deux budgets arrêtent la traversée des références : la chaîne de plus de quatre cents maillons, et
+`limits.maxReferences`. Chacun produisait un avertissement — non bloquant — et les quatre lecteurs du
+graphe n'écoutaient que les diagnostics bloquants. Chacun concluait donc depuis ce qu'il avait sous la
+main, sur un graphe qui, tronqué, ressemble en tout point à un graphe complet.
+
+Ce que cela donnait, du moins grave au plus :
+
+- `UnresolvedReferenceRule` ne trouvait rien au-delà du budget, et son silence se lit « aucune référence
+  morte ».
+- `CorrectionVerifier` concluait « les références se résolvent », si bien qu'une référence morte située
+  au-delà laissait publier une production consolidée.
+- `ContractEquivalenceVerifier` établissait une équivalence de contrat sans avoir regardé partout.
+- `UnusedComponentRule` tenait un composant atteignable seulement au-delà pour inaccessible, et
+  l'annonçait **retirable sans risque**. Supprimer un composant encore référencé casse le document :
+  c'est exactement la perte que cet outil existe pour empêcher.
+
+L'épuisement est donc porté par `ReferenceGraphResult`, en paramètre **exigé**, et non laissé à un
+diagnostic qu'on peut ne pas lire. Les quatre lecteurs refusent de conclure : trois se déclarent non
+établis, et la règle des références mortes rend un rapport *tronqué* — ses constats sont vrais et sont
+gardés, mais son silence ne vaut plus preuve.
+
+Le corpus de performance du dépôt porte un anneau de dix mille schémas : la troncature y était **déjà
+réelle**, et l'audit s'y déclarait complet après avoir vu quatre cents maillons sur dix mille. Un essai
+affirmait même cette complétude, et passait. C'est la forme la plus coûteuse du motif voisin — un
+garde-fou dont le signal existe, mais que personne n'écoute.

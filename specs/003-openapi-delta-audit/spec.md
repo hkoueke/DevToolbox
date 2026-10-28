@@ -131,6 +131,106 @@ vocabulaire qui était celui de la spécification plutôt que celui de la person
   son essai tiennent déjà. Aucune donnée n'est perdue ; une séance interrompue avant ce changement est
   simplement à refaire.
 
+### Session 2026-10-28 — un budget que la spécification décrivait et que le code n'appliquait pas
+
+Issue d'une revue de tous les garde-fous déclarés du dépôt, conduite avec une seule question : celui-ci
+mord-il ? Vingt seuils examinés, un seul manquant.
+
+- Q: `research.md` affirme depuis l'origine que « `MaxReferences` counts references », `configuration.md`
+  publie `maxReferences: 20000` comme réglage, et le code ne l'appliquait nulle part — `IReferenceGraph`
+  ne recevait même pas les limites. Faut-il corriger le code ou retirer le réglage ? → A: **Corriger le
+  code.** Le besoin est réel : le dépôt porte déjà un essai où une chaîne de dix mille schémas faisait
+  déborder la pile, et le nombre de références est l'autre moitié de ce budget, celle qui compte au lieu
+  de mesurer la profondeur. Retirer le réglage aurait retiré une protection annoncée à toute équipe qui
+  l'a écrite dans son jeu de règles. Le budget est désormais consommé référence par référence, dans la
+  résolution, avec un refus qui nomme la limite et le réglage qui la gouverne — un avertissement, comme
+  pour la chaîne trop longue, les règles dépendantes se déclarant non évaluées plutôt que le document
+  entier refusé.
+- Q: Le paramètre doit-il être facultatif, pour épargner les appelants ? → A: **Non, exigé.** Un budget
+  qu'un appelant peut omettre est exactement la façon dont celui-ci est resté déclaré sans être appliqué.
+  Trois appelants le passent depuis la configuration qu'ils ont lue, cinq essais depuis la valeur par
+  défaut. Le regroupement des accumulateurs du parcours en un porteur unique relève de la même décision :
+  la liste de onze paramètres était le véritable obstacle à l'application de la limite, et un garde-fou
+  qu'il est pénible d'appliquer ne s'applique pas.
+- Q: L'essai qui prétendait couvrir ce budget était vert. Que faut-il en conclure ? → A: **Qu'il
+  n'affirmait rien.** Il plaçait son assertion sous `if (!read.IsFaithful)`, et la lecture ne résolvant
+  aucune référence, la condition n'était jamais vraie. Il est remplacé par deux essais inconditionnels —
+  le budget mord quand il doit, se tait quand il ne doit pas — et le premier a été vu rougir, garde-fou
+  retiré, avant d'être retenu. La règle générale est consignée dans `CONCEPTION.md` : un budget déclaré
+  doit mordre, et une assertion sous condition n'affirme rien.
+
+### Session 2026-10-28 — ce que l'outil dit, et ce qu'il laisse dans le fichier
+
+Six reproches, relevés en se servant de l'outil sur des fichiers réels.
+
+- Q: Les libellés de menu sont verbeux et expliquent l'outil là où il faudrait nommer un résultat. → A:
+  **Un libellé par ligne.** « Fusionner deux fichiers en un seul » et « Nettoyer un fichier ». La version
+  précédente nommait bien le résultat, mais en deux lignes de prose chacune : il fallait lire quatre
+  lignes pour choisir entre deux choses. Ce qu'il y a à expliquer s'explique après le choix, quand la
+  question est posée et que le lecteur sait pourquoi il la lit.
+- Q: L'invite propose un jeu de règles et des mises en sourdine sans dire ce que c'est, ni sous quel nom
+  de fichier, ni avec quelle extension. → A: **Dire les trois.** Chaque question annonce désormais ce que
+  le fichier fait, qu'il s'agit d'un YAML, et le nom par convention sous lequel l'outil le reconnaît
+  s'il est posé à côté — plus le fait qu'aucun n'est nécessaire. On ne peut répondre « oui » à « employer
+  un jeu de règles ? » qu'en sachant déjà ce que c'est, et celui qui sait déjà n'a pas besoin qu'on le
+  lui demande.
+- Q: Le dossier de sortie absent est confirmé, puis la question revient. → A: **La confirmation crée le
+  dossier.** `PrepareAsync` confirmait sans créer ; la publication du premier artefact le trouvait
+  absent et reposait la même question. Un « oui » qui ne change rien et une question qui revient
+  apprennent la même chose à qui l'a donné — que son accord n'a pas été entendu. Deux essais le tiennent
+  désormais, dont un qui compte les fois où la question est posée, et qui a été vu rougir, correctif
+  retiré.
+- Q: L'outil annonce que des éléments « cassent les appelants existants », ce qui est faux puisque le
+  contrat consolidé est publié sous un nouveau numéro de version. → A: **Dire le fait, non la
+  conséquence.** Le constat exact est que le contrat cesse d'être compatible avec le précédent, donc que
+  le saut de version est majeur — et l'outil inscrit lui-même ce numéro. Le message le nomme, et ajoute
+  que les appelants de la version en service ne sont pas touchés. Annoncer une panne chez des tiers
+  quand on ne connaît ni leur version ni leur déploiement, c'est l'alarme que son lecteur apprend à
+  ignorer.
+- Q: Le fichier produit porte des sections `x-apidelta` inutiles. → A: **Toutes retirées, sans option.**
+  Le bloc `x-apidelta-correction` de la racine, les traces `x-apidelta-origin`, les marqueurs
+  `x-apidelta-unfilled`. Ce fichier est destiné à remplacer le contrat en service : les notes y
+  survivaient à la publication, et la plus trompeuse annonçait « statut : correction proposée, non
+  publiée » dans un document sur le point de l'être. Le rapport en devient le seul porteur, ce qui lui
+  donne une responsabilité qu'il n'avait pas — d'où les épreuves qui comparent son compte à celui du
+  plan. Le registre interne reste tenu, et le vérificateur s'en sert toujours. Conséquence imprévue
+  consignée dans `CONCEPTION.md` : le retrait a découvert que la vérification ne voyait pas ce qui
+  *apparaît* dans un document consolidé, le seul ajout de l'outil étant jusque-là nommé dans la liste des
+  emplacements permis. Elle le voit maintenant.
+- Q: Le fichier nettoyé devrait, au moins quand on le demande, conserver l'ordre du fichier d'origine. →
+  A: **L'ordre d'origine devient le défaut, partout.** `formatting.keyOrder` valait `canonical`, un tri
+  alphabétique : un document relu par une personne devenait méconnaissable, des milliers de lignes
+  d'écart pour une route ajoutée, au profit d'une reproductibilité que l'empreinte du contenu établit
+  déjà. Le tri reste disponible par jeu de règles. L'invite qui propose le fichier nettoyé le dit
+  désormais, ce qui rend au passage la fonctionnalité trouvable.
+
+### Session 2026-10-28 — une revue trouve le revers du budget qu'on venait d'appliquer
+
+Un commentaire de revue sur la demande #23, classé P2, et exact.
+
+- Q: Le budget de références, désormais appliqué, tronque le graphe en ne laissant qu'un avertissement.
+  `CorrectionVerifier` ignore les diagnostics non bloquants et conclut « les références se résolvent » ;
+  `UnusedComponentRule` tient le graphe pour complet et annonce des composants retirables. Que faire ? →
+  A: **L'épuisement devient une propriété du graphe, et aucun lecteur ne conclut dessus.**
+  `ReferenceGraphResult` porte `Exhausted`, en paramètre exigé — un drapeau facultatif est précisément ce
+  qu'on oublie, et il n'existe qu'un seul producteur. Les quatre lecteurs refusent : les deux
+  vérificateurs se déclarent non établis, la règle des composants inaccessibles se déclare non évaluée,
+  et la règle des références mortes rend un rapport tronqué — ses constats sont vrais et sont gardés,
+  mais son silence ne vaut plus preuve. Chacun des trois refus a été vu rougir, garde retiré.
+- Q: La règle des composants pourrait-elle se contenter de signaler l'incertitude plutôt que de
+  renoncer ? → A: **Non, elle renonce.** Son produit est une proposition de suppression. Un composant
+  atteignable seulement au-delà du budget paraît inaccessible, et le dire serait proposer de le
+  supprimer à tort — ce qui casse le document. C'est la seule des quatre dont une erreur détruit quelque
+  chose, et c'est pourquoi elle est la seule à ne rien rendre du tout.
+- Q: Le corpus de performance cesse de passer : l'audit s'y déclare incomplet. Faut-il relever la borne
+  de profondeur ? → A: **Non, l'essai avait tort.** Ce corpus porte un anneau de dix mille schémas qui se
+  désignent l'un l'autre, et la borne de quatre cents maillons a été trouvée en mesurant — une chaîne de
+  dix mille faisait déborder la pile. La troncature y était donc **déjà réelle avant ce changement**, et
+  l'audit s'y déclarait complet après avoir vu quatre cents maillons sur dix mille, avec un essai qui
+  affirmait cette complétude et passait. L'essai affirme maintenant l'inverse, et vérifie en plus que
+  chaque règle qui renonce dit pourquoi. Ce qui est éprouvé là est la tenue sous le nombre, et la tenue
+  n'a jamais voulu dire l'omniscience.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)

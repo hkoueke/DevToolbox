@@ -79,7 +79,24 @@ public sealed class PerformanceTests : IDisposable
             + $"{audit.Findings.Count} constats · {plan.Groups.Count} groupes");
 
         audit.Findings.Should().NotBeEmpty("une description engendrée répétitive doit donner des constats");
-        audit.IsComplete.Should().BeTrue("aucune règle ne doit renoncer sous le nombre");
+
+        // Ce corpus porte un anneau de dix mille schémas qui se désignent l'un l'autre, et la traversée
+        // des références s'arrête à quatre cents maillons — une borne trouvée en mesurant, parce qu'une
+        // chaîne de dix mille faisait déborder la pile. Le graphe est donc tronqué, et les deux règles
+        // qui en dépendent le disent au lieu de conclure.
+        //
+        // Cet essai affirmait l'inverse — « aucune règle ne doit renoncer sous le nombre » — et il
+        // passait : la troncature n'était qu'un avertissement, que personne n'écoutait. L'audit se
+        // déclarait complet sur une traversée qui avait vu quatre cents maillons sur dix mille. Ce qui
+        // est éprouvé ici est la tenue sous le nombre, et la tenue n'a jamais voulu dire l'omniscience.
+        audit.IsComplete.Should().BeFalse(
+            "la traversée est tronquée par la profondeur, et une analyse incomplète le dit");
+
+        audit.NotEvaluated.Should().NotBeEmpty("au moins une règle dépend du graphe tronqué");
+
+        audit.NotEvaluated.Should().OnlyContain(
+            outcome => outcome.Reason != null && outcome.Reason.Length > 0,
+            "une règle qui renonce doit dire pourquoi");
 
         total.Elapsed.Should().BeLessThan(
             Budget,

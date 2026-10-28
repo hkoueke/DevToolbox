@@ -127,26 +127,31 @@ public sealed class CanonicalEmissionTests : IDisposable
     }
 
     [Fact]
-    public async Task Canonical_key_order_is_stable_and_preserved_order_is_available()
+    public async Task The_default_preserves_the_source_order_and_sorting_stays_available()
     {
+        // Le défaut a changé de sens : il conservait l'ordre du document seulement si on le demandait,
+        // et il le conserve maintenant par défaut. Un fichier que cet outil écrit est destiné à
+        // remplacer un document tenu à la main : le trier rendait sa relecture illisible — des milliers
+        // de lignes d'écart pour une route ajoutée — au profit d'une reproductibilité que l'empreinte du
+        // contenu établit déjà.
         SpecDocument original = await ReadAsync("ordre.yaml", CorpusLoader.Read("baseline-30.yaml"));
 
         CanonicalEmitter emitter = new();
 
-        string canonical = System.Text.Encoding.UTF8.GetString(
+        string byDefault = System.Text.Encoding.UTF8.GetString(
             emitter.Emit(original.Root, CanonicalFormatting.Default).Span);
 
-        string preserved = System.Text.Encoding.UTF8.GetString(
+        string sorted = System.Text.Encoding.UTF8.GetString(
             emitter.Emit(
                 original.Root,
-                CanonicalFormatting.Default with { KeyOrder = KeyOrderStyle.Preserve }).Span);
+                CanonicalFormatting.Default with { KeyOrder = KeyOrderStyle.Canonical }).Span);
 
-        // L'ordre canonique trie : « components » vient avant « info », qui vient avant « openapi ».
-        canonical.IndexOf("components:", StringComparison.Ordinal)
-            .Should().BeLessThan(canonical.IndexOf("openapi:", StringComparison.Ordinal));
+        // Par défaut, l'ordre suit le document, qui commence par « openapi ».
+        byDefault.TrimStart().Should().StartWith("openapi:");
 
-        // L'ordre conservé suit le document, qui commence par « openapi ».
-        preserved.TrimStart().Should().StartWith("openapi:");
+        // Le tri reste disponible : « components » y vient avant « openapi ».
+        sorted.IndexOf("components:", StringComparison.Ordinal)
+            .Should().BeLessThan(sorted.IndexOf("openapi:", StringComparison.Ordinal));
     }
 
     public void Dispose()
