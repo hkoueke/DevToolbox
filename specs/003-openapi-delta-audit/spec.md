@@ -131,6 +131,34 @@ vocabulaire qui était celui de la spécification plutôt que celui de la person
   son essai tiennent déjà. Aucune donnée n'est perdue ; une séance interrompue avant ce changement est
   simplement à refaire.
 
+### Session 2026-10-28 — un budget que la spécification décrivait et que le code n'appliquait pas
+
+Issue d'une revue de tous les garde-fous déclarés du dépôt, conduite avec une seule question : celui-ci
+mord-il ? Vingt seuils examinés, un seul manquant.
+
+- Q: `research.md` affirme depuis l'origine que « `MaxReferences` counts references », `configuration.md`
+  publie `maxReferences: 20000` comme réglage, et le code ne l'appliquait nulle part — `IReferenceGraph`
+  ne recevait même pas les limites. Faut-il corriger le code ou retirer le réglage ? → A: **Corriger le
+  code.** Le besoin est réel : le dépôt porte déjà un essai où une chaîne de dix mille schémas faisait
+  déborder la pile, et le nombre de références est l'autre moitié de ce budget, celle qui compte au lieu
+  de mesurer la profondeur. Retirer le réglage aurait retiré une protection annoncée à toute équipe qui
+  l'a écrite dans son jeu de règles. Le budget est désormais consommé référence par référence, dans la
+  résolution, avec un refus qui nomme la limite et le réglage qui la gouverne — un avertissement, comme
+  pour la chaîne trop longue, les règles dépendantes se déclarant non évaluées plutôt que le document
+  entier refusé.
+- Q: Le paramètre doit-il être facultatif, pour épargner les appelants ? → A: **Non, exigé.** Un budget
+  qu'un appelant peut omettre est exactement la façon dont celui-ci est resté déclaré sans être appliqué.
+  Trois appelants le passent depuis la configuration qu'ils ont lue, cinq essais depuis la valeur par
+  défaut. Le regroupement des accumulateurs du parcours en un porteur unique relève de la même décision :
+  la liste de onze paramètres était le véritable obstacle à l'application de la limite, et un garde-fou
+  qu'il est pénible d'appliquer ne s'applique pas.
+- Q: L'essai qui prétendait couvrir ce budget était vert. Que faut-il en conclure ? → A: **Qu'il
+  n'affirmait rien.** Il plaçait son assertion sous `if (!read.IsFaithful)`, et la lecture ne résolvant
+  aucune référence, la condition n'était jamais vraie. Il est remplacé par deux essais inconditionnels —
+  le budget mord quand il doit, se tait quand il ne doit pas — et le premier a été vu rougir, garde-fou
+  retiré, avant d'être retenu. La règle générale est consignée dans `CONCEPTION.md` : un budget déclaré
+  doit mordre, et une assertion sous condition n'affirme rien.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)

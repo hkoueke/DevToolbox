@@ -77,7 +77,7 @@ internal static class AuditHarness
 
         List<Diagnostic> resolution = [];
         ReferenceGraphResult references = new ReferenceGraph()
-            .Resolve(document, ReferencePolicy.Closed, resolution);
+            .Resolve(document, ReferencePolicy.Closed, LoadLimits.Default, resolution);
 
         return new AuditEngine(Wired(), metamodel, fingerprinter)
             .Run(

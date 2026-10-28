@@ -119,3 +119,26 @@ Un fragment d'URI ne les distingue pas — il est retiré. `SchemaCompiler` anal
 ligne avec `XmlSchema.Read` avant de l'ajouter, ce qui donne deux instances distinctes. Au passage :
 `Add(espace, lecteur)` applique l'espace de noms donné à *tout* ce que l'appel charge, imports compris, et
 refuse alors l'import d'un autre espace de noms. Les deux chemins passent `null`.
+
+## Un budget déclaré doit mordre, et un essai doit le prouver
+
+Six budgets de ce dépôt ont été déclarés, documentés et réglables sans être appliqués : la profondeur
+d'imbrication et les valeurs d'énumération d'un XSD, le délai de récupération, le confinement vérifié par
+préfixe de chaîne, `wsdl:import` ni suivi ni refusé, et `limits.maxReferences`. Tous passaient la
+génération, et quatre passaient aussi une revue.
+
+Un budget non appliqué est pire qu'un budget absent : une équipe qui écrit `maxReferences: 500` obtient la
+preuve d'une protection qu'elle n'a pas. L'absence se voit ; la protection imaginaire se croit.
+
+Deux obligations, donc, pour tout seuil nouveau :
+
+- **Il est appliqué à l'endroit où le travail se fait**, et non vérifié après coup. Un budget contrôlé à
+  la fin a déjà laissé faire tout ce qu'il existe pour borner.
+- **Un essai le franchit et constate le refus.** L'essai doit avoir été vu rougir une fois, garde-fou
+  retiré. Sans cela il n'atteste rien : celui de `maxReferences` plaçait son assertion sous une condition
+  que rien ne rendait jamais vraie, et il est resté vert pendant toute la vie du défaut.
+
+Corollaire sur la forme des essais : **une assertion sous condition n'affirme rien** quand la condition
+peut ne jamais se produire. `if (quelque chose) { Should()… }` sans `else` est vert le jour où « quelque
+chose » cesse d'arriver — c'est-à-dire le jour où la régression survient. Si les deux cas sont légitimes,
+les deux branches affirment ; si l'un ne doit pas se produire, c'est lui qu'il faut affirmer.

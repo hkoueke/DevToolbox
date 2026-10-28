@@ -146,6 +146,27 @@ public sealed class SafeTransformationTests : IDisposable
     /// défaut. Une transformation à relire qui changerait le contrat serait un défaut même si personne ne
     /// l'autorise aujourd'hui.
     /// </remarks>
+    [Fact]
+    public async Task The_optimizer_applies_something_somewhere_over_the_mutation_corpus()
+    {
+        // Le garde-fou de l'essai voisin : celui-ci vérifie l'équivalence « si quelque chose a été
+        // appliqué », et un optimiseur qui cesserait d'appliquer quoi que ce soit le laisserait vert en
+        // n'affirmant plus rien. Il faut donc établir ailleurs que la machinerie est vivante — sans quoi
+        // la théorie entière devient une suite d'assertions qui ne s'exécutent jamais.
+        int applied = 0;
+
+        foreach (object[] row in BreakingMutationTests.Loosenings.Select(data => data.ToArray()))
+        {
+            SpecDocument mutated = await MutatedAsync(
+                (string)row[0], (string)row[1], (string)row[2]);
+
+            applied += Applied(mutated).Applied.Count;
+        }
+
+        applied.Should().BeGreaterThan(
+            0, "sans une seule transformation appliquée, l'essai d'équivalence n'affirme rien");
+    }
+
     private static OptimizationOutcome Applied(SpecDocument document) =>
         OptimizationHarness.Applier().Apply(
             OptimizationHarness.Plan(document),

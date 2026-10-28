@@ -72,7 +72,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         }
 
         List<Diagnostic> resolution = [];
-        ReferenceGraphResult graph = _references.Resolve(corrected, ruleset.References, resolution);
+        ReferenceGraphResult graph = _references.Resolve(corrected, ruleset.References, ruleset.Limits, resolution);
 
         return resolution.Any(diagnostic => diagnostic.IsBlocking) || graph.Unresolved.Any()
             ? new CorrectionVerification(true, true, false, false, false, false, Said(resolution))

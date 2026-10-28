@@ -115,7 +115,7 @@ public sealed class ValidateStep : IToolStep
         found.AddRange(verdicts);
 
         List<Diagnostic> resolution = [];
-        ReferenceGraphResult graph = _references.Resolve(document, selection.References, resolution);
+        ReferenceGraphResult graph = _references.Resolve(document, selection.References, selection.Limits, resolution);
 
         found.AddRange(resolution.Select(one => one with { Document = document.Path }));
 

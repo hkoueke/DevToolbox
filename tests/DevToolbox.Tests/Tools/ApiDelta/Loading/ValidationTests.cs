@@ -89,7 +89,7 @@ public sealed class ValidationTests : IDisposable
 
         List<Diagnostic> found = [];
         ReferenceGraphResult graph = new ReferenceGraph().Resolve(
-            document, ReferencePolicy.Closed, found);
+            document, ReferencePolicy.Closed, LoadLimits.Default, found);
 
         graph.Unresolved.Should().HaveCount(3, "la référence morte est employée à trois endroits");
 
@@ -109,7 +109,7 @@ public sealed class ValidationTests : IDisposable
 
         List<Diagnostic> found = [];
         ReferenceGraphResult graph = new ReferenceGraph().Resolve(
-            document, ReferencePolicy.Closed, found);
+            document, ReferencePolicy.Closed, LoadLimits.Default, found);
 
         graph.Cycles.Should().NotBeEmpty("un dossier qui contient un dossier est une description juste");
         found.Should().BeEmpty();
@@ -141,7 +141,7 @@ public sealed class ValidationTests : IDisposable
         SpecDocument document = await ReadAsync(path, fromCorpus: false);
 
         List<Diagnostic> found = [];
-        new ReferenceGraph().Resolve(document, ReferencePolicy.Closed, found);
+        new ReferenceGraph().Resolve(document, ReferencePolicy.Closed, LoadLimits.Default, found);
 
         found.Should().Contain(diagnostic =>
             string.Equals(diagnostic.Code, DiagnosticCodes.DisallowedReference, StringComparison.Ordinal));
@@ -174,7 +174,7 @@ public sealed class ValidationTests : IDisposable
 
         List<Diagnostic> found = [];
         ReferenceGraphResult graph = new ReferenceGraph().Resolve(
-            document, new ReferencePolicy(AllowLocal: true), found);
+            document, new ReferencePolicy(AllowLocal: true), LoadLimits.Default, found);
 
         found.Should().BeEmpty();
         graph.ExternalPreserved.Should().ContainSingle();

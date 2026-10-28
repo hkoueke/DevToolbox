@@ -83,7 +83,7 @@ public sealed class ContractEquivalenceVerifier : IContractEquivalenceVerifier
         }
 
         List<Diagnostic> resolution = [];
-        ReferenceGraphResult graph = _references.Resolve(reparsed, ruleset.References, resolution);
+        ReferenceGraphResult graph = _references.Resolve(reparsed, ruleset.References, ruleset.Limits, resolution);
 
         IReadOnlyList<string> dangling = Dangling(reparsed);
 

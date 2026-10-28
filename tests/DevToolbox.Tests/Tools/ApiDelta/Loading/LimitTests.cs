@@ -5,6 +5,7 @@ using DevToolbox.Tools.ApiDelta.Core.Audit;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Loading;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
+using DevToolbox.Tools.ApiDelta.Infrastructure.Semantic;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Files;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -75,18 +76,44 @@ public sealed class LimitTests : IDisposable
     [Fact]
     public async Task A_reference_budget_that_is_reached_is_named_rather_than_silently_truncated()
     {
-        LoadLimits limits = LoadLimits.Default with { MaxReferences = 3 };
+        // Le budget porte sur la résolution, et c'est donc la résolution qu'il faut éprouver. La version
+        // précédente de cet essai lisait le document et plaçait son assertion sous « si la lecture a
+        // échoué » : la lecture ne résolvant rien, la condition n'était jamais vraie, l'assertion ne
+        // s'exécutait jamais, et l'essai restait vert alors que « limits.maxReferences » n'était appliqué
+        // nulle part dans le dépôt.
+        SpecReadResult read = await ReadAsync("references.yaml", GeneratedDescription.Wide(20, 40));
 
-        SpecReadResult read = await ReadAsync(
-            "references.yaml", GeneratedDescription.Wide(20, 40), limits);
+        read.IsFaithful.Should().BeTrue("le document est juste : c'est son nombre de références qui est en cause");
 
-        // La lecture peut aboutir — la limite porte sur la résolution — mais si elle est atteinte, elle
-        // est dite. Ce qui est interdit est de la franchir sans rien dire.
-        if (!read.IsFaithful)
-        {
-            read.Diagnostics.Should().Contain(diagnostic =>
-                diagnostic.Code == DiagnosticCodes.LimitReached);
-        }
+        List<Diagnostic> found = [];
+
+        new ReferenceGraph().Resolve(
+            read.Document!,
+            ReferencePolicy.Closed,
+            LoadLimits.Default with { MaxReferences = 3 },
+            found);
+
+        Diagnostic refusal = found.Should().ContainSingle(diagnostic =>
+            diagnostic.Code == DiagnosticCodes.LimitReached).Which;
+
+        refusal.Message.Should().Contain("3", "la limite atteinte doit être nommée");
+        refusal.Message.Should().Contain("maxReferences", "un refus se corrige si l'on sait quoi régler");
+        refusal.Position.Should().NotBeNull("un refus sans position se cherche à la main");
+    }
+
+    [Fact]
+    public async Task A_reference_budget_that_is_not_reached_says_nothing()
+    {
+        // L'autre moitié, sans laquelle la première ne prouve rien : un garde-fou qui se déclenche
+        // toujours est aussi inutilisable qu'un garde-fou qui ne se déclenche jamais.
+        SpecReadResult read = await ReadAsync("references.yaml", GeneratedDescription.Wide(20, 40));
+
+        List<Diagnostic> found = [];
+
+        new ReferenceGraph().Resolve(
+            read.Document!, ReferencePolicy.Closed, LoadLimits.Default, found);
+
+        found.Should().NotContain(diagnostic => diagnostic.Code == DiagnosticCodes.LimitReached);
     }
 
     [Fact]
@@ -139,6 +166,43 @@ public sealed class LimitTests : IDisposable
         read.Diagnostics.Should().NotBeEmpty();
     }
 
+    [Fact]
+    public async Task An_alias_budget_that_is_reached_is_named()
+    {
+        // Ce budget mordait déjà, mais rien ne le prouvait : c'était le seul garde-fou appliqué du
+        // dépôt dont aucun essai n'établissait qu'il arrête ce qu'il prétend arrêter. Un garde-fou que
+        // personne n'éprouve est un garde-fou qu'un remaniement enlève sans que rien ne rougisse.
+        LoadLimits limits = LoadLimits.Default with { MaxAliasExpansions = 0 };
+
+        SpecReadResult read = await ReadAsync("alias.yaml", WithAnAlias, limits);
+
+        read.IsFaithful.Should().BeFalse();
+
+        Diagnostic refusal = read.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == DiagnosticCodes.LimitReached).Which;
+
+        refusal.Message.Should().Contain("alias", "le refus doit dire de quel budget il s'agit");
+        refusal.Message.Should().Contain("0", "la limite atteinte doit être nommée");
+    }
+
+    [Fact]
+    public async Task An_alias_under_the_budget_is_still_refused_for_being_an_alias()
+    {
+        // Les deux refus sont distincts et ne doivent pas se confondre : sous le budget, l'outil refuse
+        // l'alias parce qu'il ne réécrirait pas ce qu'il n'a pas lu — et non parce qu'une limite est
+        // atteinte.
+        SpecReadResult read = await ReadAsync("alias.yaml", WithAnAlias);
+
+        read.IsFaithful.Should().BeFalse();
+
+        read.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == DiagnosticCodes.ParseFailed
+            && diagnostic.Message.Contains("alias", StringComparison.Ordinal));
+
+        read.Diagnostics.Should().NotContain(diagnostic =>
+            diagnostic.Code == DiagnosticCodes.LimitReached);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
@@ -146,6 +210,25 @@ public sealed class LimitTests : IDisposable
             Directory.Delete(_root, recursive: true);
         }
     }
+
+    /// <summary>
+    /// Une description qui emploie un alias YAML, seule forme qui met le budget d'expansions en jeu.
+    /// </summary>
+    private const string WithAnAlias = """
+        openapi: 3.0.3
+        info:
+          title: Description a alias
+          version: 1.0.0
+        paths:
+          /chose:
+            get:
+              responses: &reponses
+                '200':
+                  description: Bien
+          /autre:
+            get:
+              responses: *reponses
+        """;
 
     private async Task<SpecReadResult> ReadAsync(
         string name,
