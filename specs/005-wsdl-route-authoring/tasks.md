@@ -96,33 +96,33 @@ derivation, and chooses where in production it goes. No route is written that no
 rule would produce, and verify the written document carries exactly those three routes, at the chosen
 positions, with every pre-existing path still in place.
 
-- [ ] T020 [US1] Create `Core/Authoring/ReusableHeaders.cs` — find header components production declares
+- [X] T020 [US1] Create `Core/Authoring/ReusableHeaders.cs` — find header components production declares
   and counts how many operations reference each, most-referenced first, empty when none (RA-021, RA-023)
-- [ ] T021 [P] [US1] Create `Tests/Authoring/ReusableHeadersTests.cs` — the five headers of the corpus
+- [X] T021 [P] [US1] Create `Tests/Authoring/ReusableHeadersTests.cs` — the five headers of the corpus
   found, counted and ordered; a production declaring none yields nothing (depends on T020)
-- [ ] T022 [US1] Create `Core/Steps/AuthorStep.cs` — placed after `Correspond`, runs in `Consolidate` only,
+- [X] T022 [US1] Create `Core/Steps/AuthorStep.cs` — placed after `Correspond`, runs in `Consolidate` only,
   skipped when the companion is not a contract or the developer kept nothing, writes the record to the
   context, establishes collisions before anything is written (RA-003, RA-006)
-- [ ] T023 [US1] Add the step to `Core/Steps/ApiDeltaStepNames.cs` — its label in the developer's words,
+- [X] T023 [US1] Add the step to `Core/Steps/ApiDeltaStepNames.cs` — its label in the developer's words,
   its place in `InOrder`, and its mode in `Includes` (depends on T022)
-- [ ] T024 [US1] Register the step and the prompt in `Presentation/ServiceCollectionExtensions.cs`, **and
+- [X] T024 [US1] Register the step and the prompt in `Presentation/ServiceCollectionExtensions.cs`, **and
   add it to the chain** — the omission that left two steps written, registered and unreachable for two
   releases (depends on T022)
-- [ ] T025 [US1] Create `Presentation/Prompts/RouteAuthoringPrompt.cs` — the path and verb questions, one
+- [X] T025 [US1] Create `Presentation/Prompts/RouteAuthoringPrompt.cs` — the path and verb questions, one
   method per question to stay under the 60-line ceiling, suggestion pre-filled with its worth named
   (RA-001, RA-002)
-- [ ] T026 [US1] Add the insertion-point question to `Presentation/Prompts/RouteAuthoringPrompt.cs`, offering production's paths in the
+- [X] T026 [US1] Add the insertion-point question to `Presentation/Prompts/RouteAuthoringPrompt.cs`, offering production's paths in the
   document's own order plus "à la fin" (RA-008, RA-009) (depends on T025)
 - [ ] T027 [US1] Change `Core/Correction/CorrectionBuilder.cs` to carry the authored path, verb and
   insertion point into the splice instead of the projected route's own (depends on T016, T022)
 - [ ] T028 [US1] Add the authoring record to `Core/Correction/CorrectionRequest.cs` and to
   `Core/RunSelection.cs` (depends on T009)
-- [ ] T029 [P] [US1] Create `Tests/Authoring/AuthoringRecordTests.cs` — collisions between two authored
+- [X] T029 [P] [US1] Create `Tests/Authoring/AuthoringRecordTests.cs` — collisions between two authored
   routes, and between an authored route and a production route, each naming both sides (depends on T009)
 - [ ] T030 [US1] Create `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — three operations authored onto
   unconventional paths, written there, at the chosen positions, with production's path order preserved and
   the existing verification passing (depends on T022–T028)
-- [ ] T031 [US1] Extend `Tests/Application/CompositionRootTests.cs` — the built chain still equals the
+- [X] T031 [US1] Extend `Tests/Application/CompositionRootTests.cs` — the built chain still equals the
   declared order, which is what catches a step registered but never wired (depends on T023, T024)
 
 **Checkpoint**: user story 1 is independently demonstrable. A developer can integrate a contract and get

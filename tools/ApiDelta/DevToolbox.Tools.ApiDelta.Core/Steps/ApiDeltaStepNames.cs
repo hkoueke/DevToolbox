@@ -30,6 +30,13 @@ public static class ApiDeltaStepNames
     /// <summary>L'appariement des opérations du contrat avec les routes de la production.</summary>
     public const string Correspond = "Appariement des opérations";
 
+    /// <summary>Le développeur dit ce que chaque opération retenue devient comme route.</summary>
+    /// <remarks>
+    /// Nommé par ce que le développeur y fait, et non par ce que l'outil y calcule : il y compose des
+    /// routes. La dérivation d'un itinéraire depuis un nom d'opération n'y est plus qu'une suggestion.
+    /// </remarks>
+    public const string Author = "Composition des routes";
+
     /// <summary>Valider la structure et résoudre les références.</summary>
     public const string Validate = "Vérification des fichiers";
 
@@ -54,8 +61,8 @@ public static class ApiDeltaStepNames
     /// <summary>Toutes les étapes, dans l'ordre d'exécution.</summary>
     public static IReadOnlyList<string> InOrder { get; } =
     [
-        Select, ReadTarget, ReadWsdl, ReadSource, Correspond, Validate, Compare, Version, Audit, Plan,
-        Correct, Write,
+        Select, ReadTarget, ReadWsdl, ReadSource, Correspond, Author, Validate, Compare, Version,
+        Audit, Plan, Correct, Write,
     ];
 
     /// <summary>Indique si un mode traverse une étape.</summary>
@@ -71,7 +78,7 @@ public static class ApiDeltaStepNames
             // Tout ce qui demande un fichier compagnon : sa lecture, son appariement s'il est un
             // contrat de service, la comparaison, la version à publier, et ce qui entre dans la
             // production consolidée.
-            ReadWsdl or ReadSource or Correspond or Compare or Version or Correct =>
+            ReadWsdl or ReadSource or Correspond or Author or Compare or Version or Correct =>
                 mode is RunMode.Consolidate,
 
             Audit or Plan => mode is RunMode.Analyse,

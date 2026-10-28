@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICorrespondenceProposer, SimilarityProposer>();
         services.AddSingleton<CorrespondencePicker>();
         services.AddSingleton<ICorrespondencePrompt, CorrespondenceSelectionPrompt>();
+        services.AddSingleton<IRouteAuthoringPrompt, RouteAuthoringPrompt>();
         services.AddSingleton<SelectionSummaryRenderer>();
         services.AddSingleton<DiagnosticsView>();
         services.AddSingleton<ComparisonView>();
@@ -196,6 +197,12 @@ public static class ServiceCollectionExtensions
         // sélection des routes à insérer ne le consomme pas. Les deux étapes entrent dans le fil
         // ensemble, avec la tranche qui s'en sert.
         services.AddSingleton<CorrespondStep>();
+
+        // La composition des routes entre dans le fil en même temps que son enregistrement, et c'est
+        // délibérément écrit ici : deux étapes de la tranche précédente ont été écrites, enregistrées et
+        // éprouvées une par une tout en restant hors de la chaîne pendant deux versions. Un essai de la
+        // racine de composition compare désormais la chaîne construite à l'ordre déclaré.
+        services.AddSingleton<AuthorStep>();
         services.AddSingleton<ValidateStep>();
         services.AddSingleton<CompareStep>();
         services.AddSingleton<VersionStep>();
@@ -219,6 +226,7 @@ public static class ServiceCollectionExtensions
                 provider.GetRequiredService<ReadWsdlStep>(),
                 provider.GetRequiredService<ReadSourceStep>(),
                 provider.GetRequiredService<CorrespondStep>(),
+                provider.GetRequiredService<AuthorStep>(),
                 provider.GetRequiredService<ValidateStep>(),
                 provider.GetRequiredService<CompareStep>(),
                 provider.GetRequiredService<VersionStep>(),
