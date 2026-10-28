@@ -336,6 +336,121 @@ public sealed class SpecReaderTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("baseline-30.yaml")]
+    [InlineData("baseline-30.json")]
+    public async Task A_file_carrying_a_byte_order_mark_is_still_openapi(string fileName)
+    {
+        // Le défaut tel qu'il a été rencontré : Visual Studio, le Bloc-notes et la plupart des outils
+        // Windows écrivent « EF BB BF » en tête. La première clé était lue comme « ﻿openapi », qui
+        // n'est pas « openapi », et l'outil refusait le fichier en annonçant qu'il ne déclarait pas sa
+        // version — ce qui envoyait son auteur chercher une faute dans un fichier juste. En JSON le
+        // symptôme différait : « Utf8JsonReader » refusait l'octet, donc l'analyse échouait.
+        SpecReadResult read = await ReadAsync(WithMark(fileName), fromCorpus: false);
+
+        read.IsFaithful.Should().BeTrue(
+            string.Join(" · ", read.Diagnostics.Select(one => one.Code + " " + one.Message)));
+
+        read.Diagnostics.Should().NotContain(
+            one => one.Code == DiagnosticCodes.MissingVersion || one.Code == DiagnosticCodes.ParseFailed);
+    }
+
+    [Theory]
+    [InlineData("baseline-30.yaml")]
+    [InlineData("baseline-30.json")]
+    public async Task A_file_carrying_a_byte_order_mark_rewrites_itself_byte_for_byte(string fileName)
+    {
+        // La nomenclature fait partie du fichier, et un document consolidé la conserve : la longueur est
+        // comptée, les octets ne sont pas retirés. Sans quoi l'outil ferait perdre trois octets que
+        // personne n'a demandé de perdre — et cette épreuve verrait la différence.
+        SpecReadResult read = await ReadAsync(WithMark(fileName), fromCorpus: false);
+
+        read.IsFaithful.Should().BeTrue();
+
+        ReadOnlyMemory<byte> rewritten = new VerbatimEmitter().Emit(read.Document!);
+
+        rewritten.ToArray().Should().Equal(
+            read.Document!.Source.ToArray(), "l'arbre doit couvrir le fichier, nomenclature comprise");
+
+        read.Document.Source.Span[..3].ToArray().Should().Equal(
+            [0xEF, 0xBB, 0xBF], "la nomenclature doit toujours être là");
+    }
+
+    [Theory]
+    [InlineData("baseline-30.yaml")]
+    [InlineData("baseline-30.json")]
+    public async Task Every_scalar_span_of_a_marked_file_designates_that_scalar(string fileName)
+    {
+        // L'épreuve qui tient la base des étendues. Une base oubliée décale tout de trois octets, ce
+        // qu'aucun document sans nomenclature ne révèle — et l'épissure écrirait alors à côté.
+        SpecReadResult read = await ReadAsync(WithMark(fileName), fromCorpus: false);
+
+        read.IsFaithful.Should().BeTrue();
+
+        ReadOnlySpan<byte> bytes = read.Document!.Source.Span;
+
+        foreach (ScalarNode scalar in Scalars(read.Document.Root).Take(60))
+        {
+            string designated = Encoding.UTF8.GetString(
+                bytes.Slice((int)scalar.Span.Start, (int)scalar.Span.Length));
+
+            designated.Should().Contain(
+                scalar.Text.Length > 12 ? scalar.Text[..12] : scalar.Text,
+                scalar.Location.Display + " : l'étendue doit désigner ce scalaire");
+        }
+    }
+
+    /// <summary>Écrit un fichier du corpus précédé d'une nomenclature d'octets.</summary>
+    private string WithMark(string fileName)
+    {
+        string path = Path.Combine(_root, "nomenclature-" + fileName);
+
+        File.WriteAllBytes(
+            path,
+            [.. (byte[])[0xEF, 0xBB, 0xBF], .. Encoding.UTF8.GetBytes(CorpusLoader.Read(fileName))]);
+
+        return path;
+    }
+
+    /// <summary>Les scalaires de l'arbre, dans l'ordre du document.</summary>
+    private static IEnumerable<ScalarNode> Scalars(SpecNode node)
+    {
+        switch (node)
+        {
+            case ScalarNode scalar:
+                yield return scalar;
+
+                break;
+
+            case MappingNode mapping:
+                foreach (MappingEntry entry in mapping.Entries)
+                {
+                    yield return entry.Key;
+
+                    foreach (ScalarNode nested in Scalars(entry.Value))
+                    {
+                        yield return nested;
+                    }
+                }
+
+                break;
+
+            case SequenceNode sequence:
+                foreach (SpecNode item in sequence.Items)
+                {
+                    foreach (ScalarNode nested in Scalars(item))
+                    {
+                        yield return nested;
+                    }
+                }
+
+                break;
+
+            default:
+                break;
+        }
+    }
+
     private string Write(string fileName, string content)
     {
         string path = Path.Combine(_root, fileName);
