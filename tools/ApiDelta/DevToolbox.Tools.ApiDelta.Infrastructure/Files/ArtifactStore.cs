@@ -49,11 +49,32 @@ public sealed class ArtifactStore : IArtifactStore
 
         if (!Directory.Exists(directory))
         {
-            return Task.FromResult(_prompt.ConfirmCreateDirectory(directory)
-                ? Result.Success()
-                : Result.Fail(
+            if (!_prompt.ConfirmCreateDirectory(directory))
+            {
+                return Task.FromResult(Result.Fail(
                     FailureReason.Cancelled,
                     "L'écriture dans « " + directory + " » n'a pas été confirmée."));
+            }
+
+            // Créé ici, et non laissé à la première écriture : la question promet « le créer », et une
+            // confirmation qui ne fait pas ce qu'elle annonce se repose. C'est ce qui arrivait — le
+            // dossier restait absent, puis la publication du premier artefact reposait la même
+            // question, si bien qu'un « oui » semblait n'avoir servi à rien.
+            try
+            {
+                Directory.CreateDirectory(directory);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Log.ArtifactRefused(_logger, directory, exception.Message);
+
+                return Task.FromResult(Result.Fail(
+                    FailureReason.InvalidInput,
+                    "Le dossier « " + directory + " » n'a pas pu être créé : " + exception.Message));
+            }
+
+            // Rien ne peut y être déjà présent : le dossier vient de naître.
+            return Task.FromResult(Result.Success());
         }
 
         IReadOnlyList<string> present =

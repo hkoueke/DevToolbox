@@ -72,27 +72,27 @@ public sealed class CorrectionBuilderTests
     }
 
     [Fact]
-    public void The_document_declares_itself_a_proposal_and_names_its_source()
+    public void The_written_document_carries_nothing_but_openapi()
     {
+        // L'inverse de ce que cet essai vérifiait : le document se déclarait « correction proposée, non
+        // publiée » dans un bloc x-apidelta-correction, et portait une trace x-apidelta-origin sur chaque
+        // élément dérivé. Un fichier destiné à devenir un contrat publié ne porte que de l'OpenAPI ; ce
+        // que ces blocs disaient se lit dans le rapport écrit à côté.
         Result<BuiltCorrection> built = _builder.Build(
             Request(new CorrectionSelection([new("/dossiers/{id}", HttpOperationMethod.Get)])));
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
-
-        SpecDocument corrected = Reread(built.Value.Serialized);
-        SpecNode? declaration = PointerNavigator.Find(
-            corrected.Root, "/" + CorrectionBuilder.Declaration);
-
-        declaration.Should().NotBeNull("une correction proposée doit se déclarer comme telle");
 
         string text = Encoding.UTF8.GetString(built.Value.Serialized.Span);
 
-        text.Should().Contain("correction proposée, non publiée");
-        text.Should().Contain("candidate-additive.yaml");
+        text.Should().NotContain("x-apidelta", "aucune section de l'outil ne doit rester dans le document");
+        text.Should().NotContain("correction proposée, non publiée");
+        text.Should().NotContain(
+            "candidate-additive.yaml", "le nom du fichier source n'a rien à faire dans le contrat");
     }
 
     [Fact]
-    public void A_carried_route_says_where_it_came_from()
+    public void A_carried_route_is_recorded_in_the_ledger_rather_than_in_the_document()
     {
         Result<BuiltCorrection> built = _builder.Build(
             Request(new CorrectionSelection([new("/dossiers/{id}", HttpOperationMethod.Get)])));
@@ -101,11 +101,11 @@ public sealed class CorrectionBuilderTests
 
         SpecDocument corrected = Reread(built.Value.Serialized);
 
-        PointerNavigator.Find(
-                corrected.Root,
-                "/paths/~1dossiers~1{id}/get/" + CorrectionMark.Member)
-            .Should().NotBeNull("un élément dérivé et un élément de la production ne doivent pas se confondre");
+        PointerNavigator.Find(corrected.Root, "/paths/~1dossiers~1{id}/get")
+            .Should().NotBeNull("la route retenue doit bien être portée");
 
+        // Le registre reste tenu : c'est lui qui alimente le rapport, et le vérificateur s'en sert pour
+        // savoir quels emplacements avaient le droit de changer.
         built.Value.Marks.Should().NotBeEmpty();
     }
 

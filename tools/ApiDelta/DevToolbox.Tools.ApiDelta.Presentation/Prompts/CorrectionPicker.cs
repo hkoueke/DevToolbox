@@ -108,18 +108,38 @@ public sealed class CorrectionPicker
                 Markup.Escape(declined.Why));
         }
 
-        if (plan.CarriesBreaking)
-        {
-            _console.MarkupLine(
-                "[red]Au moins un de ces changements casse les appelants existants.[/] Vous pouvez le "
-                + "vouloir ; l'outil ne le laissera pas passer sans l'avoir dit.");
-        }
+        Incompatibility(plan);
 
         _console.MarkupLine(
             "Votre fichier de production ne sera [bold]pas[/] modifié : un fichier consolidé distinct "
             + "sera écrit à côté des rapports.");
 
         return _console.Confirm("Écrire la production consolidée de ces éléments ?", defaultValue: false);
+    }
+
+    /// <summary>Dit qu'au moins un changement rompt la compatibilité, et ce que la version en fait.</summary>
+    /// <remarks>
+    /// Dire le fait, non la conséquence. « Casse les appelants existants » était faux dès lors que le
+    /// contrat consolidé est publié sous un nouveau numéro de version : les appelants de la version en
+    /// service continuent de l'appeler, inchangée. Ce que l'outil sait — et c'est tout ce qu'il sait —
+    /// c'est que le contrat cesse d'être compatible avec le précédent, donc que le saut de version est
+    /// majeur. Annoncer une panne chez des tiers quand on ne connaît ni leur version ni leur déploiement,
+    /// c'est exactement l'alarme que son lecteur apprend à ignorer.
+    /// </remarks>
+    private void Incompatibility(CorrectionPlan plan)
+    {
+        if (!plan.CarriesBreaking)
+        {
+            return;
+        }
+
+        _console.MarkupLine(plan.Version?.Effective is { } next
+            ? "[yellow]Au moins un de ces changements rend le contrat incompatible avec le précédent.[/] "
+                + "C'est pourquoi la version passe à [bold]" + Markup.Escape(next.ToString())
+                + "[/] : un client écrit pour l'ancien contrat doit être adapté avant d'appeler celui-ci, "
+                + "et celui qui appelle la version en service n'est pas touché."
+            : "[yellow]Au moins un de ces changements rend le contrat incompatible avec le précédent.[/] "
+                + "Un client écrit pour l'ancien contrat doit être adapté avant d'appeler celui-ci.");
     }
 
     /// <summary>
@@ -148,9 +168,8 @@ public sealed class CorrectionPicker
         _console.MarkupLine(
             CultureInfo.InvariantCulture,
             "[yellow]{0} endroit(s) resteront non remplis[/] : la projection n'y a rien porté, et "
-            + "l'outil refuse de les deviner. Chacun portera « {1} » disant ce qui manque.",
-            plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture),
-            Markup.Escape(UnfilledMarker.Member));
+            + "l'outil refuse de les deviner. Le rapport les nomme un par un.",
+            plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture));
     }
 
     /// <summary>Dit ce que la comparaison a trouvé, et ce qui n'apporte rien.</summary>
@@ -239,16 +258,16 @@ public sealed class CorrectionPicker
 
     private static string Effect(ChangeImpact impact) => impact switch
     {
-        ChangeImpact.Breaking => "[red]casse les appelants[/]",
-        ChangeImpact.NonBreaking => "[green]sans effet sur les appelants[/]",
+        ChangeImpact.Breaking => "[yellow]incompatible avec l'ancien contrat[/]",
+        ChangeImpact.NonBreaking => "[green]compatible[/]",
         ChangeImpact.DocumentationOnly => "[grey]documentation[/]",
         _ => "[yellow]indéterminé[/]",
     };
 
     private static string Plain(ChangeImpact impact) => impact switch
     {
-        ChangeImpact.Breaking => "cassant",
-        ChangeImpact.NonBreaking => "non cassant",
+        ChangeImpact.Breaking => "incompatible",
+        ChangeImpact.NonBreaking => "compatible",
         ChangeImpact.DocumentationOnly => "documentaire",
         _ => "indéterminé",
     };

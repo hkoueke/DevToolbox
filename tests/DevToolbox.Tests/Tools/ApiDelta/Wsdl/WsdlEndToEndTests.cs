@@ -1,6 +1,7 @@
 using System.Text;
 using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core;
+using DevToolbox.Tools.ApiDelta.Core.Reporting;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Operations;
@@ -71,7 +72,6 @@ public sealed class WsdlEndToEndTests
         verification.ReferencesResolved.Should().BeTrue(string.Join(" · ", verification.Complaints));
         verification.UnselectedUntouched.Should().BeTrue(string.Join(" · ", verification.Complaints));
         verification.SelectedAsChosen.Should().BeTrue(string.Join(" · ", verification.Complaints));
-        verification.Marked.Should().BeTrue(string.Join(" · ", verification.Complaints));
 
         verification.Established.Should().BeTrue(verification.Explanation);
     }
@@ -103,7 +103,7 @@ public sealed class WsdlEndToEndTests
     }
 
     [Fact]
-    public void Every_derived_element_is_marked_and_nothing_copied_is()
+    public void Every_derived_element_is_recorded_and_the_report_says_where_it_came_from()
     {
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
@@ -113,43 +113,37 @@ public sealed class WsdlEndToEndTests
 
         SpecDocument corrected = run.Reread(built.Value.Serialized);
 
-        string declaration = Encoding.UTF8.GetString(built.Value.Serialized.Span);
+        // Les traces vivaient dans le document, sous « x-apidelta-origin ». Elles vivent maintenant dans
+        // le registre, que le rapport publie : l'origine d'un élément dérivé reste établie, et le contrat
+        // écrit ne porte que de l'OpenAPI.
+        string report = Encoding.UTF8.GetString(
+            MarkdownReportWriter.Write(Reported(run, built.Value)).Span);
+
+        built.Value.Marks.Should().NotBeEmpty();
 
         foreach (CorrectionMark mark in built.Value.Marks)
         {
             mark.IsDerived.Should().BeTrue(mark.Target.Display + " vient du contrat");
 
-            if (PointerNavigator.Find(corrected.Root, mark.Target.Json) is MappingNode)
-            {
-                PointerNavigator.Find(
-                    corrected.Root, mark.Target.Child(CorrectionMark.Member).Child("wsdl").Json)
-                    .Should().NotBeNull(
-                        mark.Target.Display + " est un objet : il porte sa trace lui-même");
+            PointerNavigator.Find(corrected.Root, mark.Target.Json)
+                .Should().NotBeNull(mark.Target.Display + " doit avoir été porté");
 
-                continue;
-            }
-
-            // Un champ scalaire ne peut pas porter un membre d'extension : OpenAPI ne les autorise que
-            // sur des objets. Sa trace figure dans la déclaration du document, qui le nomme.
-            declaration.Should().Contain(
-                "champ: " + mark.Target.Json,
-                mark.Target.Display + " est un champ : la déclaration doit le nommer");
+            report.Should().Contain(
+                mark.Target.Display, mark.Target.Display + " doit se retrouver dans le rapport");
         }
 
-        // Les routes que la production portait et que personne n'a retenues : recopiées à l'octet, et
-        // donc sans aucune trace. Une trace y figurant signifierait que l'outil a touché ce qu'il
-        // promettait de ne pas toucher.
+        // Les routes que la production portait et que personne n'a retenues sont recopiées à l'octet.
         foreach (string untouched in new[] { "/paths/~1dossiers/get", "/paths/~1documents~1{id}/get" })
         {
             PointerNavigator.Find(corrected.Root, untouched).Should().NotBeNull();
-
-            PointerNavigator.Find(corrected.Root, untouched + "/" + CorrectionMark.Member)
-                .Should().BeNull(untouched + " a été recopiée, et ne porte donc aucune trace");
         }
+
+        Encoding.UTF8.GetString(built.Value.Serialized.Span)
+            .Should().NotContain("x-apidelta", "le contrat écrit ne porte aucune note de l'outil");
     }
 
     [Fact]
-    public void Every_place_the_projection_could_not_carry_holds_a_marker_and_the_count_is_declared()
+    public void Every_place_the_projection_could_not_carry_is_named_in_the_report()
     {
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
@@ -159,24 +153,22 @@ public sealed class WsdlEndToEndTests
 
         built.Value.Plan.Unfilled.Should().NotBeEmpty();
 
-        SpecDocument corrected = run.Reread(built.Value.Serialized);
+        // Le document n'en porte plus la trace : c'est le rapport qui doit tout dire, et chaque endroit
+        // doit s'y retrouver par son emplacement — sans quoi le retrait des marqueurs aurait perdu de
+        // l'information au lieu de la déplacer.
+        string report = Encoding.UTF8.GetString(
+            MarkdownReportWriter.Write(Reported(run, built.Value)).Span);
 
         foreach (IGrouping<SpecPointer, UnfilledMarker> at in built.Value.Plan.Unfilled.GroupBy(
             marker => marker.Target))
         {
-            PointerNavigator.Find(
-                corrected.Root, at.Key.Child(UnfilledMarker.Member).Json)
-                .Should().BeOfType<SequenceNode>()
-                .Which.Items.Should().HaveCount(at.Count(), at.Key.Display + " doit tout dire");
+            report.Should().Contain(
+                at.Key.Display, at.Key.Display + " doit se retrouver dans le rapport");
         }
 
-        PointerNavigator.Find(
-            corrected.Root,
-            "/" + CorrectionBuilder.Declaration + "/" + UnfilledMarker.Count)
-            .Should().BeOfType<ScalarNode>()
-            .Which.Text.Should().Be(
-                built.Value.Plan.Unfilled.Count.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture));
+        string text = Encoding.UTF8.GetString(built.Value.Serialized.Span);
+
+        text.Should().NotContain("x-apidelta", "le contrat écrit ne porte aucune note de l'outil");
     }
 
     [Fact]
@@ -253,4 +245,18 @@ public sealed class WsdlEndToEndTests
             [run.Route("dossierModifie"), run.Route("archiverDocument")],
             [new DifferenceSelector(covered, difference.ChangeId, difference.Location.Json)]);
     }
+
+    /// <summary>L'exécution telle que les rapports la lisent, réduite à ce que ces essais regardent.</summary>
+    private static ApiDeltaRun Reported(WsdlCorrectionRun run, BuiltCorrection built) => new(
+        Guid.Empty,
+        new RunSelection(RunMode.Consolidate, "production.yaml", "sans objet", "artefacts"),
+        DateTimeOffset.UnixEpoch,
+        TimeSpan.Zero,
+        run.Production,
+        run.Candidate,
+        [],
+        run.Differences,
+        [],
+        Correction: new CorrectionOutcome(built.Plan, CorrectionVerification.NotRun, Written: true),
+        Footing: run.Footing);
 }

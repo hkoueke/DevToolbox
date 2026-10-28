@@ -105,20 +105,27 @@ public sealed class CorrectionVerifierTests
     }
 
     [Fact]
-    public void A_carried_element_stripped_of_its_origin_is_refused()
+    public void A_document_carrying_anything_the_selection_did_not_ask_for_is_refused()
     {
+        // Cet essai en remplace un qui vérifiait qu'un élément dépouillé de sa trace d'origine était
+        // refusé. Les traces ne sont plus écrites, et leur retrait a resserré la vérification plutôt que
+        // de l'affaiblir : la liste des emplacements autorisés à changer ne contient plus que la version
+        // et ce que la sélection a nommé. Un membre ajouté à la racine — ce que le bloc
+        // « x-apidelta-correction » était — est donc désormais refusé comme n'importe quelle dérive.
         SpecDocument production = Read("baseline-30.yaml");
         BuiltCorrection built = Build(production);
 
-        string stripped = Encoding.UTF8.GetString(built.Serialized.Span)
-            .Replace(CorrectionMark.Member + ":", "x-autre-chose:", StringComparison.Ordinal);
+        string tampered = Encoding.UTF8.GetString(built.Serialized.Span).TrimEnd('\n')
+            + "\nx-autre-chose: vrai\n";
 
         CorrectionVerification verification = _verifier.Verify(
-            Encoding.UTF8.GetBytes(stripped), production, built, Ruleset.Default);
+            Encoding.UTF8.GetBytes(tampered), production, built, Ruleset.Default);
 
-        verification.Marked.Should().BeFalse();
+        verification.UnselectedUntouched.Should().BeFalse(
+            "personne n'avait retenu ce membre : il n'a pas le droit d'être là");
+
         verification.Established.Should().BeFalse();
-        verification.Explanation.Should().Contain("d'où il vient");
+        verification.Explanation.Should().Contain("que personne n'avait retenu a changé");
     }
 
     private BuiltCorrection Build(SpecDocument production)

@@ -34,9 +34,6 @@ public sealed record CorrectionMark(
     IReadOnlyDictionary<string, string>? Replaced = null,
     DerivedOrigin? Derived = null)
 {
-    /// <summary>Le nom du membre d'extension qui porte la trace.</summary>
-    public const string Member = "x-apidelta-origin";
-
     /// <summary>Les champs concernés, jamais nuls.</summary>
     public IReadOnlyList<string> Fields { get; init; } = Fields ?? [];
 

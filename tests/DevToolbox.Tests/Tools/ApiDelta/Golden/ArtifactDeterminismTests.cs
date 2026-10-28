@@ -150,8 +150,9 @@ public sealed class ArtifactDeterminismTests : IDisposable
         string corrected = await File.ReadAllTextAsync(path);
         string production = await File.ReadAllTextAsync(harness.ProductionPath);
 
-        corrected.Should().Contain(
-            "x-apidelta-correction", "une correction proposée doit se déclarer comme telle");
+        corrected.Should().NotContain(
+            "x-apidelta",
+            "le fichier consolidé est destiné à devenir un contrat publié : il ne porte que de l'OpenAPI");
 
         // Tout ce que la production disait s'y retrouve : la sélection n'a rien emporté d'autre.
         foreach (string line in production.Split('\n').Where(line => line.Trim().Length > 0))

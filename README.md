@@ -57,11 +57,11 @@ Trois choses à savoir avant de s'en servir :
   fondé, et attend. Renoncer est une réponse — la séance réussit, n'ayant rien comparé. L'appariement
   validé est mémorisé : une séance reprise ne vous le redemande pas.
 - **Ce que la traduction ne porte pas est recensé, jamais deviné.** Un attribut XSD, un contenu mixte, un
-  groupe de substitution n'ont pas de contrepartie en OpenAPI. Le document engendré porte à ces
-  endroits-là un marqueur `x-apidelta-unfilled` qui dit quoi et pourquoi, en déclare le nombre à son
-  propre niveau, et chaque élément dérivé nomme le document du contrat, la ligne et ce que la projection
-  valait. Un schéma plausible serait la seule sortie dont vous ne pourriez pas récupérer le fait que
-  personne ne sait.
+  groupe de substitution n'ont pas de contrepartie en OpenAPI. Le rapport nomme chacun de ces endroits —
+  quoi, où, pourquoi — en donne le nombre, et dit de quel document du contrat, de quelle ligne et avec
+  quelle fidélité chaque élément dérivé provient. Le fichier produit, lui, ne porte que de l'OpenAPI : il
+  est destiné à remplacer votre contrat, pas à garder les notes de l'outil. Un schéma plausible serait la
+  seule sortie dont vous ne pourriez pas récupérer le fait que personne ne sait.
 - **Le rapport chiffre ce qui était comparable.** Couverture du contrat par la production, part portée
   exactement, et ce qui n'a pas de contrepartie groupé par motif. « La projection s'est bien passée » ne
   veut rien dire ; « 62 % des constructions portées » se recoupe et se discute.

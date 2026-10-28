@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core;
@@ -10,20 +11,26 @@ using Xunit;
 namespace DevToolbox.Tests.Tools.ApiDelta.Wsdl;
 
 /// <summary>
-/// Là où la projection n'a rien porté, le document le dit-il — ou bien l'invente-t-il ?
+/// Là où la projection n'a rien porté, est-ce dit — ou bien inventé ?
 /// </summary>
 /// <remarks>
 /// Un schéma plausible est la seule sortie dont un lecteur ne peut pas récupérer le fait que personne ne
 /// sait. Un attribut XSD n'a aucune contrepartie en JSON Schema : le produire comme une propriété
 /// ordinaire serait affirmer que la production doit porter un champ que le contrat n'a jamais décrit, et
-/// rien dans le document ne permettrait de s'en apercevoir.
+/// rien ne permettrait de s'en apercevoir.
+/// <para>
+/// Ce qui n'a pas été porté se disait dans le document, par des membres <c>x-apidelta-unfilled</c>, et se
+/// dit maintenant dans le rapport seul. Le document écrit est destiné à devenir un contrat publié : il ne
+/// porte que de l'OpenAPI. La garantie de fond est inchangée et c'est elle que ces essais tiennent —
+/// aucun champ n'est inventé, et chaque endroit non rempli est nommé quelque part.
+/// </para>
 /// </remarks>
 public sealed class UnfilledMarkerTests
 {
     private const string Response = "DocumentDetaille";
 
     [Fact]
-    public void A_response_type_using_an_attribute_yields_a_marker_and_never_a_plausible_schema()
+    public void A_response_type_using_an_attribute_yields_a_gap_and_never_a_plausible_schema()
     {
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
@@ -52,17 +59,13 @@ public sealed class UnfilledMarkerTests
                     "« " + attribute + " » est un attribut XSD, et non une propriété : l'inventer "
                         + "ferait croire que le contrat décrit un champ dont il ne parle pas");
         }
-
-        PointerNavigator.Find(corrected.Root, schema + "/" + UnfilledMarker.Member)
-            .Should().BeOfType<SequenceNode>(
-                "le schéma doit dire ce que la projection n'a pas porté de lui");
     }
 
     [Fact]
-    public void An_operation_says_on_itself_what_its_payload_could_not_carry()
+    public void The_report_says_what_the_payload_could_not_carry_and_where()
     {
-        // Un marqueur posé seulement sur le composant laisserait croire, à qui lit l'opération, que sa
-        // réponse est complète. C'est l'opération que le développeur lit pour décider.
+        // Ce que le marqueur posé sur l'opération disait. Le lire dans le rapport plutôt que dans le
+        // document ne change pas ce qui doit être dit : quoi, où, et pourquoi.
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
         Result<BuiltCorrection> built = run.Build(
@@ -70,25 +73,40 @@ public sealed class UnfilledMarkerTests
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
 
-        SpecDocument corrected = run.Reread(built.Value.Serialized);
-        SpecNode? posted = PointerNavigator.Find(
-            corrected.Root, "/paths/~1documents/get/" + UnfilledMarker.Member);
+        string report = Encoding.UTF8.GetString(
+            MarkdownReportWriter.Write(Run(run, built.Value)).Span);
 
-        SequenceNode markers = posted.Should().BeOfType<SequenceNode>().Subject;
-
-        markers.Items.Should().NotBeEmpty();
-
-        foreach (SpecNode item in markers.Items)
+        foreach (UnfilledMarker marker in built.Value.Plan.Unfilled)
         {
-            IEnumerable<string> keys = item.Should().BeOfType<MappingNode>().Subject
-                .Entries.Select(entry => entry.Key.Text);
-
-            keys.Should().Contain(["construction", "dans", "raison"], "un marqueur dit quoi, où et pourquoi");
+            report.Should().Contain(
+                marker.Construct, "le rapport doit nommer la construction qui n'a pas été portée");
         }
+
+        report.Should().Contain(
+            "/documents", "un endroit non rempli sans son emplacement ne se retrouve pas");
     }
 
     [Fact]
-    public void The_count_the_document_declares_is_the_count_it_carries_and_the_count_the_report_states()
+    public void The_written_document_carries_no_marker_of_the_tool_at_all()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+
+        CorrectionSelection selection = new([run.Route("lireDocument"), run.Route("dossierModifie")]);
+        Result<BuiltCorrection> built = run.Build(selection);
+
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+
+        built.Value.Plan.Unfilled.Should().NotBeEmpty("ces deux routes ont des endroits non remplis");
+
+        string text = Encoding.UTF8.GetString(built.Value.Serialized.Span);
+
+        text.Should().NotContain(
+            "x-apidelta",
+            "un contrat publié ne porte pas les notes de l'outil qui l'a aidé à naître");
+    }
+
+    [Fact]
+    public void The_count_the_report_states_is_the_count_the_plan_carries()
     {
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
@@ -101,26 +119,18 @@ public sealed class UnfilledMarkerTests
 
         announced.Should().BeGreaterThan(0);
 
-        SpecDocument corrected = run.Reread(built.Value.Serialized);
-
-        Declared(corrected).Should().Be(
-            announced, "un document inachevé doit être reconnaissable comme inachevé depuis lui seul");
-
-        Posted(corrected.Root).Should().Be(
-            announced, "le nombre déclaré doit se recouper avec les marqueurs posés");
-
         string report = Encoding.UTF8.GetString(
             MarkdownReportWriter.Write(Run(run, built.Value)).Span);
 
         report.Should().Contain(
-            "Endroits non remplis : " + announced.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "le rapport et le document doivent dire le même nombre");
+            "Endroits non remplis : " + announced.ToString(CultureInfo.InvariantCulture),
+            "le rapport est désormais le seul endroit qui porte ce nombre : il doit être juste");
     }
 
     [Fact]
-    public void The_verification_expects_the_markers_instead_of_reading_them_as_a_missing_change()
+    public void The_verification_does_not_read_an_unfilled_place_as_a_missing_change()
     {
-        // L'endroit qu'un marqueur occupe est précisément celui où la projection n'avait rien à porter :
+        // L'endroit qu'un trou occupe est précisément celui où la projection n'avait rien à porter :
         // exiger qu'il ait changé reviendrait à exiger le schéma que l'outil a refusé de deviner.
         using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
 
@@ -131,53 +141,7 @@ public sealed class UnfilledMarkerTests
 
         CorrectionVerification verification = run.Verify(built.Value);
 
-        verification.Marked.Should().BeTrue(string.Join(" · ", verification.Complaints));
         verification.Established.Should().BeTrue(verification.Explanation);
-    }
-
-    private static int Declared(SpecDocument corrected)
-    {
-        SpecNode? node = PointerNavigator.Find(
-            corrected.Root,
-            "/" + CorrectionBuilder.Declaration + "/" + UnfilledMarker.Count);
-
-        return int.Parse(
-            node.Should().BeOfType<ScalarNode>().Subject.Text,
-            System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    /// <summary>Les marqueurs réellement posés dans le document, où qu'ils soient.</summary>
-    private static int Posted(SpecNode node)
-    {
-        int posted = 0;
-
-        switch (node)
-        {
-            case MappingNode mapping:
-                foreach (MappingEntry entry in mapping.Entries)
-                {
-                    posted += string.Equals(
-                        entry.Key.Text, UnfilledMarker.Member, StringComparison.Ordinal)
-                        && entry.Value is SequenceNode sequence
-                            ? sequence.Items.Count
-                            : Posted(entry.Value);
-                }
-
-                break;
-
-            case SequenceNode items:
-                foreach (SpecNode item in items.Items)
-                {
-                    posted += Posted(item);
-                }
-
-                break;
-
-            default:
-                break;
-        }
-
-        return posted;
     }
 
     /// <summary>L'exécution telle que les rapports la lisent, réduite à ce que cet essai regarde.</summary>

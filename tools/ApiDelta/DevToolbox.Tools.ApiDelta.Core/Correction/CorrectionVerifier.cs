@@ -60,7 +60,7 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         if (read.Document is not { } corrected)
         {
             return new CorrectionVerification(
-                false, false, false, false, false, false, Said(read.Diagnostics));
+                false, false, false, false, false, Said(read.Diagnostics));
         }
 
         IReadOnlyList<Diagnostic> verdicts = _validator.Validate(corrected);
@@ -68,14 +68,14 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         if (verdicts.Any(diagnostic => diagnostic.IsBlocking))
         {
             return new CorrectionVerification(
-                true, false, false, false, false, false, Said(verdicts));
+                true, false, false, false, false, Said(verdicts));
         }
 
         List<Diagnostic> resolution = [];
         ReferenceGraphResult graph = _references.Resolve(corrected, ruleset.References, ruleset.Limits, resolution);
 
         return resolution.Any(diagnostic => diagnostic.IsBlocking) || graph.Unresolved.Any()
-            ? new CorrectionVerification(true, true, false, false, false, false, Said(resolution))
+            ? new CorrectionVerification(true, true, false, false, false, Said(resolution))
             : Compare(corrected, production, built);
     }
 
@@ -89,36 +89,35 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
 
         List<string> drifted = Drifted(corrected, production, expected);
 
+        drifted.AddRange(Appeared(corrected, production, expected));
+
         if (drifted.Count > 0)
         {
-            return new CorrectionVerification(true, true, true, false, false, false, drifted);
+            return new CorrectionVerification(true, true, true, false, false, drifted);
         }
 
         List<string> missing = Missing(corrected, production, built);
 
         if (missing.Count > 0)
         {
-            return new CorrectionVerification(true, true, true, true, false, false, missing);
+            return new CorrectionVerification(true, true, true, true, false, missing);
         }
 
-        List<string> unmarked = Unmarked(corrected, built);
-
-        return new CorrectionVerification(
-            true, true, true, true, true, unmarked.Count == 0, unmarked);
+        return new CorrectionVerification(true, true, true, true, true, []);
     }
 
     /// <summary>Les emplacements que la sélection autorisait à changer.</summary>
     /// <remarks>
-    /// La version et la déclaration du document en font partie sans avoir été retenues : la première est
-    /// exigée par la recommandation, la seconde est ce qui empêche de prendre une proposition pour un
-    /// contrat. Les nommer ici est ce qui permet au reste d'être tenu pour intouchable.
+    /// La version en fait partie sans avoir été retenue : elle est exigée par la recommandation. La
+    /// nommer ici est ce qui permet au reste d'être tenu pour intouchable — et la liste s'est
+    /// raccourcie, puisque le document ne porte plus de bloc de déclaration : hors la version et ce que
+    /// la sélection a nommé, plus rien n'a le droit de changer.
     /// </remarks>
     private static HashSet<string> Expected(BuiltCorrection built)
     {
         HashSet<string> expected = new(StringComparer.Ordinal)
         {
             VersionPointer,
-            "/" + CorrectionBuilder.Declaration,
         };
 
         foreach (CorrectionMark mark in built.Marks)
@@ -171,6 +170,40 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         return drifted;
     }
 
+
+    /// <summary>Ce que la production consolidée porte en plus, sans que personne l'ait retenu.</summary>
+    /// <remarks>
+    /// L'autre sens de l'épreuve, et il manquait. <see cref="Drifted" /> parcourt l'arbre de la
+    /// production et vérifie que chaque valeur s'y retrouve inchangée : il voit donc ce qui disparaît et
+    /// ce qui change, jamais ce qui <em>apparaît</em>. Tant que la seule addition de l'outil était son
+    /// propre bloc de déclaration — nommé dans les emplacements permis — le trou ne pouvait pas se voir.
+    /// Le bloc retiré, il s'est vu : un membre ajouté à la racine d'une production consolidée passait la
+    /// vérification sans un mot, alors que « tout ce qui n'avait pas été retenu y est identique à
+    /// l'octet » est exactement ce que cette vérification promet.
+    /// </remarks>
+    private static List<string> Appeared(
+        SpecDocument corrected,
+        SpecDocument production,
+        HashSet<string> expected)
+    {
+        List<string> appeared = [];
+
+        Walk(corrected.Root, node =>
+        {
+            if (node is not ScalarNode || appeared.Count >= 10 || Covered(node.Location.Json, expected))
+            {
+                return;
+            }
+
+            if (PointerNavigator.Find(production.Root, node.Location.Json) is null)
+            {
+                appeared.Add(
+                    node.Location.Display + " a été ajouté alors que personne ne l'avait retenu");
+            }
+        });
+
+        return appeared;
+    }
     /// <summary>Ce que la sélection avait retenu et que la correction n'a pas changé.</summary>
     private static List<string> Missing(
         SpecDocument corrected,
@@ -199,80 +232,6 @@ public sealed class CorrectionVerifier : ICorrectionVerifier
         }
 
         return missing;
-    }
-
-    /// <summary>Les éléments neufs qui ne disent pas d'où ils viennent, ou ce qu'ils ne portent pas.</summary>
-    private static List<string> Unmarked(SpecDocument corrected, BuiltCorrection built)
-    {
-        List<string> unmarked = [];
-
-        IEnumerable<SpecPointer> additions = built.Marks
-            .Where(mark => mark.IsAddition)
-            .Select(mark => mark.Target)
-            .Where(target => PointerNavigator.Find(corrected.Root, target.Json) is MappingNode)
-            .Where(target =>
-                PointerNavigator.Find(corrected.Root, target.Child(CorrectionMark.Member).Json) is null);
-
-        foreach (SpecPointer target in additions)
-        {
-            unmarked.Add(target.Display + " ne porte pas sa trace d'origine");
-        }
-
-        unmarked.AddRange(Unannounced(corrected, built.Plan));
-
-        return unmarked;
-    }
-
-    /// <summary>
-    /// Les endroits que le plan annonçait non remplis et que le document ne dit pas tels.
-    /// </summary>
-    /// <remarks>
-    /// Un marqueur de non-remplissage est <em>attendu</em> dans un document dérivé d'un contrat de
-    /// service, et ne doit jamais être lu comme un changement qui manque : l'endroit qu'il occupe est
-    /// précisément celui où la projection n'avait rien à porter, et exiger qu'il ait changé reviendrait à
-    /// exiger un schéma que l'outil a refusé de deviner. L'épreuve va donc dans l'autre sens — elle
-    /// établit que chaque endroit annoncé porte bien son marqueur, et que le nombre déclaré au niveau du
-    /// document est celui des marqueurs posés.
-    /// <para>
-    /// Le nombre est vérifié parce qu'il est la seule chose qu'un lecteur peut recouper sans relire le
-    /// document en entier. Un compte faux serait pire qu'absent : il laisserait croire qu'on a fini de
-    /// chercher.
-    /// </para>
-    /// </remarks>
-    private static IEnumerable<string> Unannounced(SpecDocument corrected, CorrectionPlan plan)
-    {
-        if (plan.Unfilled.Count == 0)
-        {
-            yield break;
-        }
-
-        foreach (IGrouping<SpecPointer, UnfilledMarker> at in plan.Unfilled.GroupBy(
-            marker => marker.Target))
-        {
-            SpecPointer member = at.Key.Child(UnfilledMarker.Member);
-
-            if (PointerNavigator.Find(corrected.Root, member.Json) is not SequenceNode posted)
-            {
-                yield return at.Key.Display
-                    + " devait dire ce que la projection n'y a pas porté, et ne le dit pas";
-            }
-            else if (posted.Items.Count != at.Count())
-            {
-                yield return at.Key.Display + " ne porte pas tous ses endroits non remplis";
-            }
-        }
-
-        SpecPointer declared = SpecPointer.Root.Child(CorrectionBuilder.Declaration)
-            .Child(UnfilledMarker.Count);
-
-        if (PointerNavigator.Find(corrected.Root, declared.Json) is not ScalarNode count
-            || !string.Equals(
-                count.Text,
-                plan.Unfilled.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                StringComparison.Ordinal))
-        {
-            yield return "le document ne déclare pas le nombre exact d'endroits non remplis qu'il porte";
-        }
     }
 
     /// <summary>Indique qu'un emplacement est, ou est sous, un emplacement autorisé à changer.</summary>

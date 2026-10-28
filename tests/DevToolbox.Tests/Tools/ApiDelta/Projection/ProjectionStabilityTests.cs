@@ -97,18 +97,20 @@ public sealed class ProjectionStabilityTests
     public void Each_delivery_still_names_the_documents_it_was_actually_read_from()
     {
         // Le revers de l'épreuve précédente, et il compte autant : neutraliser l'origine pour comparer
-        // ne doit pas vouloir dire que l'origine est interchangeable. Une trace qui nommerait le même
-        // fichier pour trois livraisons différentes serait fausse pour deux d'entre elles.
+        // ne doit pas vouloir dire que l'origine est interchangeable. Un registre qui nommerait le même
+        // fichier pour trois livraisons différentes serait faux pour deux d'entre elles.
         using WsdlCorrectionRun inlined = Inlined();
 
         Result<BuiltCorrection> built = inlined.Build(Chosen(inlined));
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
 
-        string text = Encoding.UTF8.GetString(built.Value.Serialized.Span);
+        IReadOnlyList<string> named =
+            [.. built.Value.Marks.Where(mark => mark.IsDerived).Select(mark => mark.Derived!.Document)];
 
-        text.Should().Contain("wsdl: catalogue-inline.wsdl");
-        text.Should().NotContain("catalogue-types.xsd", "cette livraison n'a pas lu ce fichier");
+        named.Should().NotBeEmpty();
+        named.Should().Contain("catalogue-inline.wsdl");
+        named.Should().NotContain("catalogue-types.xsd", "cette livraison n'a pas lu ce fichier");
     }
 
     [Fact]

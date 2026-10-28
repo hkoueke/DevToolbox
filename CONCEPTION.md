@@ -86,16 +86,40 @@ puis revalidé*.
 C'est pourquoi l'épreuve de bout en bout vaut d'exister en plus des épreuves d'unité : elle ne vérifie pas
 ce qu'elles vérifient déjà, elle prend les défauts qui n'existent qu'au bout.
 
+## Le fichier que l'outil écrit ne porte que de l'OpenAPI
+
+Un fichier consolidé portait trois sortes de notes de l'outil : un bloc `x-apidelta-correction` à la
+racine — fichier source, empreinte, statut, nombre d'endroits non remplis, champs dérivés — une trace
+`x-apidelta-origin` sur chaque élément dérivé, et un `x-apidelta-unfilled` partout où une projection
+n'avait rien porté.
+
+Elles sont retirées. Ce fichier n'est pas un rapport : il est destiné à **remplacer** le contrat en
+service, dans un dépôt, après relecture. Les notes y survivaient à la publication, et la plus trompeuse
+annonçait `statut: correction proposée, non publiée` dans un document sur le point de l'être.
+
+Ce qu'elles disaient se lit dans le rapport posé à côté, qui en devient le seul porteur — d'où les
+épreuves qui comparent son compte d'endroits non remplis à celui du plan, et qui vérifient que chaque
+élément dérivé s'y retrouve. **Le registre que la construction rend reste tenu** : c'est lui qui alimente
+le rapport, et c'est lui que le vérificateur consulte pour savoir quels emplacements avaient le droit de
+changer.
+
+Corollaire, qui est la raison de tenir cette règle ici : le retrait du bloc de racine a découvert que la
+vérification ne regardait que dans un sens. Elle parcourait l'arbre de la production pour établir que
+chaque valeur s'y retrouvait inchangée — donc elle voyait ce qui disparaît et ce qui change, **jamais ce
+qui apparaît**. Le seul ajout de l'outil étant son propre bloc, nommé dans la liste des emplacements
+permis, le trou ne pouvait pas se voir. Un membre ajouté à la racine d'une production consolidée passait
+la vérification sans un mot.
+
 ## Une trace d'origine ne dit jamais « non portée »
 
 Un élément *écrit* a forcément été porté, exactement ou à peu près. Ce qui n'a pas été porté n'est pas un
-élément : c'est une absence, et une absence se dit par un marqueur de non-remplissage, jamais par une
-trace d'origine. Annoncer « non portée » sur un élément présent dirait au lecteur le contraire de ce qu'il
-a sous les yeux.
+élément : c'est une absence, et une absence se dit comme un endroit non rempli, jamais comme une origine.
+Annoncer « non portée » sur un élément présent dirait au lecteur le contraire de ce qu'il a sous les yeux.
 
-Le corollaire tient la promesse entière : un champ scalaire ne peut pas porter de membre `x-`, si bien que
-sa trace figure dans la déclaration du document, qui le nomme. Sans cela, un champ dérivé d'une traduction
-serait indiscernable d'un champ recopié des octets d'un candidat.
+La règle a survécu au déplacement des traces hors du document : `DerivedOrigin.Confidence` ne vaut jamais
+`NotCarried` pour un élément inscrit au registre, et c'est là que l'épreuve la tient désormais. Sans
+cela, un élément dérivé d'une traduction serait indiscernable d'un élément recopié des octets d'un
+candidat — et c'est dans le rapport, maintenant, que cette distinction se lit.
 
 ## Ce qui sort de la projection est trié, et ce tri n'est pas cosmétique
 

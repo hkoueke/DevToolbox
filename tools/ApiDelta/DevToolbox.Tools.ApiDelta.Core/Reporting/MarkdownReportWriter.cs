@@ -832,10 +832,10 @@ public static class MarkdownReportWriter
 
         builder.Append("**Endroits non remplis : ")
             .Append(plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture))
-            .Append(".** La projection n'y a rien porté, et l'outil refuse de les deviner : chacun porte "
-                + "un « ")
-            .Append(Correction.UnfilledMarker.Member)
-            .AppendLine(" » disant ce qui manque.").AppendLine();
+            .AppendLine(".** La projection n'y a rien porté, et l'outil refuse de les deviner. Le "
+                + "document écrit ne le dit pas : il est destiné à devenir un contrat publié et ne "
+                + "porte que de l'OpenAPI. C'est donc ici, et ici seulement, que chacun est nommé.")
+            .AppendLine();
 
         foreach (Correction.UnfilledMarker marker in plan.Unfilled)
         {

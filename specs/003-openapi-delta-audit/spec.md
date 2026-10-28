@@ -159,6 +159,51 @@ mord-il ? Vingt seuils examinés, un seul manquant.
   retiré, avant d'être retenu. La règle générale est consignée dans `CONCEPTION.md` : un budget déclaré
   doit mordre, et une assertion sous condition n'affirme rien.
 
+### Session 2026-10-28 — ce que l'outil dit, et ce qu'il laisse dans le fichier
+
+Six reproches, relevés en se servant de l'outil sur des fichiers réels.
+
+- Q: Les libellés de menu sont verbeux et expliquent l'outil là où il faudrait nommer un résultat. → A:
+  **Un libellé par ligne.** « Fusionner deux fichiers en un seul » et « Nettoyer un fichier ». La version
+  précédente nommait bien le résultat, mais en deux lignes de prose chacune : il fallait lire quatre
+  lignes pour choisir entre deux choses. Ce qu'il y a à expliquer s'explique après le choix, quand la
+  question est posée et que le lecteur sait pourquoi il la lit.
+- Q: L'invite propose un jeu de règles et des mises en sourdine sans dire ce que c'est, ni sous quel nom
+  de fichier, ni avec quelle extension. → A: **Dire les trois.** Chaque question annonce désormais ce que
+  le fichier fait, qu'il s'agit d'un YAML, et le nom par convention sous lequel l'outil le reconnaît
+  s'il est posé à côté — plus le fait qu'aucun n'est nécessaire. On ne peut répondre « oui » à « employer
+  un jeu de règles ? » qu'en sachant déjà ce que c'est, et celui qui sait déjà n'a pas besoin qu'on le
+  lui demande.
+- Q: Le dossier de sortie absent est confirmé, puis la question revient. → A: **La confirmation crée le
+  dossier.** `PrepareAsync` confirmait sans créer ; la publication du premier artefact le trouvait
+  absent et reposait la même question. Un « oui » qui ne change rien et une question qui revient
+  apprennent la même chose à qui l'a donné — que son accord n'a pas été entendu. Deux essais le tiennent
+  désormais, dont un qui compte les fois où la question est posée, et qui a été vu rougir, correctif
+  retiré.
+- Q: L'outil annonce que des éléments « cassent les appelants existants », ce qui est faux puisque le
+  contrat consolidé est publié sous un nouveau numéro de version. → A: **Dire le fait, non la
+  conséquence.** Le constat exact est que le contrat cesse d'être compatible avec le précédent, donc que
+  le saut de version est majeur — et l'outil inscrit lui-même ce numéro. Le message le nomme, et ajoute
+  que les appelants de la version en service ne sont pas touchés. Annoncer une panne chez des tiers
+  quand on ne connaît ni leur version ni leur déploiement, c'est l'alarme que son lecteur apprend à
+  ignorer.
+- Q: Le fichier produit porte des sections `x-apidelta` inutiles. → A: **Toutes retirées, sans option.**
+  Le bloc `x-apidelta-correction` de la racine, les traces `x-apidelta-origin`, les marqueurs
+  `x-apidelta-unfilled`. Ce fichier est destiné à remplacer le contrat en service : les notes y
+  survivaient à la publication, et la plus trompeuse annonçait « statut : correction proposée, non
+  publiée » dans un document sur le point de l'être. Le rapport en devient le seul porteur, ce qui lui
+  donne une responsabilité qu'il n'avait pas — d'où les épreuves qui comparent son compte à celui du
+  plan. Le registre interne reste tenu, et le vérificateur s'en sert toujours. Conséquence imprévue
+  consignée dans `CONCEPTION.md` : le retrait a découvert que la vérification ne voyait pas ce qui
+  *apparaît* dans un document consolidé, le seul ajout de l'outil étant jusque-là nommé dans la liste des
+  emplacements permis. Elle le voit maintenant.
+- Q: Le fichier nettoyé devrait, au moins quand on le demande, conserver l'ordre du fichier d'origine. →
+  A: **L'ordre d'origine devient le défaut, partout.** `formatting.keyOrder` valait `canonical`, un tri
+  alphabétique : un document relu par une personne devenait méconnaissable, des milliers de lignes
+  d'écart pour une route ajoutée, au profit d'une reproductibilité que l'empreinte du contenu établit
+  déjà. Le tri reste disponible par jeu de règles. L'invite qui propose le fichier nettoyé le dit
+  désormais, ce qui rend au passage la fonctionnalité trouvable.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)
