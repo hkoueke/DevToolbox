@@ -3,6 +3,7 @@ using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
+using DevToolbox.Tools.ApiDelta.Core.Authoring;
 using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Correspondence;
 using DevToolbox.Tools.ApiDelta.Core.Dependencies;
@@ -118,11 +119,13 @@ internal sealed class WsdlCorrectionRun : IDisposable
     /// <param name="selection">Ce qui est retenu.</param>
     /// <returns>Ce que le constructeur a produit.</returns>
     public Result<BuiltCorrection> Build(
-        CorrectionSelection selection, bool includeRemovals = false)
+        CorrectionSelection selection,
+        bool includeRemovals = false,
+        AuthoringRecord? authoring = null)
     {
         ArgumentNullException.ThrowIfNull(selection);
 
-        return _builder.Build(Request(selection, includeRemovals));
+        return _builder.Build(Request(selection, includeRemovals, authoring));
     }
 
     /// <summary>Énonce ce qui serait inséré, sans rien écrire.</summary>
@@ -168,7 +171,10 @@ internal sealed class WsdlCorrectionRun : IDisposable
     /// <summary>La demande complète, fermeture de dépendances comprise.</summary>
     /// <param name="selection">Ce qui est retenu.</param>
     /// <returns>La demande.</returns>
-    public CorrectionRequest Request(CorrectionSelection selection, bool includeRemovals = false)
+    public CorrectionRequest Request(
+        CorrectionSelection selection,
+        bool includeRemovals = false,
+        AuthoringRecord? authoring = null)
     {
         ArgumentNullException.ThrowIfNull(selection);
 
@@ -186,7 +192,8 @@ internal sealed class WsdlCorrectionRun : IDisposable
             Version: null,
             CanonicalFormatting.Default,
             includeRemovals,
-            Footing);
+            Footing,
+            authoring);
     }
 
     public void Dispose()

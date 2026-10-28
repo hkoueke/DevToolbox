@@ -14,6 +14,10 @@ namespace DevToolbox.Tools.ApiDelta.Core.Correction;
 /// <param name="Version">La version à inscrire, quand elle a pu être établie.</param>
 /// <param name="Formatting">La mise en forme des parties neuves seulement.</param>
 /// <param name="IncludeRemovals">Autorise les suppressions, qui ne sont jamais faites sans demande.</param>
+/// <param name="Authoring">
+/// Les routes que le développeur a composées : leur chemin, leur verbe et où elles se placent. Nul quand
+/// le compagnon n'est pas un contrat de service, auquel cas une route reprise garde la sienne.
+/// </param>
 /// <param name="Footing">
 /// Ce sur quoi la sélection repose, quand le candidat est projeté depuis un contrat de service.
 /// </param>
@@ -31,4 +35,5 @@ public sealed record CorrectionRequest(
     VersionRecommendation? Version,
     CanonicalFormatting Formatting,
     bool IncludeRemovals = false,
-    WsdlFooting? Footing = null);
+    WsdlFooting? Footing = null,
+    Authoring.AuthoringRecord? Authoring = null);

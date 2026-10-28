@@ -130,7 +130,8 @@ public sealed class CorrectStep : IToolStep
             context.Get<VersionRecommendation>(ApiDeltaContextKeys.VersionRecommendation),
             _options.DefaultRuleset.Formatting,
             selection.IncludeRemovals,
-            footing);
+            footing,
+            context.Get<Authoring.AuthoringRecord>(ApiDeltaContextKeys.Authoring));
 
         return Announce(context, request, Ruleset(context));
     }

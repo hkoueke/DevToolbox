@@ -113,13 +113,13 @@ positions, with every pre-existing path still in place.
   (RA-001, RA-002)
 - [X] T026 [US1] Add the insertion-point question to `Presentation/Prompts/RouteAuthoringPrompt.cs`, offering production's paths in the
   document's own order plus "à la fin" (RA-008, RA-009) (depends on T025)
-- [ ] T027 [US1] Change `Core/Correction/CorrectionBuilder.cs` to carry the authored path, verb and
+- [X] T027 [US1] Change `Core/Correction/CorrectionBuilder.cs` to carry the authored path, verb and
   insertion point into the splice instead of the projected route's own (depends on T016, T022)
-- [ ] T028 [US1] Add the authoring record to `Core/Correction/CorrectionRequest.cs` and to
+- [X] T028 [US1] Add the authoring record to `Core/Correction/CorrectionRequest.cs` and to
   `Core/RunSelection.cs` (depends on T009)
 - [X] T029 [P] [US1] Create `Tests/Authoring/AuthoringRecordTests.cs` — collisions between two authored
   routes, and between an authored route and a production route, each naming both sides (depends on T009)
-- [ ] T030 [US1] Create `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — three operations authored onto
+- [X] T030 [US1] Create `Tests/Wsdl/AuthoredRouteEndToEndTests.cs` — three operations authored onto
   unconventional paths, written there, at the chosen positions, with production's path order preserved and
   the existing verification passing (depends on T022–T028)
 - [X] T031 [US1] Extend `Tests/Application/CompositionRootTests.cs` — the built chain still equals the

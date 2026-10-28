@@ -1,6 +1,7 @@
 using System.Globalization;
 using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
+using DevToolbox.Tools.ApiDelta.Core.Authoring;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
 using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
@@ -258,34 +259,54 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
             return;
         }
 
-        SpecPointer item = SpecPointer.Root.Child(Paths).Child(route.Path);
-        bool pathHeld = PointerNavigator.Find(request.Production.Root, item.Json) is not null;
         DerivedOrigin? origin = request.Footing?.Derivation.ForRoute(route.Method.ToString(), route.Path);
         IReadOnlyList<ProjectionGap> gaps =
             request.Footing?.Derivation.UnfilledAtRoute(route.Method.ToString(), route.Path, source)
             ?? [];
+
+        // Là où le développeur a composé la route, c'est sa réponse qui décide du chemin, du verbe et de
+        // l'endroit ; la route reprise ne sert plus qu'à retrouver la source dans le candidat. Le lien
+        // passe par l'origine dérivée, qui nomme l'opération dont la route vient — rien d'autre ne relie
+        // un itinéraire projeté à l'opération du contrat.
+        AuthoredRoute? authored = Authored(request, origin);
+        OperationSelector target = authored?.Selector ?? route;
+
+        SpecPointer item = SpecPointer.Root.Child(Paths).Child(target.Path);
+        bool pathHeld = PointerNavigator.Find(request.Production.Root, item.Json) is not null;
 
         SpecNode marked = source;
 
         // La méthode est ajoutée sous le chemin que la production porte, et jamais à la place : c'est la
         // forme de l'épissure qui le tient, et non une vérification qu'on pourrait oublier de faire.
         ledger.Splices.Add(pathHeld
-            ? new Splice(SpliceKind.Add, item, route.MethodKey, marked)
+            ? new Splice(SpliceKind.Add, item, target.MethodKey, marked)
             : new Splice(
                 SpliceKind.Add,
                 SpecPointer.Root.Child(Paths),
-                route.Path,
-                TreeEdits.Mapping(item, [new MappingEntry(TreeEdits.Key(route.MethodKey), marked)])));
+                target.Path,
+                TreeEdits.Mapping(item, [new MappingEntry(TreeEdits.Key(target.MethodKey), marked)]),
+                AfterKey: authored?.Insertion.AfterPath));
 
         if (pathHeld && origin is { } derived)
         {
-            ledger.Collisions.Add(new PathCollision(route.Path, route.Display, derived.Subject));
+            ledger.Collisions.Add(new PathCollision(target.Path, target.Display, derived.Subject));
         }
 
         Noted(ledger, operation, gaps);
         ledger.Marks.Add(new CorrectionMark(operation, operation.Json, Derived: origin));
-        ledger.Routes.Add(route);
+        ledger.Routes.Add(target);
     }
+
+    /// <summary>La route composée pour l'opération dont une route projetée vient, s'il y en a une.</summary>
+    /// <remarks>
+    /// Retrouvée par le nom de l'opération et non par l'itinéraire : l'itinéraire est précisément ce que
+    /// le développeur vient de changer, et le chercher par lui ne retrouverait rien.
+    /// </remarks>
+    private static AuthoredRoute? Authored(CorrectionRequest request, DerivedOrigin? origin) =>
+        origin is { } derived && request.Authoring is { } record
+            ? record.Routes.FirstOrDefault(authored =>
+                string.Equals(authored.Operation, derived.Subject, StringComparison.Ordinal))
+            : null;
 
     /// <summary>Consigne ce qui restera non rempli à un emplacement, un marqueur par construction.</summary>
     private static void Noted(
