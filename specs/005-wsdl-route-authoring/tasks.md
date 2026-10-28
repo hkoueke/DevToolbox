@@ -29,14 +29,14 @@ task below names the test that holds it, and the polish phase contains the mutat
 No project is created and no package is added: the work lands in three projects that exist. Setup is
 limited to the corpus the tests need.
 
-- [ ] T001 [P] Create `Tests/Corpus/Authoring/rpc-production.yaml` — a production whose paths carry a
+- [X] T001 [P] Create `Tests/Corpus/Authoring/rpc-production.yaml` — a production whose paths carry a
   prefix and keep the operation name, grouped by family, with five header parameters declared under
   `components/parameters` and referenced by every route. This is the shape no naming rule reproduces, and
   every assertion about insertion order and reusable headers rests on it.
-- [ ] T002 [P] Create `Tests/Corpus/Authoring/rpc-contract.wsdl` — a contract of six operations: two whose
+- [X] T002 [P] Create `Tests/Corpus/Authoring/rpc-contract.wsdl` — a contract of six operations: two whose
   input is flat scalars, two whose input is a single composite, one with no input at all, and one whose
   name yields no known verb. Six is the smallest set that covers every placement branch.
-- [ ] T003 Register both corpus files as embedded resources in `tests/DevToolbox.Tests/DevToolbox.Tests.csproj`
+- [X] T003 Register both corpus files as embedded resources in `tests/DevToolbox.Tests/DevToolbox.Tests.csproj`
 
 ---
 
@@ -45,27 +45,27 @@ limited to the corpus the tests need.
 These block every story. The order matters: the records come before the rules that validate them, and the
 splicer capability comes before anything can be written where it was asked to go.
 
-- [ ] T004 [P] Create `Core/Authoring/ParameterLocation.cs` — `Path`, `Query`, `Body`, `Header`,
+- [X] T004 [P] Create `Core/Authoring/ParameterLocation.cs` — `Path`, `Query`, `Body`, `Header`,
   `Nowhere`, with the remark on why `Nowhere` is a member and not an absence (data-model)
-- [ ] T005 [P] Create `Core/Authoring/InsertionPoint.cs` — `AfterPath` nullable, with the remark on why it
+- [X] T005 [P] Create `Core/Authoring/InsertionPoint.cs` — `AfterPath` nullable, with the remark on why it
   is a neighbour's name and not an index (RA-008, RA-009)
-- [ ] T006 [P] Create `Core/Authoring/OfferedHeader.cs` — component name, wire name, reference count
-- [ ] T007 Create `Core/Authoring/FieldPlacement.cs` with its three invariants enforced in the
+- [X] T006 [P] Create `Core/Authoring/OfferedHeader.cs` — component name, wire name, reference count
+- [X] T007 Create `Core/Authoring/FieldPlacement.cs` with its three invariants enforced in the
   constructor: a path placement is required, a composite cannot go to path/query/header, a dropped field
   cannot be required (RA-013, RA-014)
-- [ ] T008 Create `Core/Authoring/AuthoredRoute.cs` — operation, path, method, placements, headers,
+- [X] T008 Create `Core/Authoring/AuthoredRoute.cs` — operation, path, method, placements, headers,
   insertion point, suggestion worth, whether the suggestion was taken (depends on T004–T007)
-- [ ] T009 Create `Core/Authoring/AuthoringRecord.cs` with `Dropped()`, `Placeholders()`,
+- [X] T009 Create `Core/Authoring/AuthoringRecord.cs` with `Dropped()`, `Placeholders()`,
   `Collisions(production)` and `Empty` (depends on T008)
-- [ ] T010 Create `Core/Authoring/RouteSyntax.cs` — the six path rules and the verb check, each failure
+- [X] T010 Create `Core/Authoring/RouteSyntax.cs` — the six path rules and the verb check, each failure
   naming the rule it broke and its position, none repairing the input (RA-004, RA-005)
-- [ ] T011 [P] Create `Tests/Authoring/RouteSyntaxTests.cs` — one case per rule, plus the JSON Pointer
+- [X] T011 [P] Create `Tests/Authoring/RouteSyntaxTests.cs` — one case per rule, plus the JSON Pointer
   rule that came out of the STRIDE pass: a path carrying `~` must be refused **before** a pointer is built
   from it (depends on T010)
-- [ ] T012 Create `Core/Authoring/PlacementDefaults.cs` — `GET`/`DELETE` propose the query, the write verbs
+- [X] T012 Create `Core/Authoring/PlacementDefaults.cs` — `GET`/`DELETE` propose the query, the write verbs
   propose the body, a composite under a read verb arrives at `Nowhere` **flagged as needing a decision**
   (RA-011)
-- [ ] T013 [P] Create `Tests/Authoring/PlacementDefaultsTests.cs` — including the case that matters most:
+- [X] T013 [P] Create `Tests/Authoring/PlacementDefaultsTests.cs` — including the case that matters most:
   accepting the defaults wholesale on a composite under `GET` must not silently drop it (depends on T012)
 - [ ] T014 Create `Core/Authoring/PlacementRules.cs` — the refusals, separate from the proposals, naming
   field and declared type for a composite and naming the placeholder for a mismatch (RA-013, RA-015)
