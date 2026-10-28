@@ -195,6 +195,113 @@ public sealed class SplicingTests
             ?? throw new InvalidOperationException(json + " absent");
 
     /// <summary>Un scalaire neuf, celui que l'outil écrirait.</summary>
+    [Fact]
+    public void An_addition_lands_after_the_named_neighbour_and_the_order_holds()
+    {
+        // La seule capacité qui manquait à l'épisseur : l'ajout plaçait toute entrée nouvelle après la
+        // dernière de l'association. Une description de production est relue par des personnes et ses
+        // chemins sont groupés à la main — ajouter toute route nouvelle à la fin dispersait une famille
+        // de routes qui se tiennent ensemble.
+        SpecDocument production = Read("baseline-30.yaml");
+        SpecDocument candidate = Read("candidate-additive.yaml", DocumentRole.Candidate);
+
+        IReadOnlyList<string> before = Paths(production);
+
+        before.Should().HaveCountGreaterThan(1, "il faut un voisin à nommer");
+
+        string neighbour = before[0];
+
+        Result<ReadOnlyMemory<byte>> spliced = _splicer.Splice(
+            production,
+            [
+                new Splice(
+                    SpliceKind.Add,
+                    Target(production, "/paths"),
+                    Key: "/dossiers/{id}",
+                    Value: Node(candidate, "/paths/~1dossiers~1{id}"),
+                    AfterKey: neighbour),
+            ],
+            CanonicalFormatting.Default);
+
+        spliced.IsSuccess.Should().BeTrue(spliced.Failure?.Message);
+
+        SpecReadResult reread = _reader.ReadBytes(
+            spliced.Value, "corrigé", DocumentRole.Production, LoadLimits.Default);
+
+        reread.Document.Should().NotBeNull(
+            string.Join(" / ", reread.Diagnostics.Select(one => one.Message)));
+
+        IReadOnlyList<string> after = Paths(reread.Document);
+
+        after[1].Should().Be("/dossiers/{id}", "la route doit suivre le voisin nommé");
+
+        // Et l'ordre de ce qui existait est intact : la nouvelle s'insère, elle ne réordonne rien.
+        after.Where(path => before.Contains(path, StringComparer.Ordinal))
+            .Should().Equal(before, "les chemins existants gardent leur ordre");
+    }
+
+    [Fact]
+    public void An_addition_after_an_unknown_neighbour_is_refused_rather_than_appended()
+    {
+        // Rabattre sur la fin mettrait la route ailleurs que là où le développeur l'a demandée, ce qui
+        // est exactement ce que ce paramètre existe pour empêcher. Un déplacement silencieux est pire
+        // qu'un refus : le refus se corrige, le déplacement se découvre en relisant le fichier.
+        SpecDocument production = Read("baseline-30.yaml");
+        SpecDocument candidate = Read("candidate-additive.yaml", DocumentRole.Candidate);
+
+        Result<ReadOnlyMemory<byte>> spliced = _splicer.Splice(
+            production,
+            [
+                new Splice(
+                    SpliceKind.Add,
+                    Target(production, "/paths"),
+                    Key: "/dossiers/{id}",
+                    Value: Node(candidate, "/paths/~1dossiers~1{id}"),
+                    AfterKey: "/chemin-qui-n-existe-pas"),
+            ],
+            CanonicalFormatting.Default);
+
+        spliced.IsSuccess.Should().BeFalse("le voisin nommé n'existe pas");
+        spliced.Failure!.Reason.Should().Be(FailureReason.InvalidInput);
+        spliced.Failure.Message.Should().Contain("/chemin-qui-n-existe-pas");
+    }
+
+    [Fact]
+    public void An_addition_with_no_named_neighbour_still_lands_at_the_end()
+    {
+        // Le comportement d'avant, inchangé : c'est ce qui permet au reste de l'outil de ne rien savoir
+        // du nouveau paramètre.
+        SpecDocument production = Read("baseline-30.yaml");
+        SpecDocument candidate = Read("candidate-additive.yaml", DocumentRole.Candidate);
+
+        Result<ReadOnlyMemory<byte>> spliced = _splicer.Splice(
+            production,
+            [
+                new Splice(
+                    SpliceKind.Add,
+                    Target(production, "/paths"),
+                    Key: "/dossiers/{id}",
+                    Value: Node(candidate, "/paths/~1dossiers~1{id}")),
+            ],
+            CanonicalFormatting.Default);
+
+        spliced.IsSuccess.Should().BeTrue(spliced.Failure?.Message);
+
+        SpecReadResult reread = _reader.ReadBytes(
+            spliced.Value, "corrigé", DocumentRole.Production, LoadLimits.Default);
+
+        Paths(reread.Document!)[^1].Should().Be("/dossiers/{id}");
+    }
+
+    /// <summary>Les chemins d'un document, dans l'ordre où il les écrit.</summary>
+    private static IReadOnlyList<string> Paths(SpecDocument document)
+    {
+        SpecNode? paths = PointerNavigator.Find(document.Root, "/paths");
+
+        return [.. paths.Should().BeOfType<MappingNode>().Subject.Entries
+            .Select(entry => entry.Key.Text)];
+    }
+
     private static ScalarNode Scalar(string text) => TreeEdits.Key(text);
 
     private static string Text(ReadOnlyMemory<byte> bytes) => Encoding.UTF8.GetString(bytes.Span);

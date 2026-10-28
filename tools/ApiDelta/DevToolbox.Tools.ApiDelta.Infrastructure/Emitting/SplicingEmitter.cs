@@ -166,8 +166,28 @@ public sealed class SplicingEmitter : ISplicingEmitter
                     + "entrée : l'outil ne peut pas en déduire à quelle indentation écrire la nouvelle.");
         }
 
+        // L'entrée après laquelle écrire : celle que l'appelant nomme, ou la dernière. Nommer un voisin
+        // qui n'existe pas est refusé et non rabattu sur la fin — un ajout silencieusement déplacé
+        // mettrait la route ailleurs que là où le développeur l'a demandée, ce qui est précisément ce que
+        // ce paramètre existe pour empêcher.
+        MappingEntry? after = mapping.Entries[^1];
+
+        if (splice.AfterKey is { Length: > 0 } key)
+        {
+            after = mapping.Entries.FirstOrDefault(entry =>
+                string.Equals(entry.Key.Text, key, StringComparison.Ordinal));
+
+            if (after is null)
+            {
+                return Result.Fail<Edit>(
+                    FailureReason.InvalidInput,
+                    "« " + splice.Target.Display + " » ne porte aucune entrée « " + key + " » : "
+                        + "l'ajout ne peut pas être placé après elle.");
+            }
+        }
+
         int indent = mapping.Entries[0].Key.Position.Column - 1;
-        int insertion = ContentEnd(document, mapping.Entries[^1].Value);
+        int insertion = ContentEnd(document, after.Value);
 
         string text = "\n" + new string(' ', indent) + splice.Key + ":\n";
         text += Render(splice.Value, formatting, indent + formatting.Indent, firstLineIndented: true);

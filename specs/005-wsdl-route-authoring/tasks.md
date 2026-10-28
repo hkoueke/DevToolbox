@@ -67,19 +67,19 @@ splicer capability comes before anything can be written where it was asked to go
   (RA-011)
 - [X] T013 [P] Create `Tests/Authoring/PlacementDefaultsTests.cs` — including the case that matters most:
   accepting the defaults wholesale on a composite under `GET` must not silently drop it (depends on T012)
-- [ ] T014 Create `Core/Authoring/PlacementRules.cs` — the refusals, separate from the proposals, naming
+- [X] T014 Create `Core/Authoring/PlacementRules.cs` — the refusals, separate from the proposals, naming
   field and declared type for a composite and naming the placeholder for a mismatch (RA-013, RA-015)
-- [ ] T015 [P] Create `Tests/Authoring/PlacementRulesTests.cs` — composite refused for each of the three
+- [X] T015 [P] Create `Tests/Authoring/PlacementRulesTests.cs` — composite refused for each of the three
   locations, placeholder with no field, duplicate effective name (depends on T014)
-- [ ] T016 Add `AfterKey` to `Splice` in `Core/Correction/Splice.cs`, documented as the sibling after which
+- [X] T016 Add `AfterKey` to `Splice` in `Core/Correction/Splice.cs`, documented as the sibling after which
   a member is added, with null keeping today's behaviour
-- [ ] T017 Change `Infrastructure/Emitting/SplicingEmitter.cs` so `Adding` computes its insertion from
+- [X] T017 Change `Infrastructure/Emitting/SplicingEmitter.cs` so `Adding` computes its insertion from
   `AfterKey`'s content end rather than from `mapping.Entries[^1]`, and **refuses** an `AfterKey` naming no
   existing member rather than appending (contract: application-ports) (depends on T016)
-- [ ] T018 [P] Extend `Tests/Correction/SplicingEmitterTests.cs` — a member added after a named sibling
+- [X] T018 [P] Extend `Tests/Correction/SplicingEmitterTests.cs` — a member added after a named sibling
   lands there with the siblings' order preserved; an unknown `AfterKey` is refused; a null `AfterKey`
   behaves exactly as before (depends on T017)
-- [ ] T019 Create `Core/Abstractions/IRouteAuthoringPrompt.cs` with `AuthoringSubject`, and the remark on
+- [X] T019 Create `Core/Abstractions/IRouteAuthoringPrompt.cs` with `AuthoringSubject`, and the remark on
   why it is a new port rather than an extension of `ICorrespondencePrompt` (Principle II)
 
 **Checkpoint**: at the end of phase 2, `dotnet build` is clean and the new unit tests pass. Nothing is
