@@ -71,6 +71,16 @@ dotnet test DevToolbox.slnx --filter 'FullyQualifiedName~WsdlHostileTests'
 crash, no hang, no external fetch, no entity expansion, and no partial document left behind. A test that
 passed by timing out would not be passing.
 
+The document size budget applies before allocating the document contents, both for the entry WSDL and
+for WSDL/XSD imports. The reader also bounds the actual read if a file grows after its size is checked;
+only one additional byte is read to detect overflow. `BoundedDocumentReaderTests` verifies that an
+oversized advertised length causes zero content reads, and that growth cannot trigger a full read.
+
+`WsdlReaderTests` also injects materialised XSD paths through `RetrievalMap`: a file inside the selected
+root remains usable, while an outside path (even a nonexistent one), a symbolic file link and a symbolic
+directory link are refused with `ImportOutsideRoot` before opening the import. Retrieval does not grant
+an exemption from confinement.
+
 ## Scenario 3 — the same contract, written differently, projects identically
 
 ```bash

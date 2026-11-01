@@ -800,6 +800,103 @@ public sealed class WsdlReaderTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Oversized_wsdl_and_xsd_imports_report_the_document_budget(bool xsd)
+    {
+        string name = xsd ? "oversized.xsd" : "oversized.wsdl";
+        _ = Write(name, new string(' ', 2048) + (xsd
+            ? "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:external'/>"
+            : "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/' targetNamespace='urn:external'/>"));
+        string directive = xsd
+            ? "<types><xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:import namespace='urn:external' schemaLocation='" + name + "'/></xs:schema></types>"
+            : "<import namespace='urn:external' location='" + name + "'/>";
+        string entry = Write("entry.wsdl", "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/' targetNamespace='urn:entry'>"
+            + directive + "</definitions>");
+
+        WsdlReadResult result = await _reader.ReadAsync(entry,
+            WsdlLimits.Default with { MaxDocumentBytes = 1024 }, Policy(), CancellationToken.None);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == DiagnosticCodes.LimitReached);
+    }
+
+    [Fact]
+    public async Task An_oversized_entry_document_reports_the_document_budget()
+    {
+        string entry = Write("large.wsdl", new string(' ', 2048));
+        WsdlReadResult result = await _reader.ReadAsync(entry,
+            WsdlLimits.Default with { MaxDocumentBytes = 1024 }, Policy(), CancellationToken.None);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle(diagnostic => diagnostic.Code == DiagnosticCodes.LimitReached);
+    }
+
+    [Theory]
+    [InlineData("inside", true)]
+    [InlineData("outside", false)]
+    [InlineData("missing-outside", false)]
+    [InlineData("file-link", false)]
+    [InlineData("directory-link", false)]
+    public async Task Materialised_xsd_imports_must_remain_confined(string placement, bool accepted)
+    {
+        string outside = Path.Combine(Path.GetTempPath(), "retrieval-external-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outside);
+        try
+        {
+            string external = Path.Combine(outside, "external.xsd");
+            string local = Write("external.xsd",
+                "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:external'/>");
+            File.Copy(local, external);
+            string materialised = placement switch
+            {
+                "outside" => external,
+                "missing-outside" => Path.Combine(outside, "missing.xsd"),
+                _ => local,
+            };
+            if (string.Equals(placement, "file-link", StringComparison.Ordinal))
+            {
+                File.Delete(local);
+                File.CreateSymbolicLink(local, external);
+            }
+            else if (string.Equals(placement, "directory-link", StringComparison.Ordinal))
+            {
+                Directory.CreateSymbolicLink(Path.Combine(_root, "linked"), outside);
+                materialised = Path.Combine(_root, "linked", "external.xsd");
+            }
+
+            string entry = Write("entry.wsdl", """
+                <definitions xmlns="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn:entry">
+                  <types><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:entry">
+                    <xs:import namespace="urn:external" schemaLocation="external.xsd"/>
+                  </xs:schema></types>
+                </definitions>
+                """);
+            RetrievalMap retrieved = new([
+                new KeyValuePair<Uri, string>(new Uri("https://example.test/entry.wsdl"), entry),
+                new KeyValuePair<Uri, string>(new Uri("https://example.test/external.xsd"), materialised),
+            ]);
+
+            WsdlReadResult result = await _reader.ReadAsync(entry, WsdlLimits.Default, Policy(),
+                CancellationToken.None, retrieved);
+
+            result.IsFaithful.Should().Be(accepted, Said(result));
+            if (accepted)
+            {
+                result.Contract!.Documents.Should().HaveCount(2);
+            }
+            else
+            {
+                result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == WsdlDiagnosticCodes.ImportOutsideRoot);
+            }
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
