@@ -54,11 +54,12 @@ public sealed class ResumePromptTests
 
         string output = console.Output;
 
-        output.Should().Contain("Reprendre là où vous en étiez");
-        output.Should().Contain("oublier cette séance", "la suppression doit être dite");
+        output.Should().Contain("Reprendre les choix enregistrés");
+        output.Should().Contain("premier enregistrement automatique").And.Contain("ne supprime vos fichiers ni vos rapports");
+        output.Should().Contain("oublier les anciens choix", "la suppression doit être dite");
         output.Should().Contain(
-            "redemander au prochain lancement",
-            "la seule différence entre les deux départs de zéro doit figurer dans le libellé");
+            "garder les anciens choix provisoirement",
+            "la limite de conservation doit être annoncée");
     }
 
     [Fact]

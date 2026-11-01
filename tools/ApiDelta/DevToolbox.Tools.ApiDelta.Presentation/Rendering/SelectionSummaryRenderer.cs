@@ -93,20 +93,25 @@ public sealed class SelectionSummaryRenderer
     {
         if (run.Outcome == RunOutcome.Success)
         {
-            _console.MarkupLine("[green]Traitement terminé.[/]");
+            _console.MarkupLine(run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is not null)
+                ? "[yellow]Traitement terminé avec une étape ignorée après erreur.[/]"
+                : "[green]Traitement terminé.[/]");
         }
 
-        if (run.Steps.Any(step => step.Status == StepStatus.Skipped))
+        if (run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is null))
         {
             _console.MarkupLine(mode == RunMode.Analyse
                 ? "[grey]Ce parcours vérifie un seul fichier ; il ne compare pas deux versions.[/]"
                 : "[grey]Ce parcours compare deux fichiers. Le nettoyage se demande depuis l’autre choix du menu.[/]");
         }
 
-        foreach (StepState step in run.Steps.Where(step => step.Status is not (StepStatus.Completed or StepStatus.Skipped)))
+        foreach (StepState step in run.Steps.Where(step => step.Status != StepStatus.Completed
+            && (step.Status != StepStatus.Skipped || step.FailureReason is not null)))
         {
             _console.MarkupLine(step.Status switch
             {
+                StepStatus.Skipped => "[yellow]Étape passée après erreur :[/] " + Markup.Escape(step.Name)
+                    + " · " + Markup.Escape(step.FailureReason ?? string.Empty),
                 StepStatus.Failed => "[red]×[/] " + Markup.Escape(step.Name)
                     + " · " + Markup.Escape(step.FailureReason ?? string.Empty),
                 _ => "[grey]·[/] [grey]" + Markup.Escape(step.Name) + "[/]",

@@ -184,6 +184,22 @@ public sealed class RunCheckpointStoreTests
     }
 
 
+    [Fact]
+    public async Task A_cancelled_checkpoint_update_keeps_the_previous_session_and_no_temporary_file()
+    {
+        using TempPaths temp = new();
+        FileRunCheckpointStore store = CreateStore(temp, Now);
+        PersistedRun original = Checkpoint();
+        await store.SaveAsync(original, CancellationToken.None);
+        string before = await File.ReadAllTextAsync(SingleRunFile(temp));
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+        Func<Task> update = () => store.SaveAsync(original with { CompletedSteps = ["Changed"] }, cancellation.Token);
+        await update.Should().ThrowAsync<OperationCanceledException>();
+        (await File.ReadAllTextAsync(SingleRunFile(temp))).Should().Be(before);
+        Directory.GetFiles(temp.Paths.RunsDirectory, "*.tmp").Should().BeEmpty();
+    }
+
     private static string SingleRunFile(TempPaths temp) =>
         Directory.EnumerateFiles(temp.Paths.RunsDirectory, "*.json").Single();
 

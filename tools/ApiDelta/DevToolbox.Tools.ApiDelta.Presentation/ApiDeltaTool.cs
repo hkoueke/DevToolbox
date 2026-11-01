@@ -1,5 +1,6 @@
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Audit;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
@@ -130,14 +131,11 @@ public sealed class ApiDeltaTool : ITool
         // seulement si les fichiers sont encore ceux qui avaient été lus.
         await _resume.TryResumeAsync(Id, context, cancellationToken).ConfigureAwait(false);
 
-        // Et de nouveau après la réponse : le panneau de reprise a fait son travail, et ce qui suit est
-        // une autre conversation. Nettoyer ici évite aussi qu'une séance reprise affiche sous ses
-        // questions le descriptif de la séance qu'elle remplace.
-        _console.Clear();
-
+        // Les effets du choix de reprise et ses éventuels refus doivent rester lisibles.
         await _runner.RunAsync(context, _steps, cancellationToken).ConfigureAwait(false);
 
         RenderOutcome(run, context);
+        ResumePrompt.RenderCleanupWarning(_console, context);
 
         if (run.Outcome != RunOutcome.Success)
         {
@@ -193,6 +191,10 @@ public sealed class ApiDeltaTool : ITool
                 ? $"[red]{Markup.Escape(failed.Name)} ne s'est pas achevée :[/] {Markup.Escape(reason)}"
                 : "[yellow]L'exécution ne s'est pas achevée.[/]");
         }
+        else if (run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is not null))
+        {
+            _console.MarkupLine("[yellow]Le traitement a continué après une erreur. Des fichiers ont pu être écrits avant celle-ci ; vérifiez le dossier des résultats.[/]");
+        }
         else if (selection is not null)
         {
             _summary.RenderWritten(selection,
@@ -219,6 +221,12 @@ public sealed class ApiDeltaTool : ITool
     {
         if (context.Get<string>(ApiDeltaContextKeys.Outcome) is not { Length: > 0 } code)
         {
+            return;
+        }
+
+        if (context.Run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is not null))
+        {
+            _console.MarkupLine("[yellow]Une étape a été passée après une erreur : les résultats peuvent être incomplets.[/]");
             return;
         }
 

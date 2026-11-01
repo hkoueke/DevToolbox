@@ -129,6 +129,27 @@ collection, votre projet, les groupes choisis et l'avancement des étapes : asse
 sélection, jamais assez pour reconstituer une comparaison. Reprendre relit les groupes, si bien que vous
 n'agissez jamais sur une image périmée.
 
+## Reprendre ou recommencer une session
+
+Ces choix concernent les sélections enregistrées dans DevToolbox, pas vos fichiers, vos rapports ni les données du serveur.
+
+| À l’ouverture de l’outil | Effet |
+|---|---|
+| **Reprendre les choix enregistrés** | Réutilise les choix affichés et relit les données. apidelta vérifie aussi que les fichiers n’ont pas changé. |
+| **Nouvelle session — oublier les anciens choix** | Supprime immédiatement la session enregistrée et repose les questions de sélection. |
+| **Nouvelle session — garder les anciens choix provisoirement** | Repose les questions ; l’ancienne session reste disponible si vous annulez avant tout nouvel enregistrement. Elle est remplacée dès le premier enregistrement automatique des nouveaux choix. |
+
+Une session entièrement réussie est retirée de la liste de reprise. Une reprise apidelta devenue invalide est oubliée avec une explication, puis les fichiers sont redemandés. Un seul enregistrement est gardé par outil ; une nouvelle sélection ne réinitialise pas les réglages du serveur.
+
+| Après une erreur | Effet |
+|---|---|
+| **Réessayer cette étape** | Rejoue seulement l’étape en erreur, avec les choix et les étapes déjà terminées. |
+| **Passer cette étape** | Ne la rejoue pas ; poursuit avec ce qui est disponible. Le bilan signale les résultats potentiellement incomplets et la session reste reprenable. |
+| **Tout recommencer** | Efface le point de reprise concerné et l’état de travail en mémoire, puis revient à la première question. Les fichiers et rapports déjà écrits ne sont pas effacés ni annulés. |
+| **Arrêter ici** | Arrête le traitement et conserve les derniers choix enregistrés, s’il y en a, pour une prochaine ouverture. |
+
+Les enregistrements sont remplacés par écriture atomique : une mise à jour annulée conserve l’enregistrement précédent. Si l’outil ne parvient pas à oublier une session, il l’annonce ; une remise à zéro ne se poursuit pas comme si l’oubli avait réussi.
+
 ## Lire la comparaison
 
 Chaque cellule affiche un seul état. La couleur ne fait que renforcer : le symbole et le mot portent le sens,
