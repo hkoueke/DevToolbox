@@ -331,8 +331,15 @@ public sealed class WsdlReader : IWsdlReader
             return null;
         }
 
-        return messages.TryGetValue(qualified, out WsdlMessage? message)
-            || messages.TryGetValue(Local(qualified), out message)
+        // A qualified QName must never fall back to an unrelated namespace.
+        // The local-name fallback is reserved for genuinely unqualified references.
+        if (messages.TryGetValue(qualified, out WsdlMessage? message))
+        {
+            return message;
+        }
+
+        return string.Equals(qualified, Local(qualified), StringComparison.Ordinal)
+            && messages.TryGetValue(Local(qualified), out message)
                 ? message
                 : null;
     }
