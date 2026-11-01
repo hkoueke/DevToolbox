@@ -185,6 +185,30 @@ public sealed class WsdlReaderTests : IDisposable
                 DiagnosticSeverity.Information, "un cycle est légal : consigné, pas reproché");
     }
 
+    [Fact]
+    public void Qualified_message_reference_never_resolves_from_another_namespace()
+    {
+        const string source = """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              xmlns:foreign="urn:foreign"
+                              targetNamespace="urn:root">
+              <wsdl:message name="Request" />
+              <wsdl:portType name="Port">
+                <wsdl:operation name="Call">
+                  <wsdl:input message="foreign:Request" />
+                </wsdl:operation>
+              </wsdl:portType>
+            </wsdl:definitions>
+            """;
+
+        WsdlReadResult result = _reader.ReadBytes(
+            Encoding.UTF8.GetBytes(source), "entry.wsdl", WsdlLimits.Default, Policy());
+
+        result.IsFaithful.Should().BeTrue(Said(result));
+        result.Contract!.Operations.Should().ContainSingle()
+            .Which.Input.Should().BeNull("un QName qualifié ne peut pas désigner le message local homonyme");
+    }
+
     [Theory]
     [InlineData("<wsdl:import namespace='urn:shared' />")]
     [InlineData("<wsdl:import location='shared.wsdl' />")]
