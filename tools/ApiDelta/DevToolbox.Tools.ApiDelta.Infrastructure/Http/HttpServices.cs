@@ -81,6 +81,7 @@ internal static class HttpServices
         SocketsHttpConnectionContext context, CancellationToken cancellationToken)
     {
         if (context.InitialRequestMessage.RequestUri is not { } requested
+            || context.DnsEndPoint.Port != requested.Port
             || !string.Equals(context.DnsEndPoint.Host.Trim('[', ']'), requested.IdnHost.Trim('[', ']'), StringComparison.OrdinalIgnoreCase))
         {
             throw new HttpRequestException("Le proxy ne permet pas de garantir l'épinglage de l'adresse. Utilisez une collecte locale.");

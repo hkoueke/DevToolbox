@@ -20,6 +20,7 @@ est produit par l'exporteur réel. SHA-256 des octets UTF-8 sans BOM, fins de li
 ```bash
 dotnet test DevToolbox.slnx -c Release --filter 'FullyQualifiedName~WsdlUrlExportTests'
 dotnet test DevToolbox.slnx -c Release --filter 'FullyQualifiedName~PinnedConnectionTests.The_registered_exporter'
+dotnet test DevToolbox.slnx -c Release --filter 'FullyQualifiedName~PinnedConnectionTests.A_proxy_on_the_same_host'
 sha256sum tests/DevToolbox.Tests/Tools/ApiDelta/Corpus/Wsdl/url/expected.openapi.yaml
 ```
 
@@ -28,6 +29,8 @@ taille annoncée/absente, budgets cumulés, profondeur, annulation, erreurs et n
 compare l'export au YAML de référence et vérifie son rejeu sans requête. Le deuxième utilise le client
 HTTP enregistré par la DI et un vrai serveur local : six documents collectés, épinglage de connexion,
 même YAML, puis zéro connexion supplémentaire pendant le rejeu. Aucun serveur externe n'est appelé.
+Le test de proxy utilise une écoute TCP sur le même hôte mais un autre port : elle ne doit recevoir
+aucune connexion. Sans la protection du port, ce test observe effectivement une connexion et échoue.
 
 Pour vérifier l'empreinte sous PowerShell :
 

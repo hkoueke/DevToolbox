@@ -9,6 +9,7 @@ using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using DevToolbox.Tools.ApiDelta.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Xunit;
 using DevToolbox.Tests.Tools.ApiDelta.Corpus;
 
@@ -148,6 +149,43 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_proxy_on_the_same_host_cannot_change_the_pinned_destination_port()
+    {
+        bool configured = false;
+        TcpListener proxy = new(IPAddress.Loopback, 0);
+        proxy.Start();
+        int proxyPort = ((IPEndPoint)proxy.LocalEndpoint).Port;
+        ServiceCollection services = [];
+        services.AddApiDeltaInfrastructure();
+        services.AddSingleton<IClock>(new DevToolbox.Infrastructure.Platform.SystemClock());
+        services.ConfigureAll<HttpClientFactoryOptions>(options => options.HttpMessageHandlerBuilderActions.Add(builder =>
+        {
+            SocketsHttpHandler transport = (SocketsHttpHandler)builder.PrimaryHandler;
+            transport.Proxy = new WebProxy(new Uri("http://127.0.0.1:" + proxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                { BypassProxyOnLocal = false };
+            transport.UseProxy = true;
+            configured = true;
+        }));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Uri source = new("http://127.0.0.1:" + Free().ToString(System.Globalization.CultureInfo.InvariantCulture) + "/service.wsdl");
+        Func<Task> export = async () => _ = await provider.GetRequiredService<IWsdlOpenApiExporter>().ExportUrlAsync(source,
+            new(Path.Combine(_root, "capture"), ConfirmedAddresses: ["127.0.0.1"], AllowPlainHttp: true,
+                Limits: WsdlLimits.Default with { FetchTimeoutSeconds = 1 }), "SOAP acceptance", "1.0", CancellationToken.None);
+
+        try
+        {
+            await export.Should().ThrowAsync<WsdlExportException>();
+            configured.Should().BeTrue();
+            proxy.Pending().Should().BeFalse("le transport refuse le proxy avant d'ouvrir une connexion vers un autre port");
+            Directory.GetFileSystemEntries(_root).Should().BeEmpty();
+        }
+        finally
+        {
+            proxy.Stop();
         }
     }
 
