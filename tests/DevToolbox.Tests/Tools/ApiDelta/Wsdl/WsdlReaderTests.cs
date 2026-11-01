@@ -186,6 +186,28 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public void Every_unresolved_wsdl_import_is_reported()
+    {
+        const string source = """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:root">
+              <wsdl:import namespace="urn:first" location="first.wsdl" />
+              <wsdl:import namespace="urn:second" location="second.wsdl" />
+            </wsdl:definitions>
+            """;
+
+        WsdlReadResult result = _reader.ReadBytes(
+            Encoding.UTF8.GetBytes(source), "entry.wsdl", WsdlLimits.Default, Policy());
+
+        result.IsFaithful.Should().BeFalse();
+        Diagnostic[] imports = [.. result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == WsdlDiagnosticCodes.ImportUnresolved)];
+        imports.Should().HaveCount(2);
+        imports.Should().Contain(diagnostic => diagnostic.Message.Contains("first.wsdl", StringComparison.Ordinal));
+        imports.Should().Contain(diagnostic => diagnostic.Message.Contains("second.wsdl", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void A_wsdl_two_document_is_refused_by_naming_the_versions_supported()
     {
         const string Wsdl20 = """
