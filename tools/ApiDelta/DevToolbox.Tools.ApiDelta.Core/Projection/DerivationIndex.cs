@@ -73,13 +73,13 @@ public sealed class DerivationIndex
             new HashSet<string>(
                 contract.Operations.Select(operation => operation.Name), StringComparer.Ordinal));
 
-        Dictionary<string, List<ProjectionGap>> types = Grouped(
-            projection.Gaps,
-            new HashSet<string>(contract.Types.Keys.Select(Local), StringComparer.Ordinal));
+        SchemaNameRegistry schemaNames = new(contract.Types.Keys);
+        Dictionary<string, List<ProjectionGap>> types = GroupedTypes(
+            projection.Gaps, contract.Types.Keys, schemaNames);
 
         return new DerivationIndex(
             Routes(contract, projection, operations),
-            SchemaOrigins(contract, types),
+            SchemaOrigins(contract, types, schemaNames),
             operations,
             types,
             projection.Routes);
@@ -104,7 +104,7 @@ public sealed class DerivationIndex
     {
         ArgumentNullException.ThrowIfNull(name);
 
-        return _components.GetValueOrDefault(Local(name));
+        return _components.GetValueOrDefault(name);
     }
 
     /// <summary>D'où un emplacement quelconque du document projeté vient.</summary>
@@ -202,13 +202,14 @@ public sealed class DerivationIndex
 
     /// <summary>Les composants du document projeté, par nom local de type.</summary>
     private static Dictionary<string, DerivedOrigin> SchemaOrigins(
-        WsdlContract contract, Dictionary<string, List<ProjectionGap>> gaps)
+        WsdlContract contract, Dictionary<string, List<ProjectionGap>> gaps,
+        SchemaNameRegistry schemaNames)
     {
         Dictionary<string, DerivedOrigin> components = new(StringComparer.Ordinal);
 
         foreach (KeyValuePair<string, XsdType> type in contract.Types)
         {
-            string name = Local(type.Key);
+            string name = schemaNames.Key(type.Key);
 
             components[name] = new DerivedOrigin(
                 type.Key, type.Value.Location, Worth(gaps, name));
@@ -227,7 +228,7 @@ public sealed class DerivationIndex
     /// </remarks>
     private static ProjectionConfidence Worth(
         Dictionary<string, List<ProjectionGap>> gaps, string subject) =>
-        gaps.TryGetValue(Local(subject), out List<ProjectionGap>? own) && own.Count > 0
+        gaps.TryGetValue(subject, out List<ProjectionGap>? own) && own.Count > 0
             ? ProjectionConfidence.Approximate
             : ProjectionConfidence.Carried;
 
@@ -258,9 +259,38 @@ public sealed class DerivationIndex
         return grouped;
     }
 
+    /// <summary>Range les écarts des types par clé de composant, sans confondre les namespaces.</summary>
+    private static Dictionary<string, List<ProjectionGap>> GroupedTypes(
+        IReadOnlyList<ProjectionGap> gaps,
+        IEnumerable<string> qualifiedTypes,
+        SchemaNameRegistry schemaNames)
+    {
+        HashSet<string> known = new(qualifiedTypes, StringComparer.Ordinal);
+        Dictionary<string, List<ProjectionGap>> grouped = new(StringComparer.Ordinal);
+
+        foreach (ProjectionGap gap in gaps)
+        {
+            if (!known.Contains(gap.Subject))
+            {
+                continue;
+            }
+
+            string component = schemaNames.Key(gap.Subject);
+            if (!grouped.TryGetValue(component, out List<ProjectionGap>? own))
+            {
+                own = [];
+                grouped[component] = own;
+            }
+
+            own.Add(gap);
+        }
+
+        return grouped;
+    }
+
     private static IEnumerable<ProjectionGap> NotCarried(
         Dictionary<string, List<ProjectionGap>> gaps, string subject) =>
-        gaps.TryGetValue(Local(subject), out List<ProjectionGap>? own)
+        gaps.TryGetValue(subject, out List<ProjectionGap>? own)
             ? own.Where(gap => gap.Confidence == ProjectionConfidence.NotCarried)
             : [];
 
@@ -278,7 +308,9 @@ public sealed class DerivationIndex
         {
             if (scalar.Text.StartsWith(ComponentPrefix, StringComparison.Ordinal))
             {
-                _ = referenced.Add(scalar.Text[ComponentPrefix.Length..]);
+                _ = referenced.Add(scalar.Text[ComponentPrefix.Length..]
+                    .Replace("~1", "/", StringComparison.Ordinal)
+                    .Replace("~0", "~", StringComparison.Ordinal));
             }
         });
 
