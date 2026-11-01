@@ -158,7 +158,7 @@ internal sealed class DefinitionsReader
     }
 
     /// <summary>Le message qu'un flux désigne, son préfixe résolu.</summary>
-    private static string? Message(XElement? flow) =>
+    private string? Message(XElement? flow) =>
         flow is null ? null : Qualified(flow, flow.Attribute("message")?.Value);
 
     /// <summary>Les opérations de tous les types de port, avec leur schéma d'échange.</summary>
