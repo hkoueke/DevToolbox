@@ -38,7 +38,14 @@ internal sealed class WsdlImportWalker(
             string? targetNamespace = directive.Attribute("namespace")?.Value;
             if (string.IsNullOrWhiteSpace(location) || string.IsNullOrWhiteSpace(targetNamespace))
             {
-                // DefinitionsReader owns malformed-directive diagnostics.
+                // The root reader diagnoses root directives. Imported documents are
+                // parsed with importsResolved=true and need their own diagnostics.
+                if (depth > 0)
+                {
+                    Refuse(WsdlDiagnosticCodes.ImportUnresolved,
+                        "Un wsdl:import doit déclarer namespace et location non vides.", containing);
+                }
+
                 continue;
             }
 
