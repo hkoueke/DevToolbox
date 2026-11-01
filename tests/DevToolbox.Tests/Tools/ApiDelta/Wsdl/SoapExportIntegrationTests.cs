@@ -31,6 +31,13 @@ public sealed class SoapExportIntegrationTests : IDisposable
         Map(post, "responses", "default", "content", media).ToString().Should().Contain("Fault").And.Contain("Failure");
         yaml.Should().Contain("wrapped: false").And.Contain("minItems: 0").And.Contain("maxItems: 3")
             .And.Contain("int32").And.Contain("urn:types").And.Contain("SOAPAction = \"\"");
+        YamlSequenceNode faults = (YamlSequenceNode)Map(post, "responses", "default", "content", media, "schema")
+            .Children[new YamlScalarNode("anyOf")];
+        string detailName = string.Equals(media, "text/xml", StringComparison.Ordinal) ? "detail" : "Detail";
+        YamlMappingNode detailXml = Map((YamlMappingNode)faults.Children[0], "properties", "Body", "properties", "Fault", "properties", detailName, "xml");
+        _ = detailXml.Children.TryGetValue(new YamlScalarNode("namespace"), out YamlNode? namespaceNode);
+        string? detailNamespace = namespaceNode?.ToString();
+        detailNamespace.Should().Be(string.Equals(media, "text/xml", StringComparison.Ordinal) ? null : envelope);
         yaml.Should().NotContain("private.example").And.NotContain("x-soap-");
         Map(document, "components", "schemas").Children.Should().HaveCountGreaterThan(1);
         (await Export(path)).Should().Be(yaml, "serialization is deterministic for the same graph");
@@ -294,6 +301,14 @@ public sealed class SoapExportIntegrationTests : IDisposable
         string path = Contract();
         await Replace(Path.Combine(_directory, "model.wsdl"), "schemaLocation='types.xsd'", "schemaLocation='../types.xsd'");
         await Refused(path, "WSDL_XSD_GRAPH_UNRESOLVED_OR_INVALID");
+    }
+
+    [Fact]
+    public async Task Missing_operation_names_are_refused_without_an_unhandled_exception()
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "binding.wsdl"), "<operation name='Call'>", "<operation>");
+        await Refused(path, "WSDL_OPERATION_UNRESOLVED_OR_AMBIGUOUS");
     }
 
     private string Contract(string soap = "http://schemas.xmlsoap.org/wsdl/soap/")

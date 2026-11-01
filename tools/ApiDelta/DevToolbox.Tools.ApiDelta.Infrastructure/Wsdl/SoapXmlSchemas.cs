@@ -256,11 +256,13 @@ internal sealed class SoapXmlSchemas(XmlSchemaSet schemas, SchemaDraft component
 
     internal static void Xml(SchemaDraft draft, string name, string space)
     {
-        draft.Section("xml").Set("name", name);
+        SchemaDraft xml = new();
+        draft.Set("xml", xml);
+        xml.Set("name", name);
         if (space.Length > 0)
         {
-            draft.Section("xml").Set("namespace", space);
-            draft.Section("xml").Set("prefix", "ns");
+            xml.Set("namespace", space);
+            xml.Set("prefix", "ns");
         }
     }
 

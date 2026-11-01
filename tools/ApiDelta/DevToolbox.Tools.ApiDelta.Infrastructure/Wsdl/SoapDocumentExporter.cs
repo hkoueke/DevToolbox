@@ -53,6 +53,10 @@ internal sealed class SoapDocumentExporter(SoapExportGraph graph)
             .OrderBy(operation => operation.Attribute("name")?.Value, StringComparer.Ordinal))
         {
             string name = bound.Attribute("name")?.Value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new WsdlExportException("WSDL_OPERATION_UNRESOLVED_OR_AMBIGUOUS");
+            }
             XElement[] candidates = [.. portType.Elements(Wsdl + "operation")
                 .Where(operation => string.Equals(operation.Attribute("name")?.Value, name, StringComparison.Ordinal))];
             if (candidates.Length != 1 || !names.Add(name))
@@ -179,6 +183,10 @@ internal sealed class SoapDocumentExporter(SoapExportGraph graph)
             .OrderBy(fault => fault.Attribute("name")?.Value, StringComparer.Ordinal))
         {
             string? name = fault.Attribute("name")?.Value;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new WsdlExportException("SOAP_FAULT_BINDING_UNRESOLVED_OR_ENCODED");
+            }
             XElement[] matches = [.. bound.Elements(Wsdl + "fault").Where(item =>
                 string.Equals(item.Attribute("name")?.Value, name, StringComparison.Ordinal))];
             if (matches.Length != 1 || !string.Equals(matches[0].Element(soap + "fault")?.Attribute("use")?.Value, "literal", StringComparison.Ordinal))
