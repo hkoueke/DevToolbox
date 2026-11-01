@@ -275,6 +275,99 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_malformed_transitive_wsdl_import_is_refused()
+    {
+        _ = Write("nested.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:nested">
+              <wsdl:import namespace="urn:missing" />
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:nested" location="nested.wsdl" />
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == WsdlDiagnosticCodes.ImportUnresolved
+            && diagnostic.Message.Contains("nested.wsdl", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_binding_declared_in_an_imported_wsdl_is_linked_to_the_root_operation()
+    {
+        _ = Write("binding.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                              targetNamespace="urn:binding">
+              <wsdl:binding name="SoapBinding" type="urn:binding:Port">
+                <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http" />
+                <wsdl:operation name="Call">
+                  <soap:operation soapAction="urn:call" />
+                  <wsdl:input><soap:body use="literal" /></wsdl:input>
+                </wsdl:operation>
+              </wsdl:binding>
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:binding" location="binding.wsdl" />
+              <wsdl:portType name="Port">
+                <wsdl:operation name="Call" />
+              </wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeTrue(Said(result));
+        result.Contract!.Operations.Should().ContainSingle()
+            .Which.Binding!.SoapAction.Should().Be("urn:call");
+    }
+
+    [Fact]
+    public async Task Conflicting_imported_soap_bindings_are_refused()
+    {
+        _ = Write("first.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:first">
+              <wsdl:binding name="First" type="Port">
+                <wsdl:operation name="Call" />
+              </wsdl:binding>
+            </wsdl:definitions>
+            """);
+        _ = Write("second.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:second">
+              <wsdl:binding name="Second" type="Port">
+                <wsdl:operation name="Call" />
+              </wsdl:binding>
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:first" location="first.wsdl" />
+              <wsdl:import namespace="urn:second" location="second.wsdl" />
+              <wsdl:portType name="Port"><wsdl:operation name="Call" /></wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == WsdlDiagnosticCodes.StructuralViolation
+            && diagnostic.Message.Contains("bindings SOAP", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Imported_wsdl_messages_are_bound_by_namespace()
     {
         _ = Write("shared.wsdl", """
