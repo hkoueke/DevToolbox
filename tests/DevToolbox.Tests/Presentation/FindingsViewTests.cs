@@ -91,7 +91,7 @@ public sealed class FindingsViewTests
                 [new RuleOutcome("AUD-206", RuleState.Evaluated, 1)]),
             everything: true);
 
-        output.Should().Contain("déduction").And.Contain("Déduit du nom de la propriété.");
+        output.Should().Contain("pourquoi ce résultat").And.Contain("Déduit du nom de la propriété.");
 
         console.Dispose();
     }

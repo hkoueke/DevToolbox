@@ -159,8 +159,40 @@ public sealed class AddressGuardTests
         check.Refusal!.Message.Should().NotContain("tres-secret").And.NotContain("aussi");
     }
 
+    [Theory]
+    [InlineData("https://exemple.test.evil/contract.wsdl")]
+    [InlineData("https://other.test/contract.wsdl")]
+    [InlineData("https://user:password@exemple.test/contract.wsdl")]
+    [InlineData("https://exemple.test/contract.wsdl?token=secret")]
+    [InlineData("https://exemple.test/contract.wsdl#secret")]
+    public async Task Unauthorized_authorities_and_sensitive_URI_parts_are_refused_before_DNS(string uri)
+    {
+        int calls = 0;
+        AddressGuard guard = new((_, _) =>
+        {
+            calls++;
+            return Task.FromResult<IPAddress[]>([IPAddress.Parse("8.8.8.8")]);
+        });
+
+        AddressCheck check = await guard.CheckAsync(new Uri(uri), Policy(), CancellationToken.None);
+
+        check.IsAllowed.Should().BeFalse();
+        check.Refusal!.Message.Should().NotContain("secret").And.NotContain("password");
+        calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Empty_DNS_answers_do_not_authorize_a_request()
+    {
+        AddressGuard guard = new((_, _) => Task.FromResult(Array.Empty<IPAddress>()));
+        AddressCheck check = await guard.CheckAsync(new Uri("https://exemple.test/contract.wsdl"), Policy(), CancellationToken.None);
+        check.IsAllowed.Should().BeFalse();
+        check.Refusal!.Code.Should().Be(WsdlDiagnosticCodes.AddressUnresolved);
+    }
+
     private static ImportPolicy Policy() =>
-        new(Root, AllowRemote: true, AllowedHosts: ["exemple.test"]);
+        new(Root, AllowRemote: true, AllowedHosts:
+            ["exemple.test", "interne.test", "parfaitement-public.test", "nulle-part.test", "deux.test", "10.0.0.5"]);
 
     private static Task<AddressCheck> CheckAsync(string address) => CheckAsync(address, Policy());
 

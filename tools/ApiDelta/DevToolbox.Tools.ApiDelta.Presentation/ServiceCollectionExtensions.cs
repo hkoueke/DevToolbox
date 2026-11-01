@@ -79,6 +79,7 @@ public static class ServiceCollectionExtensions
         AddSteps(services);
 
         services.AddSingleton<ITool>(CreateTool);
+        services.AddSingleton<ITool, WsdlOpenApiTool>();
 
         return services;
     }

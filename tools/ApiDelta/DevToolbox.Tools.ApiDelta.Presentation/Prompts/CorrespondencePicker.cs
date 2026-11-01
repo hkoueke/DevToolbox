@@ -20,8 +20,8 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 public sealed class CorrespondencePicker
 {
     private const int PageSize = 15;
-    private const string Decline = "Renoncer : ne rien comparer";
-    private const string Accept = "Confirmer cet appariement";
+    private const string Decline = "Annuler la comparaison";
+    private const string Accept = "Valider ces correspondances et comparer";
 
     private readonly IAnsiConsole _console;
 
@@ -48,7 +48,7 @@ public sealed class CorrespondencePicker
         {
             _console.MarkupLine(
                 "[yellow]Le contrat de service ne déclare aucune opération : il n'y a rien à "
-                    + "apparier.[/]");
+                    + "comparer.[/]");
 
             return proposed;
         }
@@ -64,8 +64,7 @@ public sealed class CorrespondencePicker
             if (string.Equals(choice, Decline, StringComparison.Ordinal))
             {
                 _console.MarkupLine(
-                    "[yellow]Appariement non confirmé : rien ne sera comparé, et le rapport le "
-                        + "dira.[/]");
+                    "[yellow]Comparaison annulée. Les fichiers restent inchangés.[/]");
 
                 return current with { IsConfirmed = false };
             }
@@ -87,12 +86,13 @@ public sealed class CorrespondencePicker
     /// </remarks>
     private void Announce(OperationCorrespondence proposed)
     {
+        _console.MarkupLine("[bold]Associer les opérations WSDL aux appels OpenAPI[/]");
         Table table = new Table()
             .Border(TableBorder.Rounded)
-            .AddColumn("Appariement")
+            .AddColumn("État")
             .AddColumn("Opération")
             .AddColumn("Route")
-            .AddColumn("Fondement");
+            .AddColumn("Pourquoi ce choix ?");
 
         foreach (CorrespondenceEntry entry in proposed.Entries)
         {
@@ -106,8 +106,7 @@ public sealed class CorrespondencePicker
         _console.Write(table);
 
         _console.MarkupLine(
-            "[grey]Chaque constat de compatibilité ne vaut que ce que vaut l'appariement au-dessus de "
-                + "lui : une ligne fausse produit un rapport assuré sur la mauvaise paire.[/]");
+            "[grey]Vérifiez que chaque opération du WSDL correspond au bon appel dans votre fichier OpenAPI. Corrigez les lignes incorrectes avant de comparer.[/]");
     }
 
     /// <summary>La marque d'une entrée, colorée selon la nouvelle qu'elle porte.</summary>
@@ -124,7 +123,7 @@ public sealed class CorrespondencePicker
     {
         if (!entry.HasRoute)
         {
-            return "rien en production";
+            return "aucun appel correspondant";
         }
 
         return entry.Alternatives.Count == 0
@@ -136,7 +135,7 @@ public sealed class CorrespondencePicker
     private string Pick(OperationCorrespondence current)
     {
         SelectionPrompt<string> prompt = new SelectionPrompt<string>()
-            .Title("Que faire de cet appariement ?")
+            .Title("Ces correspondances sont-elles correctes ?")
             .PageSize(PageSize)
             .AddChoices(Accept);
 
@@ -159,7 +158,7 @@ public sealed class CorrespondencePicker
     private OperationCorrespondence Correct(
         OperationCorrespondence current, string choice, IReadOnlyList<string> routes)
     {
-        const string Nothing = "Aucune : cette opération n'est pas couverte";
+        const string Nothing = "Aucun appel correspondant";
 
         string operation = choice["Corriger : ".Length..];
 
@@ -167,7 +166,7 @@ public sealed class CorrespondencePicker
             new SelectionPrompt<string>()
                 .Title("À quelle route « " + Markup.Escape(operation) + " » correspond-elle ?")
                 .PageSize(PageSize)
-                .AddChoices(routes.Count > 0 ? routes : [Nothing])
+                .AddChoices(routes)
                 .AddChoices(Nothing));
 
         bool absent = string.Equals(chosen, Nothing, StringComparison.Ordinal);
@@ -183,7 +182,7 @@ public sealed class CorrespondencePicker
             {
                 Route = absent ? string.Empty : chosen,
                 Origin = absent ? CorrespondenceOrigin.Ambiguous : CorrespondenceOrigin.Declared,
-                Basis = "désignée par le développeur",
+                Basis = "choisie par vous",
                 Alternatives = [],
             };
         }

@@ -17,17 +17,14 @@ namespace DevToolbox.Presentation.Shell;
 /// liste de groupes de variables et deux fichiers accompagnés d'un mode.
 /// </para>
 /// <para>
-/// Les trois entrées portaient des libellés qui cachaient leur différence : deux d'entre elles finissaient
-/// par « repartir de zéro » sans dire ce qu'elles faisaient de la séance mémorisée, et passaient donc pour
-/// un doublon. Elles nomment maintenant la seule chose qui les sépare — redemandera-t-on, ou non, au
-/// prochain lancement.
+/// Les choix distinguent la reprise, l'oubli immédiat et la conservation jusqu'au prochain enregistrement.
 /// </para>
 /// </remarks>
 public sealed class ResumePrompt
 {
-    private const string ResumeLabel = "Reprendre là où vous en étiez";
-    private const string DiscardLabel = "Repartir de zéro, et oublier cette séance";
-    private const string StartFreshLabel = "Repartir de zéro, me la redemander au prochain lancement";
+    private const string ResumeLabel = "Reprendre les choix enregistrés";
+    private const string DiscardLabel = "Nouvelle session — oublier les anciens choix";
+    private const string StartFreshLabel = "Nouvelle session — garder les anciens choix provisoirement";
 
     private readonly IAnsiConsole _console;
 
@@ -43,9 +40,9 @@ public sealed class ResumePrompt
     /// <param name="candidates">Les exécutions reprenables, la plus récente en tête.</param>
     /// <returns>
     /// La réponse du développeur. <em>Oublier</em> supprime la séance mémorisée ; <em>me la redemander</em>
-    /// la laisse en place, et la question reviendra au prochain lancement de cet outil. Un seul point de
-    /// reprise existe par outil : une séance gardée est remplacée par la suivante qui s'interrompt, et le
-    /// libellé promet donc le prochain lancement, non l'éternité.
+    /// la laisse en place jusqu'au prochain enregistrement de cet outil. Un seul point de
+    /// reprise existe par outil : une séance gardée est remplacée dès que les nouveaux choix sont enregistrés, et le
+    /// libellé explique donc cette conservation provisoire.
     /// </returns>
     public ResumeAnswer Ask(IReadOnlyList<PersistedRun> candidates)
     {
@@ -59,12 +56,12 @@ public sealed class ResumePrompt
         PersistedRun candidate = candidates[0];
 
         _console.Write(new Panel(Describe(candidate))
-            .Header("[bold]Une exécution précédente ne s'est pas terminée[/]")
+            .Header("[bold]Des choix précédents sont disponibles[/]")
             .Border(BoxBorder.Rounded));
 
-        _console.MarkupLine(
-            "[grey]Seule votre sélection a été mémorisée. Reprendre la relit, si bien que vous n'agissez "
-            + "jamais sur une image périmée.[/]");
+        _console.MarkupLine("[grey]Reprendre réutilise les choix ci-dessus et relit les données. Aucun ancien résultat n’est réutilisé.[/]");
+        _console.MarkupLine("[grey]Nouvelle session redemande les choix. Aucun de ces choix ne supprime vos fichiers ni vos rapports.[/]");
+        _console.MarkupLine("[grey]Si vous gardez les anciens choix, ils restent disponibles jusqu’au premier enregistrement automatique de la nouvelle session.[/]");
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
@@ -79,6 +76,22 @@ public sealed class ResumePrompt
         };
 
         return new ResumeAnswer(decision, candidate);
+    }
+
+    /// <summary>Explique un oubli impossible sans présenter une remise à zéro comme réussie.</summary>
+    public static void RenderCleanupWarning(IAnsiConsole console, DevToolbox.Domain.Runs.ToolRunContext context)
+    {
+        ArgumentNullException.ThrowIfNull(console);
+        ArgumentNullException.ThrowIfNull(context);
+        if (context.Get<bool>(CheckpointContextKeys.CleanupFailed))
+        {
+            if (context.Run.Outcome == DevToolbox.Domain.Runs.RunOutcome.Abandoned)
+            {
+                console.MarkupLine("[yellow]La remise à zéro n’a pas eu lieu. Le traitement a été arrêté avec les anciens choix.[/]");
+            }
+
+            console.MarkupLine("[yellow]La session enregistrée n’a pas pu être oubliée. Les anciens choix peuvent encore être proposés à la prochaine ouverture. Vos fichiers et rapports sont conservés.[/]");
+        }
     }
 
     private static Grid Describe(PersistedRun run)

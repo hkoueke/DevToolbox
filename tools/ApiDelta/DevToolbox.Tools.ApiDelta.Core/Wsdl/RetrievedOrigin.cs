@@ -63,6 +63,7 @@ public sealed record RetrievedOrigin
         {
             UserName = string.Empty,
             Password = string.Empty,
+            Fragment = string.Empty,
         };
 
         if (!string.IsNullOrEmpty(builder.Query))

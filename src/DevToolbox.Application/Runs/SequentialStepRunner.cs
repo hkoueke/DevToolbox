@@ -126,8 +126,40 @@ public sealed class SequentialStepRunner : IStepRunner
             cursor = recovery.NextCursor(cursor);
         }
 
-        run.End(RunOutcome.Success, _clock.UtcNow);
-        return run;
+        return await FinishAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ToolRun> FinishAsync(ToolRunContext context, CancellationToken cancellationToken)
+    {
+        if (!context.Run.Steps.Any(state => state.Status == StepStatus.Skipped && state.FailureReason is not null))
+        {
+            _ = await TryDiscardCheckpointAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        context.Run.End(RunOutcome.Success, _clock.UtcNow);
+        return context.Run;
+    }
+
+    private async Task<bool> TryDiscardCheckpointAsync(ToolRunContext context, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _checkpointStore.DiscardAsync(context.Run.RunId, cancellationToken).ConfigureAwait(false);
+            Guid source = context.Get<Guid>(CheckpointContextKeys.SourceRunId);
+            if (source != Guid.Empty && source != context.Run.RunId)
+            {
+                await _checkpointStore.DiscardAsync(source, cancellationToken).ConfigureAwait(false);
+            }
+
+            context.Set(CheckpointContextKeys.CleanupFailed, false);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            context.Set(CheckpointContextKeys.CleanupFailed, true);
+            Log.CheckpointCleanupFailed(_logger, context.Run.RunId);
+            return false;
+        }
     }
 
     private static StepState FindStepOrThrow(ToolRun run, string name) =>
@@ -165,6 +197,11 @@ public sealed class SequentialStepRunner : IStepRunner
             case RecoveryChoice.RestartAll:
                 // Tout ce qui était conservé est jeté, pour que l'exécution reparte vraiment de zéro plutôt
                 // que de se poursuivre sur un état périmé.
+                if (!await TryDiscardCheckpointAsync(context, cancellationToken).ConfigureAwait(false))
+                {
+                    return new RecoveryOutcome(Abandoned: true, RestartFromBeginning: false, Retry: false);
+                }
+
                 context.Run.ResetAllSteps();
                 context.Clear();
                 return new RecoveryOutcome(Abandoned: false, RestartFromBeginning: true, Retry: false);

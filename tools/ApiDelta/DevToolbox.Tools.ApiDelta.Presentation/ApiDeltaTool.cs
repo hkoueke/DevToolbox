@@ -1,5 +1,6 @@
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Audit;
 using DevToolbox.Tools.ApiDelta.Core.Comparison;
@@ -92,7 +93,7 @@ public sealed class ApiDeltaTool : ITool
 
     /// <inheritdoc />
     public string Description =>
-        "fusionner ou nettoyer un fichier OpenAPI (Swagger)";
+        "comparer, vérifier et nettoyer des fichiers OpenAPI (Swagger)";
 
     /// <inheritdoc />
     /// <remarks>
@@ -130,17 +131,15 @@ public sealed class ApiDeltaTool : ITool
         // seulement si les fichiers sont encore ceux qui avaient été lus.
         await _resume.TryResumeAsync(Id, context, cancellationToken).ConfigureAwait(false);
 
-        // Et de nouveau après la réponse : le panneau de reprise a fait son travail, et ce qui suit est
-        // une autre conversation. Nettoyer ici évite aussi qu'une séance reprise affiche sous ses
-        // questions le descriptif de la séance qu'elle remplace.
-        _console.Clear();
-
+        // Les effets du choix de reprise et ses éventuels refus doivent rester lisibles.
         await _runner.RunAsync(context, _steps, cancellationToken).ConfigureAwait(false);
 
         RenderOutcome(run, context);
+        ResumePrompt.RenderCleanupWarning(_console, context);
 
         if (run.Outcome != RunOutcome.Success)
         {
+            Pause();
             return run;
         }
 
@@ -168,6 +167,7 @@ public sealed class ApiDeltaTool : ITool
                 cancellationToken);
         }
 
+        Pause();
         return run;
     }
 
@@ -191,27 +191,25 @@ public sealed class ApiDeltaTool : ITool
                 ? $"[red]{Markup.Escape(failed.Name)} ne s'est pas achevée :[/] {Markup.Escape(reason)}"
                 : "[yellow]L'exécution ne s'est pas achevée.[/]");
         }
+        else if (run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is not null))
+        {
+            _console.MarkupLine("[yellow]Le traitement a continué après une erreur. Des fichiers ont pu être écrits avant celle-ci ; vérifiez le dossier des résultats.[/]");
+        }
         else if (selection is not null)
         {
-            // Ce qui a réellement eu lieu, et non une phrase toute faite. L'ancienne annonçait un
-            // examen et un chiffrage même quand les deux étapes avaient été sautées : un message qui
-            // décrit une autre exécution que celle qu'on vient de regarder apprend à ne plus le lire.
-            _console.MarkupLine(
-                selection.Mode == RunMode.Consolidate
-                    ? "[grey]Votre fichier de production et le fichier compagnon ont été lus et "
-                        + "comparés, et les rapports sont écrits. Votre fichier de production n'a pas "
-                        + "été modifié : ce qui a été retenu est allé dans le fichier consolidé, à "
-                        + "côté.[/]"
-                    : "[grey]Votre fichier a été lu, examiné, et ce qu'un nettoyage lui gagnerait est "
-                        + "chiffré. Votre fichier n'a pas été modifié.[/]");
+            _summary.RenderWritten(selection,
+                context.Get<IReadOnlyList<Artifact>>(ApiDeltaContextKeys.Artifacts) ?? []);
         }
+    }
 
+    private void Pause()
+    {
         _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir au menu.[/]");
         _console.Input.ReadKey(intercept: true);
     }
 
     /// <summary>
-    /// Affiche l'issue dans le vocabulaire publié.
+    /// Explique le résultat en français ; les codes des rapports restent inchangés.
     /// </summary>
     /// <remarks>
     /// Affichée et écrite dans le rapport lisible par une machine, et nulle part ailleurs. Ce n'est pas
@@ -226,11 +224,26 @@ public sealed class ApiDeltaTool : ITool
             return;
         }
 
-        string name = Markup.Escape(code);
+        if (context.Run.Steps.Any(step => step.Status == StepStatus.Skipped && step.FailureReason is not null))
+        {
+            _console.MarkupLine("[yellow]Une étape a été passée après une erreur : les résultats peuvent être incomplets.[/]");
+            return;
+        }
+
+        string label = code switch
+        {
+            "clean" => "Aucun problème au-dessus du seuil choisi.",
+            "thresholdExceeded" => "Des points à vérifier dépassent le seuil choisi.",
+            "breakingChange" => "Des changements incompatibles avec l’ancien contrat ont été détectés.",
+            "invalidUsage" => "La demande est incomplète ou invalide.",
+            "loadFailure" => "Un fichier n’a pas pu être lu correctement.",
+            "outputFailure" => "Un résultat n’a pas pu être écrit ou vérifié.",
+            _ => "Une erreur interne a interrompu le traitement.",
+        };
 
         _console.MarkupLine(
             string.Equals(code, OutcomeCodeNames.Of(OutcomeCode.Clean), StringComparison.Ordinal)
-                ? "[grey]Issue :[/] " + name
-                : "[yellow]Issue :[/] " + name);
+                ? "[grey]" + label + "[/]"
+                : "[yellow]" + label + "[/]");
     }
 }

@@ -9,7 +9,9 @@ using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using DevToolbox.Tools.ApiDelta.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Xunit;
+using DevToolbox.Tests.Tools.ApiDelta.Corpus;
 
 namespace DevToolbox.Tests.Tools.ApiDelta.Http;
 
@@ -36,6 +38,8 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
     private string _origin = null!;
     private Task _serving = null!;
     private TimeSpan _delay = TimeSpan.Zero;
+    private bool _exportGraph;
+    private readonly List<string> _requested = [];
 
     public Task InitializeAsync()
     {
@@ -111,6 +115,26 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
         fetched.Failure!.Message.Should().Contain("fetchTimeoutSeconds");
     }
 
+    [Fact]
+    public async Task The_registered_exporter_collects_a_real_multi_document_URL_graph_and_replays_it()
+    {
+        _exportGraph = true;
+        using ServiceProvider provider = Provider();
+        IWsdlOpenApiExporter exporter = provider.GetRequiredService<IWsdlOpenApiExporter>();
+        string collection = Path.Combine(_root, "capture");
+
+        string yaml = await exporter.ExportUrlAsync(new Uri(_origin + "/service.wsdl"),
+            new(collection, ConfirmedAddresses: ["127.0.0.1"], AllowPlainHttp: true),
+            "SOAP acceptance", "1.0", CancellationToken.None);
+
+        yaml.Should().Be(CorpusLoader.Read("Wsdl.url.expected.openapi.yaml"));
+        _requested.Should().HaveCount(6);
+        string replay = await exporter.ExportAsync(Path.Combine(collection, "manifest.json"),
+            "SOAP acceptance", "1.0", CancellationToken.None);
+        replay.Should().Be(yaml);
+        _requested.Should().HaveCount(6, "le rejeu n'ouvre aucune connexion");
+    }
+
     public async Task DisposeAsync()
     {
         _listener.Stop();
@@ -125,6 +149,43 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_proxy_on_the_same_host_cannot_change_the_pinned_destination_port()
+    {
+        bool configured = false;
+        TcpListener proxy = new(IPAddress.Loopback, 0);
+        proxy.Start();
+        int proxyPort = ((IPEndPoint)proxy.LocalEndpoint).Port;
+        ServiceCollection services = [];
+        services.AddApiDeltaInfrastructure();
+        services.AddSingleton<IClock>(new DevToolbox.Infrastructure.Platform.SystemClock());
+        services.ConfigureAll<HttpClientFactoryOptions>(options => options.HttpMessageHandlerBuilderActions.Add(builder =>
+        {
+            SocketsHttpHandler transport = (SocketsHttpHandler)builder.PrimaryHandler;
+            transport.Proxy = new WebProxy(new Uri("http://127.0.0.1:" + proxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+                { BypassProxyOnLocal = false };
+            transport.UseProxy = true;
+            configured = true;
+        }));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        Uri source = new("http://127.0.0.1:" + Free().ToString(System.Globalization.CultureInfo.InvariantCulture) + "/service.wsdl");
+        Func<Task> export = async () => _ = await provider.GetRequiredService<IWsdlOpenApiExporter>().ExportUrlAsync(source,
+            new(Path.Combine(_root, "capture"), ConfirmedAddresses: ["127.0.0.1"], AllowPlainHttp: true,
+                Limits: WsdlLimits.Default with { FetchTimeoutSeconds = 1 }), "SOAP acceptance", "1.0", CancellationToken.None);
+
+        try
+        {
+            await export.Should().ThrowAsync<WsdlExportException>();
+            configured.Should().BeTrue();
+            proxy.Pending().Should().BeFalse("le transport refuse le proxy avant d'ouvrir une connexion vers un autre port");
+            Directory.GetFileSystemEntries(_root).Should().BeEmpty();
+        }
+        finally
+        {
+            proxy.Stop();
         }
     }
 
@@ -181,7 +242,10 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
                     await Task.Delay(_delay).ConfigureAwait(false);
                 }
 
-                byte[] body = Encoding.UTF8.GetBytes(Contract);
+                string path = context.Request.Url!.AbsolutePath.TrimStart('/');
+                _requested.Add(path);
+                byte[] body = Encoding.UTF8.GetBytes(_exportGraph
+                    ? CorpusLoader.Read("Wsdl.url." + path.Replace('/', '.')) : Contract);
 
                 context.Response.ContentType = "text/xml";
                 context.Response.ContentLength64 = body.Length;

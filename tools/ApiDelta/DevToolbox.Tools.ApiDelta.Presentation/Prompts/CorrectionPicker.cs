@@ -79,7 +79,7 @@ public sealed class CorrectionPicker
 
         foreach (OperationSelector route in plan.Routes)
         {
-            _ = table.AddRow(Markup.Escape(route.Display), "route neuve");
+            _ = table.AddRow(Markup.Escape(route.Display), "nouvel appel");
         }
 
         foreach (PlannedDifference difference in plan.Differences)
@@ -93,7 +93,7 @@ public sealed class CorrectionPicker
         {
             _console.MarkupLine(
                 CultureInfo.InvariantCulture,
-                "Plus les composants dont ces éléments ont besoin : [bold]{0}[/].",
+                "Définitions nécessaires ajoutées automatiquement : [bold]{0}[/].",
                 plan.Components.ToString(CultureInfo.InvariantCulture));
         }
 
@@ -111,10 +111,9 @@ public sealed class CorrectionPicker
         Incompatibility(plan);
 
         _console.MarkupLine(
-            "Votre fichier de production ne sera [bold]pas[/] modifié : un fichier consolidé distinct "
-            + "sera écrit à côté des rapports.");
+            "Votre fichier de référence sera [bold]conservé[/]. La copie avec les changements choisis sera écrite dans le dossier des résultats.");
 
-        return _console.Confirm("Écrire la production consolidée de ces éléments ?", defaultValue: false);
+        return _console.Confirm("Créer le fichier fusionné avec cette sélection ?", defaultValue: false);
     }
 
     /// <summary>Dit qu'au moins un changement rompt la compatibilité, et ce que la version en fait.</summary>
@@ -133,13 +132,11 @@ public sealed class CorrectionPicker
             return;
         }
 
-        _console.MarkupLine(plan.Version?.Effective is { } next
-            ? "[yellow]Au moins un de ces changements rend le contrat incompatible avec le précédent.[/] "
-                + "C'est pourquoi la version passe à [bold]" + Markup.Escape(next.ToString())
-                + "[/] : un client écrit pour l'ancien contrat doit être adapté avant d'appeler celui-ci, "
-                + "et celui qui appelle la version en service n'est pas touché."
-            : "[yellow]Au moins un de ces changements rend le contrat incompatible avec le précédent.[/] "
-                + "Un client écrit pour l'ancien contrat doit être adapté avant d'appeler celui-ci.");
+        _console.MarkupLine("[yellow]Certains changements ne sont pas compatibles avec l’ancien contrat. Les applications qui adopteront ce contrat devront peut-être être adaptées.[/]");
+        if (plan.Version?.Effective is { } next)
+        {
+            _console.MarkupLine("[grey]Version proposée pour le nouveau fichier :[/] " + Markup.Escape(next.ToString()));
+        }
     }
 
     /// <summary>
@@ -167,8 +164,7 @@ public sealed class CorrectionPicker
 
         _console.MarkupLine(
             CultureInfo.InvariantCulture,
-            "[yellow]{0} endroit(s) resteront non remplis[/] : la projection n'y a rien porté, et "
-            + "l'outil refuse de les deviner. Le rapport les nomme un par un.",
+            "[yellow]{0} partie(s) ne peuvent pas être traduites automatiquement.[/] Consultez le rapport avant d’utiliser le fichier fusionné.",
             plan.Unfilled.Count.ToString(CultureInfo.InvariantCulture));
     }
 
@@ -179,7 +175,7 @@ public sealed class CorrectionPicker
 
         _console.MarkupLine(
             CultureInfo.InvariantCulture,
-            "Le candidat porte [bold]{0}[/] route(s), dont [bold]{1}[/] apportent quelque chose.",
+            "Le nouveau fichier contient [bold]{0}[/] appel(s), dont [bold]{1}[/] avec des ajouts ou des différences.",
             routes.Count.ToString(CultureInfo.InvariantCulture),
             carryable.Count.ToString(CultureInfo.InvariantCulture));
 
@@ -187,7 +183,7 @@ public sealed class CorrectionPicker
         {
             _console.MarkupLine(
                 CultureInfo.InvariantCulture,
-                "[grey]{0} route(s) sont déjà identiques en production : rien à y reporter.[/]",
+                "[grey]{0} appel(s) sont déjà identiques dans votre fichier de référence.[/]",
                 identical.ToString(CultureInfo.InvariantCulture));
         }
     }
@@ -196,11 +192,11 @@ public sealed class CorrectionPicker
     private List<string> Pick(List<CorrectionRoute> carryable)
     {
         MultiSelectionPrompt<string> prompt = new MultiSelectionPrompt<string>()
-            .Title("Que faut-il ajouter au fichier de production ?")
+            .Title("Quels changements voulez-vous reprendre ?")
             .PageSize(PageSize)
             .MoreChoicesText("[grey](flèches pour parcourir)[/]")
             .InstructionsText(
-                "[grey](espace pour cocher, entrée pour valider ; cocher une route la porte entière)[/]")
+                "[grey](espace : cocher · entrée : valider · cocher un appel reprend tous ses changements)[/]")
             .NotRequired();
 
         foreach (CorrectionRoute route in carryable)
@@ -252,7 +248,7 @@ public sealed class CorrectionPicker
 
     private static string Label(CorrectionRoute route, Difference difference) =>
         Markup.Escape(
-            route.Selector.Display + " · " + difference.ChangeId + " · "
+            route.Selector.Display + " · "
             + difference.Location.Display + " — " + Plain(difference.Impact) + ", "
             + Plain(difference.Confidence) + route.Footing);
 

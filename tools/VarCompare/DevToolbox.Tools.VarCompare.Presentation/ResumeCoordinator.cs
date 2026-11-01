@@ -80,16 +80,29 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
         if (answer.Decision == ResumeDecision.Discard && answer.Run is not null)
         {
             await _store.DiscardAsync(answer.Run.RunId, cancellationToken).ConfigureAwait(false);
+            _console.MarkupLine("[grey]Les anciens choix ont été oubliés. Aucun groupe ni réglage serveur n’est modifié.[/]");
             return false;
         }
 
         if (answer.Decision != ResumeDecision.Resume || answer.Run is null)
         {
+            if (answer.Run is not null)
+            {
+                _console.MarkupLine("[grey]Nouvelle session : choisissez à nouveau. Les anciens choix restent disponibles jusqu’à l’enregistrement des nouveaux.[/]");
+            }
+
             return false;
         }
 
-        Seed(context, answer.Run);
+        if (!Seed(context, answer.Run))
+        {
+            await _store.DiscardAsync(answer.Run.RunId, cancellationToken).ConfigureAwait(false);
+            _console.MarkupLine("[yellow]Cette session ne contient plus de projet utilisable. Les anciens choix sont oubliés ; choisissez à nouveau.[/]");
+            return false;
+        }
 
+        context.Set(CheckpointContextKeys.SourceRunId, answer.Run.RunId);
+        _console.MarkupLine("[grey]Les choix enregistrés sont repris. Les groupes et leurs valeurs seront relus sur le serveur.[/]");
         return true;
     }
 
@@ -144,13 +157,18 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
     /// Restaure la sélection dans le contexte, en laissant tout le reste en attente pour que les groupes
     /// soient réellement relus.
     /// </summary>
-    private static void Seed(ToolRunContext context, PersistedRun run)
+    private static bool Seed(ToolRunContext context, PersistedRun run)
     {
         // La traduction a lieu ici, à la frontière de l'outil : un point de reprise ne porte que des
         // chaînes, et c'est varcompare qui sait que « 42 » est un identifiant de groupe.
         string project = run.Selection
             .FirstOrDefault(entry => string.Equals(entry.Kind, VarCompareSelectionKinds.Project, StringComparison.Ordinal))
             ?.Key ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(project))
+        {
+            return false;
+        }
 
         IReadOnlyList<RememberedGroup> groups =
         [
@@ -178,5 +196,6 @@ public sealed class ResumeCoordinator : IResumedSelectionReconciler
                 step.Complete(run.LastUpdatedAt);
             }
         }
+        return true;
     }
 }

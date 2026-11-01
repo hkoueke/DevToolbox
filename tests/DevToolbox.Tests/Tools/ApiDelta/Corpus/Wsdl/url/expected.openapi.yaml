@@ -1,0 +1,320 @@
+openapi: 3.0.3
+info:
+  title: SOAP acceptance
+  version: '1.0'
+  description: Projection SOAP document/literal. Les autorités des endpoints sont omises. Les statuts 200/202 et default sont des conventions HTTP. OpenAPI ne valide ni l'ordre des éléments XML ni l'équivalence lexicale XSD ; le WSDL/XSD reste le contrat de validation XML.
+paths:
+  /soap:
+    post:
+      operationId: soapEndpoint1
+      description: "Call (SOAPAction = \"urn:call\")\nSend (SOAPAction = \"urn:send\")\nCall (SOAPAction = \"urn:call\")\nSend (SOAPAction = \"urn:send\")\n"
+      requestBody:
+        required: true
+        content:
+          text/xml:
+            schema:
+              anyOf:
+                - type: object
+                  additionalProperties: false
+                  xml:
+                    name: Envelope
+                    namespace: http://schemas.xmlsoap.org/soap/envelope/
+                    prefix: ns
+                  properties:
+                    Body:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        Request:
+                          allOf:
+                            - $ref: '#/components/schemas/XmlType1'
+                          xml:
+                            name: Request
+                            namespace: urn:types:a
+                            prefix: ns
+                      required:
+                        - Request
+                      xml:
+                        name: Body
+                        namespace: http://schemas.xmlsoap.org/soap/envelope/
+                        prefix: ns
+                  required:
+                    - Body
+                - type: object
+                  additionalProperties: false
+                  xml:
+                    name: Envelope
+                    namespace: http://schemas.xmlsoap.org/soap/envelope/
+                    prefix: ns
+                  properties:
+                    Body:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        Request:
+                          allOf:
+                            - $ref: '#/components/schemas/XmlType1'
+                          xml:
+                            name: Request
+                            namespace: urn:types:a
+                            prefix: ns
+                      required:
+                        - Request
+                      xml:
+                        name: Body
+                        namespace: http://schemas.xmlsoap.org/soap/envelope/
+                        prefix: ns
+                  required:
+                    - Body
+          application/soap+xml:
+            schema:
+              anyOf:
+                - type: object
+                  additionalProperties: false
+                  xml:
+                    name: Envelope
+                    namespace: http://www.w3.org/2003/05/soap-envelope
+                    prefix: ns
+                  properties:
+                    Body:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        Request:
+                          allOf:
+                            - $ref: '#/components/schemas/XmlType1'
+                          xml:
+                            name: Request
+                            namespace: urn:types:a
+                            prefix: ns
+                      required:
+                        - Request
+                      xml:
+                        name: Body
+                        namespace: http://www.w3.org/2003/05/soap-envelope
+                        prefix: ns
+                  required:
+                    - Body
+                - type: object
+                  additionalProperties: false
+                  xml:
+                    name: Envelope
+                    namespace: http://www.w3.org/2003/05/soap-envelope
+                    prefix: ns
+                  properties:
+                    Body:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        Request:
+                          allOf:
+                            - $ref: '#/components/schemas/XmlType1'
+                          xml:
+                            name: Request
+                            namespace: urn:types:a
+                            prefix: ns
+                      required:
+                        - Request
+                      xml:
+                        name: Body
+                        namespace: http://www.w3.org/2003/05/soap-envelope
+                        prefix: ns
+                  required:
+                    - Body
+      responses:
+        '200':
+          description: Réponse SOAP
+          content:
+            text/xml:
+              schema:
+                anyOf:
+                  - type: object
+                    additionalProperties: false
+                    xml:
+                      name: Envelope
+                      namespace: http://schemas.xmlsoap.org/soap/envelope/
+                      prefix: ns
+                    properties:
+                      Body:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          Reply:
+                            allOf:
+                              - type: string
+                            xml:
+                              name: Reply
+                              namespace: urn:types:b
+                              prefix: ns
+                        required:
+                          - Reply
+                        xml:
+                          name: Body
+                          namespace: http://schemas.xmlsoap.org/soap/envelope/
+                          prefix: ns
+                    required:
+                      - Body
+            application/soap+xml:
+              schema:
+                anyOf:
+                  - type: object
+                    additionalProperties: false
+                    xml:
+                      name: Envelope
+                      namespace: http://www.w3.org/2003/05/soap-envelope
+                      prefix: ns
+                    properties:
+                      Body:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          Reply:
+                            allOf:
+                              - type: string
+                            xml:
+                              name: Reply
+                              namespace: urn:types:b
+                              prefix: ns
+                        required:
+                          - Reply
+                        xml:
+                          name: Body
+                          namespace: http://www.w3.org/2003/05/soap-envelope
+                          prefix: ns
+                    required:
+                      - Body
+        default:
+          description: SOAP Fault déclaré ; aucun statut HTTP garanti.
+          content:
+            text/xml:
+              schema:
+                anyOf:
+                  - type: object
+                    additionalProperties: false
+                    xml:
+                      name: Envelope
+                      namespace: http://schemas.xmlsoap.org/soap/envelope/
+                      prefix: ns
+                    properties:
+                      Body:
+                        type: object
+                        additionalProperties: false
+                        xml:
+                          name: Body
+                          namespace: http://schemas.xmlsoap.org/soap/envelope/
+                          prefix: ns
+                        properties:
+                          Fault:
+                            type: object
+                            additionalProperties: true
+                            xml:
+                              name: Fault
+                              namespace: http://schemas.xmlsoap.org/soap/envelope/
+                              prefix: ns
+                            description: 'SOAP Fault : seul le détail métier déclaré par le WSDL est contraint. Les champs de protocole (Code/Reason ou faultcode/faultstring) restent définis par SOAP.'
+                            properties:
+                              detail:
+                                type: object
+                                additionalProperties: false
+                                properties:
+                                  Failure:
+                                    allOf:
+                                      - type: string
+                                    xml:
+                                      name: Failure
+                                      namespace: urn:types:a
+                                      prefix: ns
+                                required:
+                                  - Failure
+                                xml:
+                                  name: detail
+                            required:
+                              - detail
+                        required:
+                          - Fault
+                    required:
+                      - Body
+            application/soap+xml:
+              schema:
+                anyOf:
+                  - type: object
+                    additionalProperties: false
+                    xml:
+                      name: Envelope
+                      namespace: http://www.w3.org/2003/05/soap-envelope
+                      prefix: ns
+                    properties:
+                      Body:
+                        type: object
+                        additionalProperties: false
+                        xml:
+                          name: Body
+                          namespace: http://www.w3.org/2003/05/soap-envelope
+                          prefix: ns
+                        properties:
+                          Fault:
+                            type: object
+                            additionalProperties: true
+                            xml:
+                              name: Fault
+                              namespace: http://www.w3.org/2003/05/soap-envelope
+                              prefix: ns
+                            description: 'SOAP Fault : seul le détail métier déclaré par le WSDL est contraint. Les champs de protocole (Code/Reason ou faultcode/faultstring) restent définis par SOAP.'
+                            properties:
+                              Detail:
+                                type: object
+                                additionalProperties: false
+                                properties:
+                                  Failure:
+                                    allOf:
+                                      - type: string
+                                    xml:
+                                      name: Failure
+                                      namespace: urn:types:a
+                                      prefix: ns
+                                required:
+                                  - Failure
+                                xml:
+                                  name: Detail
+                                  namespace: http://www.w3.org/2003/05/soap-envelope
+                                  prefix: ns
+                            required:
+                              - Detail
+                        required:
+                          - Fault
+                    required:
+                      - Body
+        '202':
+          description: Accepté sans réponse métier
+components:
+  schemas:
+    XmlType1:
+      type: object
+      additionalProperties: false
+      properties:
+        count:
+          allOf:
+            - type: integer
+              format: int32
+          xml:
+            name: count
+            namespace: urn:types:a
+            prefix: ns
+        label:
+          type: array
+          items:
+            allOf:
+              - type: string
+            xml:
+              name: label
+              namespace: urn:types:a
+              prefix: ns
+          minItems: 0
+          maxItems: 2
+          xml:
+            name: label
+            namespace: urn:types:a
+            prefix: ns
+            wrapped: false
+      required:
+        - count

@@ -1,0 +1,13 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn:model" xmlns:a="urn:types:a" xmlns:b="urn:types:b" targetNamespace="urn:model">
+ <types><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:import namespace="urn:types:a" schemaLocation="../schema/a/types.xsd"/>
+  <xs:import namespace="urn:types:b" schemaLocation="../schema/b/types.xsd"/>
+ </xs:schema></types>
+ <message name="Input"><part name="body" element="a:Request"/></message>
+ <message name="Output"><part name="body" element="b:Reply"/></message>
+ <message name="Failure"><part name="detail" element="a:Failure"/></message>
+ <portType name="Port">
+  <operation name="Call"><input message="tns:Input"/><output message="tns:Output"/><fault name="Failed" message="tns:Failure"/></operation>
+  <operation name="Send"><input message="tns:Input"/></operation>
+ </portType>
+</definitions>

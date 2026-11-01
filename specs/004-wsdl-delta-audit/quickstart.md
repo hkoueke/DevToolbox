@@ -3,6 +3,22 @@
 Runnable scenarios that prove the feature end to end. Shapes live in [data-model.md](data-model.md); the
 projection table lives in [contracts/projection.md](contracts/projection.md). Nothing is duplicated here.
 
+## Delivered interactive export scope
+
+**OpenAPI → WSDL vers OpenAPI** exports a local WSDL, collects an authorized URL graph, or replays a
+saved `manifest.json`. It validates SOAP document/literal XML projection and OpenAPI 3.0.3 before
+publishing. URL collections retain unchanged inputs, self-contained offline copies, SHA-256 hashes and
+a validation report; failed collections leave no final bundle. Source hosts, redirects, DNS answers,
+private IP confirmations and collection budgets are checked. Query forms are limited to WSDL/XSD
+metadata selectors; credentials and arbitrary query parameters are refused. Proxies preventing DNS
+pinning are refused rather than bypassed. The collected source files can contain private information.
+
+The comparison, production editing, mapping confirmation and resumable apidelta sessions below are
+separate workflows. They are not acceptance evidence for the interactive export. The export's
+[reproducible acceptance evidence and remaining Sparky checks](acceptance.md) distinguish standard
+OpenAPI validation from a real import into a configured Sparky instance. No such instance is available
+here; no real Sparky import is claimed and the PR remains in draft.
+
 ## Prerequisites
 
 ```bash
@@ -70,6 +86,35 @@ dotnet test DevToolbox.slnx --filter 'FullyQualifiedName~WsdlHostileTests'
 **Expected**, for each document under `hostile/`: a refusal that **names the limit or the reason**, no
 crash, no hang, no external fetch, no entity expansion, and no partial document left behind. A test that
 passed by timing out would not be passing.
+
+The document size budget applies before allocating the document contents, both for the entry WSDL and
+for WSDL/XSD imports. The reader also bounds the actual read if a file grows after its size is checked;
+only one additional byte is read to detect overflow. `BoundedDocumentReaderTests` verifies that an
+oversized advertised length causes zero content reads, and that growth cannot trigger a full read.
+
+`WsdlReaderTests` also injects materialised XSD paths through `RetrievalMap`: a file inside the selected
+root remains usable, while an outside path (even a nonexistent one), a symbolic file link and a symbolic
+directory link are refused with `ImportOutsideRoot` before opening the import. Retrieval does not grant
+an exemption from confinement.
+
+Schema compilation and dependency resolution reuse the validated bytes rather than reopening files.
+`ConfinedResolverTests` verifies that replacing a file after validation cannot change what the compiler
+reads, and that an allowed URI without a validated snapshot is still refused.
+
+## Combined SOAP / YAML / component-reference integration
+
+The integrated SOAP exporter delegates YAML writing to `OpenApiYamlExporter`, which uses
+`DraftWriter` and `CanonicalEmitter`. SOAP graph construction and OpenAPI semantic validation remain in
+`SoapOpenApiYamlExporter`; there is one YAML emission path for projected drafts and real SOAP exports.
+
+`SoapOperationStyleTests` and `SoapExportIntegrationTests` verify SOAP 1.1/1.2 operation-style overrides,
+including imported bindings: a document operation on an RPC binding is exportable, while an RPC
+operation on a document binding is explicitly refused. The reader and exporter must agree.
+
+`OpenApiYamlExporterTests` reopens the emitted YAML to check exact text values and scalar types,
+including empty strings, boolean/null/numeric-looking text, whitespace, comments, carriage returns,
+control characters and Unicode line separators. `SchemaReferenceConformanceTests` keeps the JSON Pointer
+escaping and collision checks; serialized references must also resolve to the correct distinct targets.
 
 ## Scenario 3 — the same contract, written differently, projects identically
 

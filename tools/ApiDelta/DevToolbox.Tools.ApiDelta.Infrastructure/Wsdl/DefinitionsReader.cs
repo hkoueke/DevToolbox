@@ -37,8 +37,9 @@ internal sealed class DefinitionsReader
 
     /// <summary>Lit la structure, ou rend <see langword="null"/> si elle n'est pas lisible.</summary>
     /// <param name="root">La racine du document.</param>
+    /// <param name="importsResolved">Indique que les imports ont été résolus et validés en amont.</param>
     /// <returns>Ce que le document déclare, ou rien.</returns>
-    internal Definitions? Read(XElement root)
+    internal Definitions? Read(XElement root, bool importsResolved = false)
     {
         ArgumentNullException.ThrowIfNull(root);
 
@@ -49,9 +50,14 @@ internal sealed class DefinitionsReader
             return null;
         }
 
-        if (Imported(root) is { } imported)
+        XElement[] imports = [.. root.Elements(Wsdl + "import")];
+
+        if (imports.Length > 0 && !importsResolved)
         {
-            RefuseImport(imported);
+            foreach (XElement imported in imports)
+            {
+                RefuseImport(imported);
+            }
 
             return null;
         }
@@ -62,21 +68,10 @@ internal sealed class DefinitionsReader
             [.. Operations(root)],
             Bindings(root),
             [.. Services(root)],
-            [.. InlineSchemas(root)]);
+            [.. InlineSchemas(root)],
+            BindingPortTypes(root),
+            QualifiedBindings(root));
     }
-
-    /// <summary>
-    /// Le premier <c>wsdl:import</c> du document, s'il y en a un.
-    /// </summary>
-    /// <remarks>
-    /// Distinct d'un <c>xs:import</c>, et c'est tout le piège : celui-ci répartit les messages, les types
-    /// de port et les liaisons sur plusieurs documents WSDL, là où l'autre ne répartit que des schémas.
-    /// Le suiveur d'imports ne descend que dans les <c>xs:schema</c>, si bien qu'un <c>wsdl:import</c>
-    /// n'était ni suivi ni refusé : le contrat était bâti sur le seul document d'entrée, ses opérations
-    /// importées disparaissaient sans un mot, et la lecture se déclarait fidèle.
-    /// </remarks>
-    private static XElement? Imported(XElement root) =>
-        root.Elements(Wsdl + "import").FirstOrDefault();
 
     /// <summary>
     /// Le message de refus d'un contrat réparti sur plusieurs documents WSDL.
@@ -134,7 +129,7 @@ internal sealed class DefinitionsReader
     /// que le document.
     /// </para>
     /// </remarks>
-    private static string? Qualified(XElement carrier, string? value)
+    private string? Qualified(XElement carrier, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -148,13 +143,25 @@ internal sealed class DefinitionsReader
             ? carrier.GetDefaultNamespace()
             : carrier.GetNamespaceOfPrefix(value[..colon]);
 
+        if (colon >= 0 && space is null)
+        {
+            IXmlLineInfo info = carrier;
+            _diagnostics.Add(new Diagnostic(
+                WsdlDiagnosticCodes.StructuralViolation,
+                DiagnosticSeverity.Error,
+                "Le préfixe QName « " + value[..colon] + " » de « " + value
+                    + " » n'est pas déclaré (" + At(carrier, carrier.Name.LocalName).Display + ").",
+                Position: new Core.Syntax.SourcePosition(info.LineNumber, info.LinePosition)));
+            return null;
+        }
+
         return space is null || space == XNamespace.None
             ? local
             : space.NamespaceName + ":" + local;
     }
 
     /// <summary>Le message qu'un flux désigne, son préfixe résolu.</summary>
-    private static string? Message(XElement? flow) =>
+    private string? Message(XElement? flow) =>
         flow is null ? null : Qualified(flow, flow.Attribute("message")?.Value);
 
     /// <summary>Les opérations de tous les types de port, avec leur schéma d'échange.</summary>
@@ -189,7 +196,9 @@ internal sealed class DefinitionsReader
             Text(operation, "documentation"),
             At(
                 operation,
-                "portType[" + (portType.Attribute("name")?.Value ?? "?") + "]/operation[" + name + "]"));
+                "portType[" + (portType.Attribute("name")?.Value ?? "?") + "]/operation[" + name + "]"),
+            ((portType.Parent?.Attribute("targetNamespace")?.Value is { Length: > 0 } space)
+                ? space + ":" : string.Empty) + (portType.Attribute("name")?.Value ?? string.Empty));
     }
 
     /// <summary>Le schéma d'échange, d'après l'ordre et la présence des deux messages.</summary>
@@ -206,6 +215,51 @@ internal sealed class DefinitionsReader
     }
 
     /// <summary>Les liaisons, par nom d'opération et par nom de liaison.</summary>
+    private Dictionary<string, string> BindingPortTypes(XElement root)
+    {
+        Dictionary<string, string> result = new(StringComparer.Ordinal);
+        foreach (XElement binding in root.Elements(Wsdl + "binding"))
+        {
+            string? type = Qualified(binding, binding.Attribute("type")?.Value);
+            if (type is null)
+            {
+                continue;
+            }
+
+            foreach (XElement operation in binding.Elements(Wsdl + "operation"))
+            {
+                string key = (root.Attribute("targetNamespace")?.Value ?? string.Empty)
+                    + ":" + (binding.Attribute("name")?.Value ?? string.Empty)
+                    + ":" + (operation.Attribute("name")?.Value ?? string.Empty);
+                result[key] = type;
+            }
+        }
+
+        return result;
+    }
+
+    private Dictionary<string, WsdlBinding> QualifiedBindings(XElement root)
+    {
+        Dictionary<string, WsdlBinding> bindings = new(StringComparer.Ordinal);
+        foreach (XElement binding in root.Elements(Wsdl + "binding"))
+        {
+            string name = binding.Attribute("name")?.Value ?? "(sans nom)";
+            XElement? soap = binding.Elements().FirstOrDefault(child =>
+                string.Equals(child.Name.LocalName, "binding", StringComparison.Ordinal) && IsSoap(child));
+            foreach (XElement operation in binding.Elements(Wsdl + "operation"))
+            {
+                string key = (root.Attribute("targetNamespace")?.Value ?? string.Empty)
+                    + ":" + name + ":" + (operation.Attribute("name")?.Value ?? string.Empty);
+                if (!bindings.TryAdd(key, Describe(name, binding, soap, operation)))
+                {
+                    Refuse(operation, "Binding SOAP déclaré plusieurs fois : " + key);
+                }
+            }
+        }
+
+        return bindings;
+    }
+
     private Dictionary<string, WsdlBinding> Bindings(XElement root)
     {
         Dictionary<string, WsdlBinding> bindings = new(StringComparer.Ordinal);
@@ -239,7 +293,7 @@ internal sealed class DefinitionsReader
 
         return new WsdlBinding(
             name,
-            soap?.Attribute("style")?.Value ?? "document",
+            action?.Attribute("style")?.Value ?? soap?.Attribute("style")?.Value ?? "document",
             body?.Attribute("use")?.Value ?? "literal",
             soap?.Attribute("transport")?.Value,
             Version(soap),
@@ -294,13 +348,23 @@ internal sealed class DefinitionsReader
     }
 
     /// <summary>Refuse un contrat réparti, sous le code qui dit qu'un import n'a pas été résolu.</summary>
-    private void RefuseImport(XElement imported) =>
+    private void RefuseImport(XElement imported)
+    {
+        WsdlImport declaration = new(
+            imported.Attribute("namespace")?.Value,
+            imported.Attribute("location")?.Value);
+        string reason = declaration.HasRequiredAttributes
+            ? Split(imported)
+            : "Un « wsdl:import » doit déclarer un « namespace » et un « location » non vides. "
+                + "La référence incomplète ne peut pas être résolue fidèlement.";
+
         _diagnostics.Add(new Diagnostic(
             WsdlDiagnosticCodes.ImportUnresolved,
             DiagnosticSeverity.Error,
-            Split(imported) + " (" + At(imported, "import").Display + ")",
+            reason + " (" + At(imported, "import").Display + ")",
             Position: new Core.Syntax.SourcePosition(
                 ((IXmlLineInfo)imported).LineNumber, ((IXmlLineInfo)imported).LinePosition)));
+    }
 
     private void Refuse(XElement root, string message) =>
         _diagnostics.Add(new Diagnostic(

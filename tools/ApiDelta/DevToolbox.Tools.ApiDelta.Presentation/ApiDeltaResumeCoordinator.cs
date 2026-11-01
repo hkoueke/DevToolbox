@@ -73,26 +73,38 @@ public sealed class ApiDeltaResumeCoordinator
         if (answer.Decision == ResumeDecision.Discard && answer.Run is not null)
         {
             await _store.DiscardAsync(answer.Run.RunId, cancellationToken).ConfigureAwait(false);
+            _console.MarkupLine("[grey]Les anciens choix ont été oubliés. Vos fichiers et rapports sont conservés.[/]");
             return false;
         }
 
         if (answer.Decision != ResumeDecision.Resume || answer.Run is null)
         {
+            if (answer.Run is not null)
+            {
+                _console.MarkupLine("[grey]Nouvelle session : choisissez à nouveau. Les anciens choix restent disponibles jusqu’à l’enregistrement des nouveaux.[/]");
+            }
+
             return false;
         }
 
-        RunSelection? selection = ApiDeltaCheckpointFactory.TryRead(answer.Run);
+        return await RestoreAsync(context, answer.Run, cancellationToken).ConfigureAwait(false);
+    }
 
-        if (selection is null)
+    private async Task<bool> RestoreAsync(ToolRunContext context, PersistedRun saved, CancellationToken cancellationToken)
+    {
+
+        RunSelection? selection = ApiDeltaCheckpointFactory.TryRead(saved);
+
+        if (selection is not null && await SeedIfUnchangedAsync(context, selection, cancellationToken).ConfigureAwait(false))
         {
-            _console.MarkupLine(
-                "[yellow]Ce point de reprise n'est pas lisible par cette version. L'exécution repart de "
-                + "zéro.[/]");
-
-            return false;
+            context.Set(CheckpointContextKeys.SourceRunId, saved.RunId);
+            _console.MarkupLine("[grey]Les choix enregistrés sont repris. Les fichiers seront relus avant le calcul des résultats.[/]");
+            return true;
         }
 
-        return await SeedIfUnchangedAsync(context, selection, cancellationToken).ConfigureAwait(false);
+        await _store.DiscardAsync(saved.RunId, cancellationToken).ConfigureAwait(false);
+        _console.MarkupLine("[yellow]Cette session ne peut plus être reprise. Ses anciens choix sont oubliés ; choisissez à nouveau vos fichiers. Aucun fichier ni rapport n’est supprimé.[/]");
+        return false;
     }
 
     /// <summary>
@@ -146,7 +158,7 @@ public sealed class ApiDeltaResumeCoordinator
             _console.MarkupLine(
                 "[yellow]" + Markup.Escape(Path.GetFileName(path))
                 + " ne peut plus être lu : " + Markup.Escape(facts.Failure!.Message)
-                + " L'exécution repart de zéro.[/]");
+                + "[/]");
 
             return false;
         }
@@ -158,8 +170,7 @@ public sealed class ApiDeltaResumeCoordinator
 
         _console.MarkupLine(
             "[yellow]" + Markup.Escape(Path.GetFileName(path))
-            + " a été modifié depuis. Reprendre donnerait un résultat portant sur une version du "
-            + "fichier qui n'existe plus : on recommence depuis le début.[/]");
+            + " a été modifié depuis la session précédente. Les anciens choix ne seront pas réutilisés.[/]");
 
         return false;
     }

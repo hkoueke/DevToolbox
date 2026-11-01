@@ -52,12 +52,22 @@ public sealed class FileRunCheckpointStore : IRunCheckpointStore
         Directory.CreateDirectory(_paths.RunsDirectory);
         string path = AppPaths.CombineConfined(_paths.RunsDirectory, FileNameFor(run.RunId));
 
-        FileStream stream = File.Create(path);
-
-        await using (stream.ConfigureAwait(false))
+        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, run, SerializerOptions, cancellationToken)
-                .ConfigureAwait(false);
+            FileStream stream = new(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            await using (stream.ConfigureAwait(false))
+            {
+                await JsonSerializer.SerializeAsync(stream, run, SerializerOptions, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temporary);
         }
 
         await PruneOthersAsync(run, cancellationToken).ConfigureAwait(false);

@@ -58,7 +58,7 @@ public sealed class ProposalsViewTests
         (TestConsole console, string output) = Render(
             new OptimizationPlan([], [], GrowthCheck.For(1000, -500, 0)));
 
-        output.Should().Contain("dépasserait la croissance tolérée");
+        output.Should().Contain("dépasserait la taille autorisée");
 
         console.Dispose();
     }
@@ -105,7 +105,7 @@ public sealed class ProposalsViewTests
                 [],
                 new VerificationResult(true, true, true, false, ["le contrat diffère en /paths"])));
 
-        output.Should().Contain("Rien n'a été publié")
+        output.Should().Contain("Aucun fichier nettoyé n’a été créé")
             .And.Contain("le contrat a changé");
 
         console.Dispose();
@@ -129,8 +129,9 @@ public sealed class ProposalsViewTests
         output.Should().Contain("transformations appliquées")
             .And.Contain("écartée")
             .And.Contain("OPT-008")
-            .And.Contain("Copie vérifiée")
-            .And.Contain("le contrat est inchangé");
+            .And.Contain("Fichier nettoyé vérifié")
+            .And.Contain("le contrat est inchangé")
+            .And.NotContain("aucun fichier n'a été modifié");
 
         console.Dispose();
     }
@@ -213,6 +214,7 @@ public sealed class ProposalsViewTests
 
         new ProposalsView(console).Show(plan, 12920, applied, CancellationToken.None);
 
-        return (console, console.Output);
+        // Wording matters here; wrapping depends on terminal width and platform.
+        return (console, string.Join(" ", console.Output.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)));
     }
 }

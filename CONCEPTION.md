@@ -197,16 +197,11 @@ garde-fou dont le signal existe, mais que personne n'écoute.
 
 ## Un outil garde un seul point de reprise, parce qu'il n'en offre qu'un
 
-L'invite de reprise reçoit la liste des séances reprenables et n'en lit que la première. Les autres ne
-pouvaient donc jamais être choisies, et dormaient jusqu'au balayage des sept jours — pendant que le
-libellé promettait de laisser une séance « disponible pour un autre jour ».
+L'invite n'offre que la session la plus récente. Une nouvelle sélection remplace l'ancienne dès son premier enregistrement automatique : « garder pour plus tard » ne doit donc pas promettre un rappel après qu'une autre session a déjà enregistré ses choix. L'interface annonce explicitement cette conservation provisoire.
 
-Deux issues se présentaient : offrir la liste, ou n'en garder qu'une. La seconde a été retenue — **ce
-qu'un outil garde doit être ce qu'il sait proposer** — et `SaveAsync` élague donc les autres séances du
-même outil. Celles d'un autre outil survivent : deux outils peuvent être interrompus la même semaine.
+Une session réussie retire son point de reprise. Une remise à zéro efface le point courant et celui dont la session avait repris les choix, avant de vider l'état en mémoire et de redemander la sélection. Une annulation immédiate de cette nouvelle sélection ne peut donc pas faire réapparaître l'ancien point. Une étape volontairement passée après erreur laisse, elle, une session reprenable et un bilan indiquant que le résultat peut être incomplet.
 
-Le libellé suit la vérité du mécanisme : « me la redemander au prochain lancement », et non une promesse
-d'éternité qu'une séance gardée perd dès que la suivante s'interrompt.
+L'écriture d'un point de reprise passe par un fichier temporaire puis un déplacement : une écriture annulée ne détruit pas les choix précédents. L'oubli ne touche jamais aux fichiers métier ni aux rapports déjà produits. Un échec de suppression est signalé et ne doit pas être présenté comme une remise à zéro réussie.
 
 ## Les libellés d'un choix nomment ce qui les sépare
 

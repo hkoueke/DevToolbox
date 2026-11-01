@@ -26,6 +26,26 @@ public sealed class ProjectedDocumentTests : IDisposable
     public ProjectedDocumentTests() => Directory.CreateDirectory(_root);
 
     [Fact]
+    public void Colliding_derived_routes_are_refused_instead_of_silently_overwritten()
+    {
+        WsdlContract original = ReadContract();
+        WsdlOperation source = original.Operations[0];
+        WsdlContract collision = original with
+        {
+            Operations =
+            [
+                source with { Name = "lireDocument" },
+                source with { Name = "getDocument" },
+            ],
+        };
+
+        Action project = () => new Projector().Project(collision, OpenApiVersion.V30);
+
+        project.Should().Throw<InvalidOperationException>()
+            .WithMessage("*plusieurs opérations WSDL*GET /documents*");
+    }
+
+    [Fact]
     public void Not_one_node_of_a_projected_document_carries_a_byte_extent()
     {
         ProjectionResult projected = Project();
@@ -129,7 +149,9 @@ public sealed class ProjectedDocumentTests : IDisposable
         }
     }
 
-    private ProjectionResult Project()
+    private ProjectionResult Project() => new Projector().Project(ReadContract(), OpenApiVersion.V30);
+
+    private WsdlContract ReadContract()
     {
         foreach (string name in new[] { "catalogue.wsdl", "catalogue-types.xsd", "commun.xsd" })
         {
@@ -148,7 +170,7 @@ public sealed class ProjectedDocumentTests : IDisposable
         read.IsFaithful.Should().BeTrue(
             string.Join(" · ", read.Diagnostics.Select(one => one.Message)));
 
-        return new Projector().Project(read.Contract!, OpenApiVersion.V30);
+        return read.Contract!;
     }
 
     private static MappingNode Section(SpecNode node, string key) =>

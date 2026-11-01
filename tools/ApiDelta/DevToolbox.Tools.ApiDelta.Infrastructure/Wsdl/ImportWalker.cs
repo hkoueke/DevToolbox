@@ -30,10 +30,11 @@ internal sealed class ImportWalker
     private readonly RetrievalMap _retrieved;
     private readonly List<Diagnostic> _diagnostics;
     private readonly Dictionary<string, string> _resolved = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, byte[]> _contents = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     private readonly List<WsdlDocument> _documents = [];
     private readonly List<ReadSchema> _schemas = [];
     private readonly List<UnresolvedImport> _unresolved = [];
-    private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _seen = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     /// <summary>Crée le parcours.</summary>
     /// <param name="limits">Le budget.</param>
@@ -54,6 +55,9 @@ internal sealed class ImportWalker
 
     /// <summary>Les emplacements autorisés, et le fichier qui répond pour chacun.</summary>
     internal IReadOnlyDictionary<string, string> Resolved => _resolved;
+
+    /// <summary>Les octets contrôlés, réutilisés sans rouvrir les fichiers pendant la compilation.</summary>
+    internal IReadOnlyDictionary<string, byte[]> Contents => _contents;
 
     /// <summary>Les schémas effectivement lus.</summary>
     internal IReadOnlyList<WsdlDocument> Documents => _documents;
@@ -178,9 +182,24 @@ internal sealed class ImportWalker
             return;
         }
 
+        if (!Inside(materialised))
+        {
+            Decline(targeted, where, location,
+                "Le fichier matérialisé quitte la racine de confinement ou passe par un lien.",
+                WsdlDiagnosticCodes.ImportOutsideRoot);
+            return;
+        }
+
         Accept(
             materialised, Path.GetFileName(materialised),
             Path.GetDirectoryName(Path.GetFullPath(materialised)) ?? ".", containing, location, depth);
+        if (_contents.ContainsKey(materialised))
+        {
+            // The compiler resolves the original schemaLocation against its local base URI.
+            // This is an alias to validated bytes, never an additional filesystem permission.
+            _resolved[new Uri(new Uri(Path.GetFullPath(containing)), where).ToString()] = materialised;
+            _resolved[designated.ToString()] = materialised;
+        }
     }
 
     /// <summary>Résout l'import d'un document donné par chemin, contre son dossier.</summary>
@@ -243,9 +262,8 @@ internal sealed class ImportWalker
             return;
         }
 
-        byte[] content = File.ReadAllBytes(path);
-
-        if (content.LongLength > _limits.MaxDocumentBytes)
+        byte[]? content = BoundedDocumentReader.Read(path, _limits.MaxDocumentBytes);
+        if (content is null)
         {
             _diagnostics.Add(Budget("la taille d'un document", _limits.MaxDocumentBytes, path));
 
@@ -268,6 +286,7 @@ internal sealed class ImportWalker
             schema.Attribute("targetNamespace")?.Value));
 
         _schemas.Add(new ReadSchema(path, schema));
+        _contents.Add(path, content);
 
         Walk(schema, path, depth + 1);
     }
@@ -345,22 +364,8 @@ internal sealed class ImportWalker
     /// s'il tient. La racine elle-même reste acceptée : le document d'entrée y vit.
     /// </para>
     /// </remarks>
-    private bool Inside(string candidate)
-    {
-        string root = Path.GetFullPath(_policy.ConfinementRoot);
-        string full = Path.GetFullPath(candidate);
-
-        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        string boundary = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-
-        return full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool Inside(string candidate) =>
+        ImportConfinement.Contains(_policy.ConfinementRoot, candidate);
 
     private void Decline(
         string targeted, string where, WsdlLocation location, string why, string code)

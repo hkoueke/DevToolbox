@@ -42,9 +42,9 @@ public sealed class CanonicalEmitter : ISpecEmitter
             text += "\n";
         }
 
-        if (formatting.LineEndings == LineEndingStyle.Crlf)
+        if (formatting.LineEndings != LineEndingStyle.Preserve)
         {
-            text = text.ReplaceLineEndings("\r\n");
+            text = text.ReplaceLineEndings(formatting.LineEndings == LineEndingStyle.Crlf ? "\r\n" : "\n");
         }
 
         return Encoding.UTF8.GetBytes(text);
@@ -216,7 +216,7 @@ public sealed class CanonicalEmitter : ISpecEmitter
     /// <summary>Écrit un texte, quoté si l'écrire sans guillemets changerait ce qu'il est.</summary>
     private static string Plain(string text)
     {
-        if (text.Contains('\n', StringComparison.Ordinal))
+        if (text.Any(character => char.IsControl(character) || character is '\u2028' or '\u2029'))
         {
             // Un texte multiligne est écrit entre guillemets avec ses échappements, non en bloc littéral.
             // Le bloc est plus agréable à lire, et son indicateur de conservation est aussi un piège : se
@@ -273,6 +273,8 @@ public sealed class CanonicalEmitter : ISpecEmitter
                 '\n' => "\\n",
                 '\r' => "\\r",
                 '\t' => "\\t",
+                _ when char.IsControl(character) || character is '\u2028' or '\u2029' =>
+                    "\\u" + ((int)character).ToString("X4", System.Globalization.CultureInfo.InvariantCulture),
                 _ => character.ToString(),
             });
         }

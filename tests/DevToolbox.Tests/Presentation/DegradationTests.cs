@@ -112,7 +112,7 @@ public sealed class DegradationTests
 
         new ProposalsView(console).Show(plan, 1000, null, CancellationToken.None);
 
-        console.Output.Should().Contain("dépasserait la croissance tolérée");
+        console.Output.Should().Contain("dépasserait la taille autorisée");
 
         console.Dispose();
     }

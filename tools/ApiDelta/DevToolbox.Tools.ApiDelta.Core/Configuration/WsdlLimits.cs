@@ -8,6 +8,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Configuration;
 /// <param name="MaxEnumerationValues">Le nombre de valeurs d'une énumération.</param>
 /// <param name="MaxResponseBytes">La taille maximale d'une réponse récupérée.</param>
 /// <param name="FetchTimeoutSeconds">Le délai au-delà duquel une récupération est abandonnée.</param>
+/// <param name="MaxGraphBytes">Le budget cumulé des documents récupérés.</param>
 /// <remarks>
 /// Chaque limite existe pour être <em>annoncée</em> quand elle est atteinte, et non pour faire échouer en
 /// silence. La leçon vient de la tranche précédente : une chaîne de références plausible y avait fait
@@ -26,7 +27,8 @@ public sealed record WsdlLimits(
     int MaxDocumentCount = 256,
     int MaxEnumerationValues = 100_000,
     long MaxResponseBytes = 16L * 1024 * 1024,
-    int FetchTimeoutSeconds = 45)
+    int FetchTimeoutSeconds = 45,
+    long MaxGraphBytes = 64L * 1024 * 1024)
 {
     /// <summary>Le budget par défaut.</summary>
     public static WsdlLimits Default { get; } = new();
