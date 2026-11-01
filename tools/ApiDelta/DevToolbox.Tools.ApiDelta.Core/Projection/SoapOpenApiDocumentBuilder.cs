@@ -75,8 +75,15 @@ public static class SoapOpenApiDocumentBuilder
         }
 
         SchemaDraft responses = post.Section("responses");
-        responses.Section("200").Set("description", "Réponse SOAP pour les opérations avec réponse");
-        responses.Section("202").Set("description", "Message SOAP accepté sans réponse métier");
+        if (operations.Any(operation => operation.HasResponse))
+        {
+            responses.Section("200").Set("description", "Réponse SOAP pour les opérations avec réponse");
+        }
+
+        if (operations.Any(operation => !operation.HasResponse))
+        {
+            responses.Section("202").Set("description", "Message SOAP accepté sans réponse métier");
+        }
         foreach (WsdlOperation operation in operations.Where(operation => operation.HasResponse))
         {
             WsdlBinding binding = operation.Binding!;
