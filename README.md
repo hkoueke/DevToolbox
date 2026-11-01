@@ -227,12 +227,35 @@ fichier valide qui décrit autre chose.
 
 ## Export WSDL vers OpenAPI (expérimental)
 
-L'outil autonome **WSDL vers OpenAPI**, dans l'onglet **OpenAPI**, lit un fichier WSDL 1.1 local et les imports WSDL/XSD autorisés dans son répertoire. Il demande le chemin source, le chemin du YAML de sortie, le titre et la version du service, puis produit un document **OpenAPI 3.0.3**. Il fonctionne hors ligne, refuse d'écraser un fichier existant et n'exporte pas l'hôte des adresses SOAP.
+Onglet **OpenAPI** → **WSDL vers OpenAPI**. Sélectionnez le WSDL local, un **nouveau** fichier YAML, le titre et la version du service. Aucun serveur ni identifiant n'est nécessaire. L'export fonctionne hors ligne et ne contacte jamais les endpoints SOAP. Le fichier est publié seulement après validation, par déplacement d'un fichier temporaire, sans écraser une sortie existante. Un refus ne produit aucun document partiel.
 
-L'export ne crée **aucune route REST fictive** : chaque adresse SOAP exploitable est représentée par une opération HTTP `POST` sur son chemin déclaré. Les messages sont décrits comme **XML opaque**, avec le type de média SOAP et les faults connus ; il ne s'agit pas d'une conversion exhaustive des structures XML en schémas OpenAPI. Les endpoints contenant des identifiants, paramètres de requête, fragments ou protocoles non HTTP(S) sont refusés. Les imports distants ne sont pas récupérés implicitement.
+Le parcours suit les `wsdl:import` et `xs:import/include` locaux sous le répertoire du WSDL sélectionné. Les préfixes sont résolus dans leur portée XML : service/port → binding → portType → opération → messages → éléments/types XSD. Une référence qualifiée ne se rabat jamais sur un nom local d'un autre namespace. Les déclarations dupliquées, références manquantes et opérations surchargées ambiguës sont refusées. Deux bindings homonymes de namespaces distincts restent distincts ; plusieurs bindings SOAP 1.1/1.2 peuvent exposer le même portType.
 
-**Limite d'interopérabilité :** la génération de YAML ne garantit pas son acceptation par **Sparky API Manager**. Vérifier la validité OpenAPI du document généré et réaliser un essai d'import dans l'environnement Sparky cible avant publication. Les constructions WSDL/XSD non représentables fidèlement doivent être examinées manuellement.
+Chaque véritable chemin SOAP donne un seul `POST`, sans URL REST inventée. L'autorité de l'adresse n'est pas exportée ; le consommateur devra renseigner son serveur. Identifiants, query string, fragments, schémas non HTTP(S), chemins ambigus et caractères de contrôle sont refusés sans afficher l'URL. Les imports distants, traversées hors racine, liens symboliques et jonctions sont refusés ; DTD et entités externes restent interdits. Les budgets de taille, profondeur et nombre de documents s'appliquent à la lecture ; la projection est bornée à 64 types imbriqués et accepte les références récursives nommées.
 
-L'export garantit l'unicité des `operationId` OpenAPI entre les endpoints SOAP, y compris lorsque plusieurs bindings ou opérations partagent un même chemin. Dans ce dernier cas, les opérations SOAP sont répertoriées dans la description du `POST` commun.
+### XML document/literal pris en charge
 
-Avant l'écriture du YAML, le générateur soumet également la structure JSON équivalente au lecteur sémantique **Microsoft.OpenApi** ; un document rejeté par ce lecteur n'est pas publié. Ce contrôle structurel ne prouve pas la fidélité des messages XSD ni la compatibilité avec une configuration Sparky donnée.
+Les messages `document/literal` sont projetés à partir de leurs parties référençant des **éléments globaux**, avec le nom XML et le namespace de chaque élément. Les types nommés et anonymes, objets `sequence`/`all` simples, éléments facultatifs, répétitions non enveloppées, types récursifs et restrictions de chaînes (énumération/longueur) sont représentés dans `components.schemas`. Les primitives prises en charge sont `string`, `boolean`, `int`, `long`, `decimal` et `base64Binary`. Les préfixes XML sont normalisés ; leur orthographe d'origine ne fait pas partie de l'identité du contrat.
+
+Les enveloppes et types de média suivent SOAP 1.1 (`text/xml`) ou SOAP 1.2 (`application/soap+xml`). Plusieurs opérations sur un endpoint sont décrites par des variantes `anyOf`, avec leurs actions dans la description standard du POST, **sans extension `x-soap-*`**. Une SOAPAction vide reste distinguée d'une action absente. Les réponses avec sortie utilisent 200 ; les échanges one-way gardent un 202 sans corps. Ces statuts sont des conventions d'export, pas des garanties du WSDL. Les faults déclarés sont décrits sous `default`, avec leur détail métier et leur enveloppe SOAP ; les champs de protocole du Fault restent ouverts et définis par SOAP, sans inventer de statut ou de contrainte métier.
+
+### Refus explicites et limites
+
+L'export refuse l'ensemble du document lorsqu'une construction **atteinte depuis un port exposé** ne peut pas être portée. La console affiche le motif et un code de diagnostic, notamment :
+
+| Construction | Diagnostic |
+|---|---|
+| Style RPC / corps encoded ou literal manquant | `SOAP_RPC_UNSUPPORTED` / `SOAP_ENCODED_OR_MISSING_LITERAL_BODY_UNSUPPORTED` |
+| Attributs XML, contenu mixte | `XSD_ATTRIBUTES_UNSUPPORTED` / `XSD_MIXED_CONTENT_UNSUPPORTED` |
+| Groupes de substitution, éléments abstraits | `XSD_SUBSTITUTION_GROUP_OR_ABSTRACT_ELEMENT_UNSUPPORTED` |
+| Choix, wildcard, cardinalité d'un groupe | `XSD_CHOICE_WILDCARD_OR_GROUP_CARDINALITY_UNSUPPORTED` |
+| Nillable, contraintes d'identité, default/fixed | `XSD_NILLABLE_UNSUPPORTED` / `XSD_IDENTITY_DEFAULT_OR_FIXED_UNSUPPORTED` |
+| Headers SOAP ou extensions de flux non représentées | `SOAP_HEADERS_OR_NON_BODY_EXTENSIONS_UNSUPPORTED` |
+| Notification et solicit-response initiées par le service | `WSDL_NOTIFICATION_OR_SOLICIT_RESPONSE_UNSUPPORTED` |
+| Import invalide, manquant, distant ou hors racine | `WSDL_XSD_GRAPH_UNRESOLVED_OR_INVALID` |
+
+Les listes/unions XSD, facettes non représentées (dont les regex XSD), primitives non prises en charge et parties document/literal désignant directement un type sont également refusées. Aucun schéma approximatif ne les remplace.
+
+OpenAPI décrit la structure XML et les cardinalités ; il ne remplace pas la validation XSD, notamment pour l'ordre des éléments et les formes lexicales XML. Le YAML généré porte cette limite dans sa description. Il est relu avec YamlDotNet puis soumis à **Microsoft.OpenApi**, résolution des références et règles de validation comprises, avant toute écriture définitive.
+
+**Sparky API Manager :** les sorties utilisent uniquement OpenAPI 3.0.3 standard. Les tests vérifient leur structure et les parcours de conversion ; aucun accès à une instance Sparky n'est configuré ici. Un essai d'import dans l'instance cible reste nécessaire avant utilisation en production, en particulier pour le rendu des variantes XML `anyOf` et des faults.

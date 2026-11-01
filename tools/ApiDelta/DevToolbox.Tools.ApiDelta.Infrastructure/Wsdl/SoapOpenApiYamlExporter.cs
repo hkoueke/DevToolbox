@@ -1,5 +1,4 @@
 using System.Text.Json;
-using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using Microsoft.OpenApi;
@@ -19,22 +18,15 @@ public static class SoapOpenApiYamlExporter
         string wsdlPath, string title, string version, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(wsdlPath);
-        string absolutePath = Path.GetFullPath(wsdlPath);
-        string root = Path.GetDirectoryName(absolutePath)
-            ?? throw new InvalidOperationException("Racine WSDL introuvable.");
-        WsdlReadResult read = await new WsdlReader().ReadAsync(
-            absolutePath, WsdlLimits.Default, ImportPolicy.ConfinedTo(root),
-            cancellationToken).ConfigureAwait(false);
-        if (!read.IsFaithful)
-        {
-            throw new InvalidOperationException(
-                "Lecture WSDL refusée : le graphe n'est pas exploitable.");
-        }
-
-        return Export(read.Contract!, title, version);
+        cancellationToken.ThrowIfCancellationRequested();
+        // Confined readers are synchronous; keep cancellation boundaries around graph projection.
+        SchemaDraft draft = new SoapDocumentExporter(SoapExportGraph.Read(wsdlPath)).Build(title, version);
+        cancellationToken.ThrowIfCancellationRequested();
+        await Task.CompletedTask.ConfigureAwait(false);
+        return Serialize(draft);
     }
 
-    /// <summary>Projette les endpoints SOAP déclarés et sérialise le résultat.</summary>
+    /// <summary>Exporte un contrat complet dont les documents locaux sont disponibles.</summary>
     public static string Export(WsdlContract contract, string title, string version)
     {
         ArgumentNullException.ThrowIfNull(contract);
@@ -43,17 +35,23 @@ public static class SoapOpenApiYamlExporter
             throw new InvalidOperationException("Le graphe WSDL doit être entièrement résolu.");
         }
 
-        IReadOnlyDictionary<string, string> endpoints = SoapEndpointPathReader.Read(contract);
-        SchemaDraft draft = SoapOpenApiDocumentBuilder.Build(contract, title, version, endpoints);
-        if (draft.Section("paths").Keywords.Count == 0)
+        if (contract.Documents.Count == 0)
         {
-            throw new InvalidOperationException(
-                "Aucun endpoint SOAP exploitable n'a été trouvé dans le contrat WSDL.");
+            throw new InvalidOperationException("Aucun endpoint SOAP exploitable.");
         }
 
+        return Serialize(new SoapDocumentExporter(SoapExportGraph.Read(contract.Entry.Path)).Build(title, version));
+    }
+
+    private static string Serialize(SchemaDraft draft)
+    {
         object? document = Convert(draft);
         ValidateOpenApi(document);
-        return new SerializerBuilder().Build().Serialize(document);
+        string yaml = new SerializerBuilder().Build().Serialize(document);
+        // Validate the actual serialized YAML shape through a JSON bridge: no second YAML parser.
+        object? serialized = new DeserializerBuilder().WithAttemptingUnquotedStringTypeDeserialization().Build().Deserialize<object>(yaml);
+        ValidateOpenApi(serialized);
+        return yaml;
     }
 
     /// <summary>Rejette un export dont la structure ne respecte pas OpenAPI.</summary>
@@ -66,12 +64,13 @@ public static class SoapOpenApiYamlExporter
             parsed = OpenApiDocument.Parse(json, "json");
         }
         catch (Exception exception) when (exception is InvalidOperationException
-            or ArgumentException or NotSupportedException)
+            or ArgumentException or NotSupportedException or UriFormatException)
         {
             throw new InvalidOperationException("Le document OpenAPI généré est invalide.", exception);
         }
 
-        if (parsed.Document is null || parsed.Diagnostic?.Errors.Count > 0)
+        if (parsed.Document is null || parsed.Diagnostic?.Errors.Count > 0
+            || parsed.Document.Validate(ValidationRuleSet.GetDefaultRuleSet()).Any())
         {
             throw new InvalidOperationException("Le document OpenAPI généré est invalide.");
         }

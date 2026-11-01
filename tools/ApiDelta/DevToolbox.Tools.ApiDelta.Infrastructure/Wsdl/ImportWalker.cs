@@ -33,7 +33,7 @@ internal sealed class ImportWalker
     private readonly List<WsdlDocument> _documents = [];
     private readonly List<ReadSchema> _schemas = [];
     private readonly List<UnresolvedImport> _unresolved = [];
-    private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _seen = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     /// <summary>Crée le parcours.</summary>
     /// <param name="limits">Le budget.</param>
@@ -345,22 +345,8 @@ internal sealed class ImportWalker
     /// s'il tient. La racine elle-même reste acceptée : le document d'entrée y vit.
     /// </para>
     /// </remarks>
-    private bool Inside(string candidate)
-    {
-        string root = Path.GetFullPath(_policy.ConfinementRoot);
-        string full = Path.GetFullPath(candidate);
-
-        if (string.Equals(full, root, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        string boundary = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-
-        return full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool Inside(string candidate) =>
+        ImportConfinement.Contains(_policy.ConfinementRoot, candidate);
 
     private void Decline(
         string targeted, string where, WsdlLocation location, string why, string code)

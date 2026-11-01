@@ -2,6 +2,7 @@ using System.Globalization;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
+using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation;
@@ -53,12 +54,7 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
             string yaml = await exporter.ExportAsync(
                 sourcePath, title, version, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            FileStream output = new(targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            await using (output.ConfigureAwait(false))
-            {
-                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(yaml);
-                await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            }
+            await PublishAsync(targetPath, yaml, cancellationToken).ConfigureAwait(false);
 
             step.Complete(DateTimeOffset.UtcNow);
             run.End(RunOutcome.Success, DateTimeOffset.UtcNow);
@@ -67,6 +63,11 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
         catch (OperationCanceledException)
         {
             run.End(RunOutcome.Cancelled, DateTimeOffset.UtcNow);
+        }
+        catch (WsdlExportException exception)
+        {
+            console.MarkupLine("[red]" + Markup.Escape(exception.Message) + "[/]");
+            run.End(RunOutcome.Failed, DateTimeOffset.UtcNow);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
             or InvalidOperationException or ArgumentException or System.Xml.XmlException)
@@ -78,4 +79,21 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
 
         return run;
     }
+
+    private static async Task PublishAsync(string target, string yaml, CancellationToken cancellationToken)
+    {
+        string temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temporary, yaml, System.Text.Encoding.UTF8, cancellationToken)
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temporary, target, overwrite: false);
+        }
+        finally
+        {
+            File.Delete(temporary);
+        }
+    }
+
 }
