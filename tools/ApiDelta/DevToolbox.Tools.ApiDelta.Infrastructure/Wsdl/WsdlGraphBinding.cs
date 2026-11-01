@@ -63,7 +63,7 @@ internal static class WsdlGraphBinding
             return null;
         }
 
-        string key = reference.Contains(':', StringComparison.Ordinal)
+        string key = reference.Contains(':')
             ? reference : Key(document.TargetNamespace, reference);
         if (messages.TryGetValue(key, out WsdlMessage? message))
         {
