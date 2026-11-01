@@ -7,6 +7,61 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Projection;
 
 public sealed class SoapOpenApiDocumentBuilderTests
 {
+    [Fact]
+    public void Build_routes_multiple_bindings_to_explicit_endpoints_without_inventing_paths()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding firstBinding = new("OrdersBinding", "document", "literal",
+            null, SoapVersion.Soap11, "urn:orders", location);
+        WsdlBinding secondBinding = new("AccountsBinding", "document", "literal",
+            null, SoapVersion.Soap12, "urn:accounts", location);
+        WsdlOperation first = new("Orders", MessagePattern.OneWay,
+            null, null, [], firstBinding, null, location);
+        WsdlOperation second = new("Accounts", MessagePattern.OneWay,
+            null, null, [], secondBinding, null, location);
+        WsdlContract contract = new([], [first, second],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+        Dictionary<string, string> endpoints = new(StringComparer.Ordinal)
+        {
+            ["OrdersBinding"] = "/services/orders",
+            ["AccountsBinding"] = "/services/accounts",
+        };
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(
+            contract, "SOAP", "1.0", endpoints);
+
+        SchemaDraft paths = document.Section("paths");
+        paths.Keywords.Keys.Should().BeEquivalentTo("/services/orders", "/services/accounts");
+        paths.Section("/services/orders").Section("post").Get("operationId").Should().Be("Orders");
+        paths.Section("/services/accounts").Section("post").Get("operationId").Should().Be("Accounts");
+    }
+
+    [Fact]
+    public void Build_groups_distinct_bindings_sharing_the_same_explicit_endpoint()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding firstBinding = new("FirstBinding", "document", "literal",
+            null, SoapVersion.Soap11, "urn:first", location);
+        WsdlBinding secondBinding = firstBinding with { Name = "SecondBinding", SoapAction = "urn:second" };
+        WsdlOperation first = new("First", MessagePattern.OneWay,
+            null, null, [], firstBinding, null, location);
+        WsdlOperation second = first with { Name = "Second", Binding = secondBinding };
+        WsdlContract contract = new([], [first, second],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+        Dictionary<string, string> endpoints = new(StringComparer.Ordinal)
+        {
+            ["FirstBinding"] = "/soap",
+            ["SecondBinding"] = "/soap",
+        };
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "SOAP", "1.0", endpoints);
+
+        document.Section("paths").Keywords.Keys.Should().ContainSingle().Which.Should().Be("/soap");
+        SchemaDraft post = document.Section("paths").Section("/soap").Section("post");
+        post.Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("First").And.Contain("Second");
+    }
+
     [Theory]
     [InlineData(SoapVersion.Soap11, "text/xml")]
     [InlineData(SoapVersion.Soap12, "application/soap+xml")]
