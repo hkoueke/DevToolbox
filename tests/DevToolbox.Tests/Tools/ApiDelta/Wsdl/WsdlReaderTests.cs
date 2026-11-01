@@ -201,7 +201,7 @@ public sealed class WsdlReaderTests : IDisposable
 
         result.IsFaithful.Should().BeFalse();
         Diagnostic[] imports = [.. result.Diagnostics.Where(diagnostic =>
-            diagnostic.Code == WsdlDiagnosticCodes.ImportUnresolved)];
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.ImportUnresolved, StringComparison.Ordinal))];
         imports.Should().HaveCount(2);
         imports.Should().Contain(diagnostic => diagnostic.Message.Contains("first.wsdl", StringComparison.Ordinal));
         imports.Should().Contain(diagnostic => diagnostic.Message.Contains("second.wsdl", StringComparison.Ordinal));
