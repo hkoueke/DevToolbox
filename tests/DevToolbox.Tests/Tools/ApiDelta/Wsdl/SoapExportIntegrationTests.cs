@@ -1,4 +1,5 @@
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
+using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Presentation;
 using DevToolbox.Domain.Runs;
 using Spectre.Console.Testing;
@@ -30,7 +31,8 @@ public sealed class SoapExportIntegrationTests : IDisposable
         Map(post, "responses", "200", "content", media).ToString().Should().Contain("Reply");
         Map(post, "responses", "default", "content", media).ToString().Should().Contain("Fault").And.Contain("Failure");
         yaml.Should().Contain("wrapped: false").And.Contain("minItems: 0").And.Contain("maxItems: 3")
-            .And.Contain("int32").And.Contain("urn:types").And.Contain("SOAPAction = \"\"");
+            .And.Contain("int32").And.Contain("urn:types");
+        post.Children[new YamlScalarNode("description")].ToString().Should().Contain("SOAPAction = \"\"");
         YamlSequenceNode faults = (YamlSequenceNode)Map(post, "responses", "default", "content", media, "schema")
             .Children[new YamlScalarNode("anyOf")];
         string detailName = string.Equals(media, "text/xml", StringComparison.Ordinal) ? "detail" : "Detail";
@@ -166,7 +168,9 @@ public sealed class SoapExportIntegrationTests : IDisposable
             .Replace("soapAction=''", "soapAction='urn:wrong'", StringComparison.Ordinal));
         await Replace(path, "<service", "<import namespace='urn:other' location='other.wsdl'/><service");
         string yaml = await Export(path);
-        yaml.Should().Contain("SOAPAction = \"\"").And.NotContain("urn:wrong");
+        Map(Parse(yaml), "paths", "/actual", "post").Children[new YamlScalarNode("description")]
+            .ToString().Should().Contain("SOAPAction = \"\"");
+        yaml.Should().NotContain("urn:wrong");
     }
 
     [Fact]
@@ -416,6 +420,62 @@ public sealed class SoapExportIntegrationTests : IDisposable
         await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>",
             "<xs:simpleType name='Restricted'><xs:restriction base='" + baseType + "'>" + facets + "</xs:restriction></xs:simpleType></xs:schema>");
         (await Export(path)).Should().Contain(expected);
+    }
+
+    [Theory]
+    [InlineData("http://schemas.xmlsoap.org/wsdl/soap/", "rpc", "document", true)]
+    [InlineData("http://schemas.xmlsoap.org/wsdl/soap/", "document", "rpc", false)]
+    [InlineData("http://schemas.xmlsoap.org/wsdl/soap12/", "rpc", "document", true)]
+    [InlineData("http://schemas.xmlsoap.org/wsdl/soap12/", "document", "rpc", false)]
+    public async Task Imported_operation_styles_agree_between_reader_and_real_export(
+        string soap, string bindingStyle, string operationStyle, bool exportable)
+    {
+        string path = Contract(soap);
+        string bindingPath = Path.Combine(_directory, "binding.wsdl");
+        await Replace(bindingPath, "style='document'", "style='" + bindingStyle + "'");
+        await Replace(bindingPath, "<soap:operation soapAction=''", "<soap:operation style='" + operationStyle + "' soapAction=''");
+
+        WsdlReadResult result = await new WsdlReader().ReadAsync(path, WsdlLimits.Default,
+            ImportPolicy.ConfinedTo(_directory), CancellationToken.None);
+
+        result.IsFaithful.Should().BeTrue(string.Join(" · ", result.Diagnostics.Select(diagnostic => diagnostic.Message)));
+        result.Contract!.Operations.Should().ContainSingle().Which.Binding!.Style.Should().Be(operationStyle);
+        if (exportable)
+        {
+            string media = string.Equals(soap, WsdlNamespaces.Soap11, StringComparison.Ordinal)
+                ? "text/xml" : "application/soap+xml";
+            Map(Parse(await Export(path)), "paths", "/actual", "post", "requestBody", "content")
+                .Children.Should().ContainKey(new YamlScalarNode(media));
+        }
+        else
+        {
+            await Refused(path, "SOAP_RPC_UNSUPPORTED");
+        }
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("FALSE")]
+    [InlineData("null")]
+    [InlineData("001")]
+    [InlineData("0x2a")]
+    [InlineData("a: b")]
+    [InlineData("hello # comment")]
+    [InlineData("- item")]
+    [InlineData("first\nsecond")]
+    [InlineData("first\rsecond")]
+    [InlineData("first\u2028second")]
+    [InlineData("Été 😀")]
+    public async Task Real_soap_export_preserves_text_metadata_through_the_common_YAML_writer(string value)
+    {
+        string path = Contract();
+
+        string yaml = await SoapOpenApiYamlExporter.ExportFileAsync(path, value, value, CancellationToken.None);
+
+        YamlMappingNode info = Map(Parse(yaml), "info");
+        ((YamlScalarNode)info.Children[new YamlScalarNode("title")]).Value.Should().Be(value);
+        ((YamlScalarNode)info.Children[new YamlScalarNode("version")]).Value.Should().Be(value);
+        yaml.Should().NotContain("private.example");
     }
 
     private string Contract(string soap = "http://schemas.xmlsoap.org/wsdl/soap/")

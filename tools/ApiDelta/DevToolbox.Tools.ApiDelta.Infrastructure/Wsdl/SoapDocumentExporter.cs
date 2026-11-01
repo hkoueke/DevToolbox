@@ -219,7 +219,9 @@ internal sealed class SoapDocumentExporter(SoapExportGraph graph)
 
     private static void AddContent(SchemaDraft content, XNamespace soap, SchemaDraft envelope)
     {
-        string media = string.Equals(soap.NamespaceName, WsdlNamespaces.Soap11, StringComparison.Ordinal) ? "text/xml" : "application/soap+xml";
+        SoapVersion version = string.Equals(soap.NamespaceName, WsdlNamespaces.Soap11, StringComparison.Ordinal)
+            ? SoapVersion.Soap11 : SoapVersion.Soap12;
+        string media = SoapHttpSemantics.MediaType(version)!;
         content.Section(media).Section("schema").Append("anyOf", envelope);
     }
 

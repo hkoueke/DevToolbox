@@ -85,6 +85,21 @@ Schema compilation and dependency resolution reuse the validated bytes rather th
 `ConfinedResolverTests` verifies that replacing a file after validation cannot change what the compiler
 reads, and that an allowed URI without a validated snapshot is still refused.
 
+## Combined SOAP / YAML / component-reference integration
+
+The integrated SOAP exporter delegates YAML writing to `OpenApiYamlExporter`, which uses
+`DraftWriter` and `CanonicalEmitter`. SOAP graph construction and OpenAPI semantic validation remain in
+`SoapOpenApiYamlExporter`; there is one YAML emission path for projected drafts and real SOAP exports.
+
+`SoapOperationStyleTests` and `SoapExportIntegrationTests` verify SOAP 1.1/1.2 operation-style overrides,
+including imported bindings: a document operation on an RPC binding is exportable, while an RPC
+operation on a document binding is explicitly refused. The reader and exporter must agree.
+
+`OpenApiYamlExporterTests` reopens the emitted YAML to check exact text values and scalar types,
+including empty strings, boolean/null/numeric-looking text, whitespace, comments, carriage returns,
+control characters and Unicode line separators. `SchemaReferenceConformanceTests` keeps the JSON Pointer
+escaping and collision checks; serialized references must also resolve to the correct distinct targets.
+
 ## Scenario 3 — the same contract, written differently, projects identically
 
 ```bash

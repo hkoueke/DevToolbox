@@ -293,7 +293,7 @@ internal sealed class DefinitionsReader
 
         return new WsdlBinding(
             name,
-            soap?.Attribute("style")?.Value ?? "document",
+            action?.Attribute("style")?.Value ?? soap?.Attribute("style")?.Value ?? "document",
             body?.Attribute("use")?.Value ?? "literal",
             soap?.Attribute("transport")?.Value,
             Version(soap),

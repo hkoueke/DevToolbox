@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
@@ -47,7 +48,7 @@ public static class SoapOpenApiYamlExporter
     {
         object? document = Convert(draft);
         ValidateOpenApi(document);
-        string yaml = new SerializerBuilder().Build().Serialize(document);
+        string yaml = Encoding.UTF8.GetString(OpenApiYamlExporter.Export(draft).Span);
         // Validate the actual serialized YAML shape through a JSON bridge: no second YAML parser.
         object? serialized = new DeserializerBuilder().WithAttemptingUnquotedStringTypeDeserialization().Build().Deserialize<object>(yaml);
         ValidateOpenApi(serialized);
