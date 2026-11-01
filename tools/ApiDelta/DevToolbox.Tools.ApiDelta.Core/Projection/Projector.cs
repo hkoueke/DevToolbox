@@ -38,6 +38,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
 
         SchemaDraft paths = new();
         SchemaDraft schemas = new();
+        SchemaNameRegistry schemaNames = new(contract.Types.Keys);
 
         // Par nom, et non dans l'ordre où le contrat les déclare. L'ordre des déclarations de haut
         // niveau est une façon d'écrire, pas une partie du contrat : deux livraisons du même service
@@ -50,10 +51,10 @@ public sealed class Projector : Abstractions.IWsdlProjector
 
             routes[operation.Name] = route;
 
-            Path(paths, contract, operation, route, version, gaps);
+            Path(paths, contract, operation, route, version, gaps, schemaNames);
         }
 
-        int declined = Types(contract, schemas, version, gaps);
+        int declined = Types(contract, schemas, version, gaps, schemaNames);
 
         return new ProjectionResult(
             Document(paths, schemas, version),
@@ -106,7 +107,8 @@ public sealed class Projector : Abstractions.IWsdlProjector
         WsdlOperation operation,
         DerivedRoute route,
         OpenApiVersion version,
-        List<ProjectionGap> gaps)
+        List<ProjectionGap> gaps,
+        SchemaNameRegistry schemaNames)
     {
         SchemaDraft item = paths.Section(route.Path);
         SchemaDraft action = new();
@@ -117,8 +119,8 @@ public sealed class Projector : Abstractions.IWsdlProjector
             operation.Documentation
                 ?? ("Opération « " + operation.Name + " », schéma d'échange " + operation.Pattern));
 
-        Body(action, contract, operation);
-        Responses(action, contract, operation);
+        Body(action, contract, operation, schemaNames);
+        Responses(action, contract, operation, schemaNames);
 
         Apply(
             new ProjectionSubject(
@@ -139,9 +141,10 @@ public sealed class Projector : Abstractions.IWsdlProjector
     }
 
     /// <summary>Pose le corps de la requête, si l'opération en reçoit un.</summary>
-    private static void Body(SchemaDraft action, WsdlContract contract, WsdlOperation operation)
+    private static void Body(SchemaDraft action, WsdlContract contract, WsdlOperation operation,
+        SchemaNameRegistry schemaNames)
     {
-        if (operation.Input is not { } input || Reference(contract, input) is not { } reference)
+        if (operation.Input is not { } input || Reference(contract, input, schemaNames) is not { } reference)
         {
             return;
         }
@@ -161,7 +164,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
     /// dit — annoncer un code comme venant du contrat serait affirmer ce qu'on a choisi.
     /// </remarks>
     private static void Responses(
-        SchemaDraft action, WsdlContract contract, WsdlOperation operation)
+        SchemaDraft action, WsdlContract contract, WsdlOperation operation, SchemaNameRegistry schemaNames)
     {
         SchemaDraft responses = action.Section("responses");
 
@@ -179,7 +182,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
 
         success.Set("description", "Réponse de « " + operation.Name + " ». Statut déduit, non déclaré.");
 
-        if (operation.Output is { } output && Reference(contract, output) is { } reference)
+        if (operation.Output is { } output && Reference(contract, output, schemaNames) is { } reference)
         {
             success.Section("content").Section("application/json").Section("schema")
                 .Set("$ref", reference);
@@ -196,7 +199,8 @@ public sealed class Projector : Abstractions.IWsdlProjector
     /// type pour obtenir un schéma. Une partie désignant directement un type est licite en
     /// « rpc/literal » et se résout d'un cran de moins.
     /// </remarks>
-    private static string? Reference(WsdlContract contract, WsdlMessage message)
+    private static string? Reference(WsdlContract contract, WsdlMessage message,
+        SchemaNameRegistry schemaNames)
     {
         WsdlPart? body = message.Parts.FirstOrDefault(part => part.IsWellFormed);
 
@@ -207,7 +211,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
 
         if (body.TypeName is { } named)
         {
-            return Pointer(named);
+            return schemaNames.Reference(named);
         }
 
         if (body.ElementName is not { } element)
@@ -236,14 +240,15 @@ public sealed class Projector : Abstractions.IWsdlProjector
                 string.Equals(Local(known), Local(name), StringComparison.Ordinal))
                 ?? name;
 
-    private static string Pointer(string type) => "#/components/schemas/" + Local(type);
+    
 
     /// <summary>Projette chaque type, et rend le nombre de ceux qui ont été déclinés.</summary>
     private static int Types(
         WsdlContract contract,
         SchemaDraft schemas,
         OpenApiVersion version,
-        List<ProjectionGap> gaps)
+        List<ProjectionGap> gaps,
+        SchemaNameRegistry schemaNames)
     {
         HashSet<string> known = new(contract.Types.Keys, StringComparer.Ordinal);
         int declined = 0;
@@ -270,7 +275,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
                 continue;
             }
 
-            schemas.Set(Local(type.Key), Type(type.Value, version, known, gaps));
+            schemas.Set(schemaNames.Key(type.Key), Type(type.Value, version, known, gaps, schemaNames));
         }
 
         return declined;
@@ -281,13 +286,14 @@ public sealed class Projector : Abstractions.IWsdlProjector
         XsdType type,
         OpenApiVersion version,
         IReadOnlySet<string> known,
-        List<ProjectionGap> gaps)
+        List<ProjectionGap> gaps,
+        SchemaNameRegistry schemaNames)
     {
         SchemaDraft draft = new();
 
         Apply(
             new ProjectionSubject(
-                type.Name, type.Location, Type: type, Version: version, KnownTypes: known),
+                type.Name, type.Location, Type: type, Version: version, KnownTypes: known, SchemaNames: schemaNames),
             draft,
             gaps);
 
