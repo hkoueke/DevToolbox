@@ -1,4 +1,4 @@
-using DevToolbox.Tools.ApiDelta.Core.Syntax;
+using DevToolbox.Tools.ApiDelta.Core.Loading;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 
 namespace DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
