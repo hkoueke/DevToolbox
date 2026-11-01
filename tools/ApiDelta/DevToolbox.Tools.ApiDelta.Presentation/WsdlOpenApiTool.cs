@@ -54,7 +54,7 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
                 sourcePath, title, version, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             await using (FileStream output = new(
-                targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None).ConfigureAwait(false))
             {
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(yaml);
                 await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
