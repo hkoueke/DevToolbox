@@ -8,6 +8,42 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Wsdl;
 public sealed class SoapOpenApiYamlExporterTests
 {
     [Fact]
+    public async Task Exports_real_wsdl_file_to_openapi_yaml_without_exposing_endpoint_host()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "soap-yaml-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string path = Path.Combine(directory, "service.wsdl");
+            await File.WriteAllTextAsync(path,
+                "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/'"
+                + " xmlns:tns='urn:test' xmlns:soap='http://schemas.xmlsoap.org/wsdl/soap/'"
+                + " targetNamespace='urn:test'>"
+                + "<message name='Input'/><portType name='PortType'>"
+                + "<operation name='Ping'><input message='tns:Input'/></operation></portType>"
+                + "<binding name='Binding' type='tns:PortType'>"
+                + "<soap:binding transport='http://schemas.xmlsoap.org/soap/http'/>"
+                + "<operation name='Ping'><soap:operation soapAction='urn:ping'/>"
+                + "<input><soap:body use='literal'/></input></operation></binding>"
+                + "<service name='Service'><port name='Port' binding='tns:Binding'>"
+                + "<soap:address location='https://private.example.test/soap/ping'/>"
+                + "</port></service></definitions>");
+
+            string yaml = await SoapOpenApiYamlExporter.ExportFileAsync(
+                path, "Test SOAP", "1.0", CancellationToken.None);
+
+            yaml.Should().Contain("openapi: 3.0.3");
+            yaml.Should().Contain("/soap/ping");
+            yaml.Should().Contain("post:");
+            yaml.Should().NotContain("private.example.test");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void Refuses_contracts_without_soap_endpoints_instead_of_exporting_empty_paths()
     {
         WsdlContract contract = new([], [],
