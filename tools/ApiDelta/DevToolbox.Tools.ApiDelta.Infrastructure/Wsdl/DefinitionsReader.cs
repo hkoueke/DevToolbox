@@ -126,7 +126,7 @@ internal sealed class DefinitionsReader
     /// que le document.
     /// </para>
     /// </remarks>
-    private static string? Qualified(XElement carrier, string? value)
+    private string? Qualified(XElement carrier, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -139,6 +139,18 @@ internal sealed class DefinitionsReader
         XNamespace? space = colon < 0
             ? carrier.GetDefaultNamespace()
             : carrier.GetNamespaceOfPrefix(value[..colon]);
+
+        if (colon >= 0 && space is null)
+        {
+            IXmlLineInfo info = carrier;
+            _diagnostics.Add(new Diagnostic(
+                WsdlDiagnosticCodes.StructuralViolation,
+                DiagnosticSeverity.Error,
+                "Le préfixe QName « " + value[..colon] + " » de « " + value
+                    + " » n'est pas déclaré (" + At(carrier, carrier.Name.LocalName).Display + ").",
+                Position: new Core.Syntax.SourcePosition(info.LineNumber, info.LinePosition)));
+            return null;
+        }
 
         return space is null || space == XNamespace.None
             ? local
