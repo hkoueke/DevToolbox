@@ -29,7 +29,8 @@ public sealed record ProjectionSubject(
     WsdlBinding? Binding = null,
     WsdlOperation? Operation = null,
     Syntax.OpenApiVersion Version = Syntax.OpenApiVersion.V30,
-    IReadOnlySet<string>? KnownTypes = null)
+    IReadOnlySet<string>? KnownTypes = null,
+    SchemaNameRegistry? SchemaNames = null)
 {
     /// <summary>
     /// Les types nommés du contrat, jamais nuls.
