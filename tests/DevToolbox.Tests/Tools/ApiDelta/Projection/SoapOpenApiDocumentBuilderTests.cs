@@ -7,6 +7,30 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Projection;
 
 public sealed class SoapOpenApiDocumentBuilderTests
 {
+    [Theory]
+    [InlineData("//secret.example/soap")]
+    [InlineData("/soap?token=secret")]
+    [InlineData("/soap#fragment")]
+    [InlineData("/soap\\\\admin")]
+    [InlineData("https://example.test/soap")]
+    public void Build_rejects_unsafe_endpoint_paths_in_both_overloads(string path)
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding binding = new("Binding", "document", "literal",
+            null, SoapVersion.Soap11, null, location);
+        WsdlOperation operation = new("Call", MessagePattern.OneWay,
+            null, null, [], binding, null, location);
+        WsdlContract contract = new([], [operation],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+        Dictionary<string, string> paths = new(StringComparer.Ordinal) { ["Binding"] = path };
+
+        Action single = () => SoapOpenApiDocumentBuilder.Build(contract, "SOAP", "1.0", path);
+        Action multiple = () => SoapOpenApiDocumentBuilder.Build(contract, "SOAP", "1.0", paths);
+
+        single.Should().Throw<ArgumentException>();
+        multiple.Should().Throw<ArgumentException>();
+    }
+
     [Fact]
     public void Build_routes_multiple_bindings_to_explicit_endpoints_without_inventing_paths()
     {
