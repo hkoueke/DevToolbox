@@ -22,8 +22,8 @@ public sealed class SoapOpenApiDocumentBuilderTests
         WsdlContract contract = new(
             [], [operation], new Dictionary<string, XsdType>(), [], [], ".");
 
-        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service SOAP", "1.0");
-        SchemaDraft post = document.Section("paths").Section("/Read").Section("post");
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service SOAP", "1.0", "/soap");
+        SchemaDraft post = document.Section("paths").Section("/soap").Section("post");
 
         document.Get("openapi").Should().Be("3.0.3");
         post.Get("operationId").Should().Be("Read");
@@ -45,7 +45,7 @@ public sealed class SoapOpenApiDocumentBuilderTests
         WsdlContract contract = new(
             [], [operation], new Dictionary<string, XsdType>(), [], [], ".");
 
-        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0");
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
 
         document.Section("paths").Keywords.Should().BeEmpty();
     }
