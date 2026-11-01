@@ -7,6 +7,13 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Projection;
 /// <summary>Cas limites de conformité des références de composants OpenAPI.</summary>
 public sealed class SchemaReferenceConformanceTests
 {
+    private static readonly string[] ReorderedNames =
+    [
+        "urn:fournisseurs:Adresse",
+        "urn:clients:Adresse",
+        "urn:clients:Adresse",
+    ];
+
     [Theory]
     [InlineData("urn:example:Type/Version", "#/components/schemas/Type~1Version")]
     [InlineData("urn:example:Type~Version", "#/components/schemas/Type~0Version")]
@@ -30,12 +37,7 @@ public sealed class SchemaReferenceConformanceTests
         ];
 
         SchemaNameRegistry registry = new(names);
-        SchemaNameRegistry reordered = new(new[]
-        {
-            "urn:fournisseurs:Adresse",
-            "urn:clients:Adresse",
-            "urn:clients:Adresse",
-        });
+        SchemaNameRegistry reordered = new(ReorderedNames);
 
         registry.Reference("urn:clients:Adresse")
             .Should().Be(reordered.Reference("urn:clients:Adresse"));
