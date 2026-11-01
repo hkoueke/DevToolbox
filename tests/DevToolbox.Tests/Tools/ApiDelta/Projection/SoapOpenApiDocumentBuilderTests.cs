@@ -20,7 +20,7 @@ public sealed class SoapOpenApiDocumentBuilderTests
         WsdlOperation operation = new(
             "Read", MessagePattern.RequestResponse, input, output, [], binding, null, location);
         WsdlContract contract = new(
-            [], [operation], new Dictionary<string, XsdType>(), [], [], ".");
+            [], [operation], new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
 
         SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service SOAP", "1.0", "/soap");
         SchemaDraft post = document.Section("paths").Section("/soap").Section("post");
@@ -43,7 +43,7 @@ public sealed class SoapOpenApiDocumentBuilderTests
         WsdlOperation operation = new(
             "Unbound", MessagePattern.OneWay, null, null, [], null, null, location);
         WsdlContract contract = new(
-            [], [operation], new Dictionary<string, XsdType>(), [], [], ".");
+            [], [operation], new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
 
         SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
 
