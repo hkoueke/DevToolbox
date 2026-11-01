@@ -34,7 +34,7 @@ internal static class WsdlGraphBinding
                     continue;
                 }
 
-                WsdlBinding? binding = Binding(documents, declaration.Name, diagnostics);
+                WsdlBinding? binding = Binding(documents, declaration, diagnostics);
                 WsdlMessage? input = Resolve(messages, document, declaration.InputMessage, diagnostics);
                 WsdlMessage? output = Resolve(messages, document, declaration.OutputMessage, diagnostics);
                 List<WsdlMessage> faults = [];
@@ -56,12 +56,27 @@ internal static class WsdlGraphBinding
     }
 
     private static WsdlBinding? Binding(
-        IReadOnlyList<Definitions> documents, string name, List<Diagnostic> diagnostics)
+        IReadOnlyList<Definitions> documents, OperationDeclaration operation,
+        List<Diagnostic> diagnostics)
     {
         List<WsdlBinding> matches = [];
         foreach (Definitions document in documents)
         {
-            if (document.Bindings.TryGetValue(name, out WsdlBinding? binding))
+            if (!document.Bindings.TryGetValue(operation.Name, out WsdlBinding? binding))
+            {
+                continue;
+            }
+
+            string key = (document.TargetNamespace ?? string.Empty)
+                + ":" + binding.Name + ":" + operation.Name;
+            if (document.BindingPortTypes is null
+                || !document.BindingPortTypes.TryGetValue(key, out string? portType))
+            {
+                Refuse(diagnostics, "Le binding SOAP ne déclare pas de portType : " + key);
+                continue;
+            }
+
+            if (string.Equals(portType, operation.PortType, StringComparison.Ordinal))
             {
                 matches.Add(binding);
             }
@@ -69,7 +84,7 @@ internal static class WsdlGraphBinding
 
         if (matches.Count > 1)
         {
-            Refuse(diagnostics, "Plusieurs bindings SOAP correspondent à l'opération : " + name);
+            Refuse(diagnostics, "Plusieurs bindings SOAP correspondent à l'opération : " + operation.Name);
             return null;
         }
 
