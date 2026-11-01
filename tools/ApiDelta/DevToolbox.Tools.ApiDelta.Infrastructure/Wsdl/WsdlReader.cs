@@ -155,6 +155,22 @@ public sealed class WsdlReader : IWsdlReader
         {
             WsdlImportWalker imports = new(limits, policy, retrieved, diagnostics);
             imports.Walk(root, name);
+            foreach (var imported in imports.Documents)
+            {
+                if (Deeper(imported.Root, limits.MaxNestingDepth))
+                {
+                    diagnostics.Add(Budget(
+                        "la profondeur d'imbrication d'un document",
+                        limits.MaxNestingDepth, imported.Path));
+                    continue;
+                }
+
+                // Validate every imported definition independently. Cross-document
+                // QName binding is not yet available, so the root still refuses
+                // imports instead of assembling an incomplete contract.
+                _ = new DefinitionsReader(imported.Path, diagnostics)
+                    .Read(imported.Root, importsResolved: true);
+            }
         }
 
         Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
