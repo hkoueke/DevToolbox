@@ -44,7 +44,7 @@ internal static class SchemaCompiler
 
         foreach (InlineSchema schema in definitions.InlineSchemas)
         {
-            walker.Walk(schema.Element, document);
+            walker.Walk(schema.Element, schema.Location.Document);
         }
 
         XmlSchemaSet set = new()
@@ -58,7 +58,7 @@ internal static class SchemaCompiler
 
         foreach (InlineSchema schema in definitions.InlineSchemas)
         {
-            Add(set, schema, document, diagnostics);
+            Add(set, schema, schema.Location.Document, diagnostics);
         }
 
         foreach (string path in walker.Resolved.Values)
