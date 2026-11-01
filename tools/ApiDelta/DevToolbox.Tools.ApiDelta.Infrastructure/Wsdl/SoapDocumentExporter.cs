@@ -96,6 +96,7 @@ internal sealed class SoapDocumentExporter(SoapExportGraph graph)
                 .ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
         string? action = bound.Element(soap + "operation")?.Attribute("soapAction")?.Value;
+        SoapActionPolicy.Validate(action);
         string description = name + (action is null ? " (SOAPAction absente)" : " (SOAPAction = \"" + action + "\")");
         post.Set("description", (post.Get("description") as string ?? string.Empty) + description + "\n");
         SchemaDraft request = post.Section("requestBody");

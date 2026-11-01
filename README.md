@@ -239,6 +239,8 @@ Les messages `document/literal` sont projetés à partir de leurs parties réfé
 
 Les enveloppes et types de média suivent SOAP 1.1 (`text/xml`) ou SOAP 1.2 (`application/soap+xml`). Plusieurs opérations sur un endpoint sont décrites par des variantes `anyOf`, avec leurs actions dans la description standard du POST, **sans extension `x-soap-*`**. Une SOAPAction vide reste distinguée d'une action absente. Les réponses avec sortie utilisent 200 ; les échanges one-way gardent un 202 sans corps. Ces statuts sont des conventions d'export, pas des garanties du WSDL. Les faults déclarés sont décrits sous `default`, avec leur détail métier et leur enveloppe SOAP ; les champs de protocole du Fault restent ouverts et définis par SOAP, sans inventer de statut ou de contrainte métier.
 
+Les SOAPAction sont vérifiées **avant** leur copie dans la description : une action absente reste absente, une action vide reste vide ; les URN et références relatives sans autorité restent inchangées. Toute action portant une autorité (y compris une URL HTTP(S)), une query string, un fragment, un encodage `%`, un caractère de contrôle ou une autre forme non exportable est refusée par `SOAP_ACTION_UNSAFE`, sans afficher sa valeur. Retirer une autorité ou des paramètres changerait l'action de dispatch : le générateur refuse plutôt que de la réécrire.
+
 ### Refus explicites et limites
 
 L'export refuse l'ensemble du document lorsqu'une construction **atteinte depuis un port exposé** ne peut pas être portée. La console affiche le motif et un code de diagnostic, notamment :
@@ -246,6 +248,7 @@ L'export refuse l'ensemble du document lorsqu'une construction **atteinte depuis
 | Construction | Diagnostic |
 |---|---|
 | Style RPC / corps encoded ou literal manquant | `SOAP_RPC_UNSUPPORTED` / `SOAP_ENCODED_OR_MISSING_LITERAL_BODY_UNSUPPORTED` |
+| Facettes de `base64Binary` (longueur en octets, énumération binaire) | `XSD_BINARY_FACET_UNSUPPORTED` |
 | Attributs XML, contenu mixte | `XSD_ATTRIBUTES_UNSUPPORTED` / `XSD_MIXED_CONTENT_UNSUPPORTED` |
 | Groupes de substitution, éléments abstraits | `XSD_SUBSTITUTION_GROUP_OR_ABSTRACT_ELEMENT_UNSUPPORTED` |
 | Choix, wildcard, cardinalité d'un groupe | `XSD_CHOICE_WILDCARD_OR_GROUP_CARDINALITY_UNSUPPORTED` |
@@ -254,7 +257,7 @@ L'export refuse l'ensemble du document lorsqu'une construction **atteinte depuis
 | Notification et solicit-response initiées par le service | `WSDL_NOTIFICATION_OR_SOLICIT_RESPONSE_UNSUPPORTED` |
 | Import invalide, manquant, distant ou hors racine | `WSDL_XSD_GRAPH_UNRESOLVED_OR_INVALID` |
 
-Les listes/unions XSD, facettes non représentées (dont les regex XSD), primitives non prises en charge et parties document/literal désignant directement un type sont également refusées. Aucun schéma approximatif ne les remplace.
+Les listes/unions XSD, facettes non représentées (dont les regex XSD), primitives non prises en charge et parties document/literal désignant directement un type sont également refusées. Aucun schéma approximatif ne les remplace. Pour une particule locale `xs:element ref`, le nom, le type et les contraintes sont lus sur la déclaration globale résolue ; les bornes `minOccurs`/`maxOccurs` restent celles de la particule locale. Les contraintes `fixed`, `default` et d'identité de l'élément référencé sont donc refusées elles aussi. Les facettes de longueur ne sont traduites que pour un véritable type chaîne XSD : une longueur binaire en octets n'est jamais présentée comme une longueur de texte Base64. Un `base64Binary` sans facette reste pris en charge.
 
 OpenAPI décrit la structure XML et les cardinalités ; il ne remplace pas la validation XSD, notamment pour l'ordre des éléments et les formes lexicales XML. Le YAML généré porte cette limite dans sa description. Il est relu avec YamlDotNet puis soumis à **Microsoft.OpenApi**, résolution des références et règles de validation comprises, avant toute écriture définitive.
 

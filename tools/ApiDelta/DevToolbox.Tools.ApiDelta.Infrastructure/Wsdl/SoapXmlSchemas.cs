@@ -24,6 +24,15 @@ internal sealed class SoapXmlSchemas(XmlSchemaSet schemas, SchemaDraft component
 
     private SchemaDraft Element(XmlSchemaElement element)
     {
+        // A compiled local ref has the effective type, but not the declaration's
+        // public fixed/default/identity constraints. Occurrences stay on the local
+        // particle in AddElement; XML identity and constraints belong to the global.
+        if (!element.RefName.IsEmpty)
+        {
+            element = schemas.GlobalElements[element.RefName] as XmlSchemaElement
+                ?? throw new WsdlExportException("XSD_ELEMENT_UNRESOLVED");
+        }
+
         if (element.IsAbstract || !element.SubstitutionGroup.IsEmpty
             || schemas.GlobalElements.Values.OfType<XmlSchemaElement>().Any(candidate =>
                 candidate.SubstitutionGroup == element.QualifiedName))
@@ -184,9 +193,15 @@ internal sealed class SoapXmlSchemas(XmlSchemaSet schemas, SchemaDraft component
 
         foreach (XmlSchemaFacet facet in restriction.Facets.OfType<XmlSchemaFacet>())
         {
+            if (type.Datatype?.TypeCode == XmlTypeCode.Base64Binary)
+            {
+                // XSD binary facets operate on decoded octets, not Base64 text.
+                throw new WsdlExportException("XSD_BINARY_FACET_UNSUPPORTED");
+            }
+
             if (facet is XmlSchemaEnumerationFacet)
             {
-                if (draft.Get("type") is not "string")
+                if (type.Datatype?.TypeCode != XmlTypeCode.String)
                 {
                     throw new WsdlExportException("XSD_NON_STRING_ENUM_UNSUPPORTED");
                 }
@@ -194,7 +209,7 @@ internal sealed class SoapXmlSchemas(XmlSchemaSet schemas, SchemaDraft component
                 draft.Append("enum", facet.Value);
             }
             else if (facet is XmlSchemaMinLengthFacet or XmlSchemaMaxLengthFacet or XmlSchemaLengthFacet
-                && draft.Get("type") is "string")
+                && type.Datatype?.TypeCode == XmlTypeCode.String)
             {
                 int length = int.Parse(facet.Value!, CultureInfo.InvariantCulture);
                 if (facet is XmlSchemaMinLengthFacet or XmlSchemaLengthFacet)

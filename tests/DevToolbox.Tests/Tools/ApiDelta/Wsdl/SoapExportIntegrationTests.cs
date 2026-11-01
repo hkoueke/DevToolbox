@@ -311,6 +311,113 @@ public sealed class SoapExportIntegrationTests : IDisposable
         await Refused(path, "WSDL_OPERATION_UNRESOLVED_OR_AMBIGUOUS");
     }
 
+    [Theory]
+    [InlineData("https://user:password@private.example/action?token=secret")]
+    [InlineData("https://private.example/action")]
+    [InlineData("//private.example/action")]
+    [InlineData("urn:call?token=secret")]
+    [InlineData("urn:call#secret")]
+    [InlineData("https%3A%2F%2Fuser%3Apassword%40private.example/action")]
+    public async Task P1_unsafe_SOAPActions_are_refused_before_console_publication(string action)
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "binding.wsdl"), "soapAction=''", "soapAction='" + action + "'");
+        var refusal = await Refused(path, "SOAP_ACTION_UNSAFE");
+        refusal.Which.Message.Should().NotContain("password").And.NotContain("private.example").And.NotContain("secret");
+        string target = Path.Combine(_directory, "result.yaml");
+        TestConsole console = ConsoleFor(path, target);
+        ToolRun run = await new WsdlOpenApiTool(new WsdlOpenApiExporter(), console).RunAsync(CancellationToken.None);
+        run.Outcome.Should().Be(RunOutcome.Failed);
+        File.Exists(target).Should().BeFalse();
+        console.Output.Should().Contain("SOAP_ACTION_UNSAFE").And.NotContain("private.example").And.NotContain("password").And.NotContain("secret");
+    }
+
+    [Theory]
+    [InlineData("soapAction=''", "SOAPAction = \"\"")]
+    [InlineData("", "SOAPAction absente")]
+    [InlineData("soapAction='urn:call'", "SOAPAction = \"urn:call\"")]
+    [InlineData("soapAction='actions/call'", "SOAPAction = \"actions/call\"")]
+    public async Task P1_safe_SOAPActions_preserve_absence_empty_and_authority_free_values(string attribute, string expected)
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "binding.wsdl"), "soapAction=''", attribute);
+        Map(Parse(await Export(path)), "paths", "/actual", "post").Children[new YamlScalarNode("description")]
+            .ToString().Should().Contain(expected);
+    }
+
+    [Theory]
+    [InlineData("fixed='A'")]
+    [InlineData("default='A'")]
+    public async Task P1_local_refs_retain_global_fixed_and_default_constraints(string constraint)
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "types.xsd"), "<xs:element name='count' type='xs:int'/>",
+            "<xs:element ref='tns:Value' minOccurs='0' maxOccurs='3'/>");
+        await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>",
+            "<xs:element name='Value' type='xs:string' " + constraint + "/></xs:schema>");
+        await Refused(path, "XSD_IDENTITY_DEFAULT_OR_FIXED_UNSUPPORTED");
+    }
+
+    [Fact]
+    public async Task P1_local_refs_retain_global_identity_constraints()
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "types.xsd"), "<xs:element name='count' type='xs:int'/>", "<xs:element ref='tns:Value'/>");
+        await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>", """
+            <xs:element name='Value'><xs:complexType><xs:sequence>
+              <xs:element name='item' type='xs:string' maxOccurs='unbounded'/>
+            </xs:sequence></xs:complexType>
+            <xs:unique name='UniqueValue'><xs:selector xpath='tns:item'/><xs:field xpath='.'/></xs:unique>
+            </xs:element></xs:schema>
+            """);
+        await Refused(path, "XSD_IDENTITY_DEFAULT_OR_FIXED_UNSUPPORTED");
+    }
+
+    [Fact]
+    public async Task P1_supported_local_refs_preserve_particle_cardinality_and_global_XML_identity()
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "types.xsd"), "<xs:element name='count' type='xs:int'/>",
+            "<xs:element ref='tns:Value' minOccurs='0' maxOccurs='3'/>");
+        await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>", "<xs:element name='Value' type='xs:string'/></xs:schema>");
+        YamlMappingNode components = Map(Parse(await Export(path)), "components", "schemas");
+        YamlMappingNode payload = components.Children.Values.OfType<YamlMappingNode>().Single(node =>
+            node.Children.TryGetValue(new YamlScalarNode("properties"), out YamlNode? properties)
+            && properties is YamlMappingNode map && map.Children.ContainsKey(new YamlScalarNode("Value")));
+        YamlMappingNode value = Map(payload, "properties", "Value");
+        value.Children[new YamlScalarNode("minItems")].ToString().Should().Be("0");
+        value.Children[new YamlScalarNode("maxItems")].ToString().Should().Be("3");
+        Map(value, "items", "xml").Children[new YamlScalarNode("name")].ToString().Should().Be("Value");
+        Map(value, "items", "xml").Children[new YamlScalarNode("namespace")].ToString().Should().Be("urn:types");
+        payload.Children[new YamlScalarNode("required")].ToString().Should().NotContain("Value");
+    }
+
+    [Theory]
+    [InlineData("length", "3")]
+    [InlineData("minLength", "3")]
+    [InlineData("maxLength", "3")]
+    [InlineData("enumeration", "YWJj")]
+    public async Task P1_binary_facets_are_not_misrepresented_as_character_constraints(string facet, string value)
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "types.xsd"), "name='count' type='xs:int'", "name='count' type='tns:Binary'");
+        await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>",
+            "<xs:simpleType name='Binary'><xs:restriction base='xs:base64Binary'><xs:" + facet + " value='" + value + "'/></xs:restriction></xs:simpleType></xs:schema>");
+        await Refused(path, "XSD_BINARY_FACET_UNSUPPORTED");
+    }
+
+    [Theory]
+    [InlineData("xs:string", "<xs:length value='3'/>", "maxLength: 3")]
+    [InlineData("xs:base64Binary", "", "format: byte")]
+    public async Task P1_string_lengths_and_unconstrained_binary_remain_supported(string baseType, string facets, string expected)
+    {
+        string path = Contract();
+        await Replace(Path.Combine(_directory, "types.xsd"), "name='count' type='xs:int'", "name='count' type='tns:Restricted'");
+        await Replace(Path.Combine(_directory, "types.xsd"), "</xs:schema>",
+            "<xs:simpleType name='Restricted'><xs:restriction base='" + baseType + "'>" + facets + "</xs:restriction></xs:simpleType></xs:schema>");
+        (await Export(path)).Should().Contain(expected);
+    }
+
     private string Contract(string soap = "http://schemas.xmlsoap.org/wsdl/soap/")
     {
         Write("types.xsd", """

@@ -11,6 +11,8 @@ public sealed class WsdlExportException : InvalidOperationException
 
     private static string Explain(string reason) => reason switch
     {
+        "SOAP_ACTION_UNSAFE" => "la SOAPAction contient une autorité, des données sensibles ou une forme d'URI non exportable",
+        "XSD_BINARY_FACET_UNSUPPORTED" => "les facettes binaires portent sur les octets décodés et ne peuvent pas être traduites en contraintes de chaîne",
         "XSD_ATTRIBUTES_UNSUPPORTED" => "les attributs XML ne sont pas pris en charge",
         "XSD_MIXED_CONTENT_UNSUPPORTED" => "le contenu XML mixte ne peut pas être représenté",
         "XSD_SUBSTITUTION_GROUP_OR_ABSTRACT_ELEMENT_UNSUPPORTED" => "les groupes de substitution et éléments abstraits ne sont pas pris en charge",
