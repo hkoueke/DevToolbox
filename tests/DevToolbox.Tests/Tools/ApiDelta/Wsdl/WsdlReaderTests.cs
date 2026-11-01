@@ -275,6 +275,33 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task An_imported_wsdl_exceeding_nesting_budget_is_refused()
+    {
+        string nested = "<wsdl:documentation>" + new string(' ', 1)
+            + string.Concat(Enumerable.Repeat("<level>", 12))
+            + string.Concat(Enumerable.Repeat("</level>", 12))
+            + "</wsdl:documentation>";
+        _ = Write("deep.wsdl",
+            "<wsdl:definitions xmlns:wsdl='http://schemas.xmlsoap.org/wsdl/' "
+            + "targetNamespace='urn:deep'>" + nested + "</wsdl:definitions>");
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:deep" location="deep.wsdl" />
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await _reader.ReadAsync(
+            entry, WsdlLimits.Default with { MaxNestingDepth = 8 },
+            Policy(), CancellationToken.None);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            string.Equals(diagnostic.Code, DiagnosticCodes.LimitReached, StringComparison.Ordinal)
+            && diagnostic.Message.Contains("deep.wsdl", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_wsdl_import_outside_the_confinement_root_is_refused()
     {
         string entry = Write("root.wsdl", """
