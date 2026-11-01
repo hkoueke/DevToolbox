@@ -53,7 +53,7 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
             string yaml = await exporter.ExportAsync(
                 sourcePath, title, version, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            await using (FileStream output = new(
+            await using (FileStream output = new FileStream(
                 targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None).ConfigureAwait(false))
             {
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(yaml);
