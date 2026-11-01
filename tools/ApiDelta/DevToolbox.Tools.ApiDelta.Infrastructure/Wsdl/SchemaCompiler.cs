@@ -51,7 +51,7 @@ internal static class SchemaCompiler
         {
             // Ne répond que depuis l'ensemble déjà vérifié. Sans cela le compilateur ne suivrait rien du
             // tout, ce qui serait sûr mais ne lirait aucun contrat réel.
-            XmlResolver = new ConfinedResolver(walker.Resolved),
+            XmlResolver = new ConfinedResolver(walker.Resolved, walker.Contents),
         };
 
         set.ValidationEventHandler += (_, argument) => diagnostics.Add(Complaint(argument, document));
@@ -61,9 +61,9 @@ internal static class SchemaCompiler
             Add(set, schema, schema.Location.Document, diagnostics);
         }
 
-        foreach (string path in walker.Resolved.Values)
+        foreach (KeyValuePair<string, byte[]> snapshot in walker.Contents)
         {
-            Add(set, path, document, diagnostics);
+            Add(set, snapshot.Key, snapshot.Value, document, diagnostics);
         }
 
         SchemaConflicts.Report(document, definitions, walker.Schemas, diagnostics);
@@ -146,11 +146,14 @@ internal static class SchemaCompiler
     }
 
     private static void Add(
-        XmlSchemaSet set, string path, string document, List<Diagnostic> diagnostics)
+        XmlSchemaSet set, string path, byte[] content, string document, List<Diagnostic> diagnostics)
     {
         try
         {
-            _ = set.Add(null, path);
+            using XmlReader reader = XmlReader.Create(new MemoryStream(content, writable: false),
+                new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null },
+                new Uri(Path.GetFullPath(path)).ToString());
+            _ = set.Add(null, reader);
         }
         catch (XmlSchemaException failure)
         {

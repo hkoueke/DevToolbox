@@ -30,6 +30,7 @@ internal sealed class ImportWalker
     private readonly RetrievalMap _retrieved;
     private readonly List<Diagnostic> _diagnostics;
     private readonly Dictionary<string, string> _resolved = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, byte[]> _contents = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     private readonly List<WsdlDocument> _documents = [];
     private readonly List<ReadSchema> _schemas = [];
     private readonly List<UnresolvedImport> _unresolved = [];
@@ -54,6 +55,9 @@ internal sealed class ImportWalker
 
     /// <summary>Les emplacements autorisés, et le fichier qui répond pour chacun.</summary>
     internal IReadOnlyDictionary<string, string> Resolved => _resolved;
+
+    /// <summary>Les octets contrôlés, réutilisés sans rouvrir les fichiers pendant la compilation.</summary>
+    internal IReadOnlyDictionary<string, byte[]> Contents => _contents;
 
     /// <summary>Les schémas effectivement lus.</summary>
     internal IReadOnlyList<WsdlDocument> Documents => _documents;
@@ -275,6 +279,7 @@ internal sealed class ImportWalker
             schema.Attribute("targetNamespace")?.Value));
 
         _schemas.Add(new ReadSchema(path, schema));
+        _contents.Add(path, content);
 
         Walk(schema, path, depth + 1);
     }

@@ -81,6 +81,10 @@ root remains usable, while an outside path (even a nonexistent one), a symbolic 
 directory link are refused with `ImportOutsideRoot` before opening the import. Retrieval does not grant
 an exemption from confinement.
 
+Schema compilation and dependency resolution reuse the validated bytes rather than reopening files.
+`ConfinedResolverTests` verifies that replacing a file after validation cannot change what the compiler
+reads, and that an allowed URI without a validated snapshot is still refused.
+
 ## Scenario 3 — the same contract, written differently, projects identically
 
 ```bash
