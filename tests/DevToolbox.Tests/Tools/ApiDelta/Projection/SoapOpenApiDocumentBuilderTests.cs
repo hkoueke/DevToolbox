@@ -97,6 +97,25 @@ public sealed class SoapOpenApiDocumentBuilderTests
     }
 
     [Fact]
+    public void Build_shared_one_way_endpoint_does_not_invent_response_body()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding binding = new("Port", "document", "literal", null, SoapVersion.Soap11, null, location);
+        WsdlOperation first = new(
+            "NotifyA", MessagePattern.OneWay, null, null, [], binding, null, location);
+        WsdlOperation second = first with { Name = "NotifyB" };
+        WsdlContract contract = new(
+            [], [first, second], new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
+        SchemaDraft responses = document.Section("paths").Section("/soap")
+            .Section("post").Section("responses");
+
+        responses.Keywords.Keys.Should().ContainSingle().Which.Should().Be("202");
+        responses.Section("202").Keywords.Keys.Should().NotContain("content");
+    }
+
+    [Fact]
     public void Build_does_not_invent_http_routes_for_unbound_operations()
     {
         WsdlLocation location = new("service.wsdl", "operation", 1, 1);
