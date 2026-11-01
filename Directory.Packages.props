@@ -5,21 +5,21 @@
   </PropertyGroup>
   <!-- Analyseurs. Référencés une seule fois pour tous les projets depuis Directory.Build.props. -->
   <ItemGroup Label="Analyzers">
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.173" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.290" />
     <PackageVersion Include="AsyncFixer" Version="2.1.0" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.32.0.713" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
   </ItemGroup>
   <ItemGroup Label="Runtime">
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
     <!-- 10.9.0 : la version reprise du dépôt de référence, confirmée à jour lors de la restauration. -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
     <!-- Référencé explicitement : le lecteur d'API attrape les exceptions que le pipeline lève lui-même. -->
-    <PackageVersion Include="Polly.Core" Version="8.4.2" />
+    <PackageVersion Include="Polly.Core" Version="8.8.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.11" />
@@ -48,7 +48,7 @@
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="Spectre.Console.Testing" Version="0.57.2" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1">
+    <PackageVersion Include="coverlet.collector" Version="10.1.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageVersion>
