@@ -30,7 +30,12 @@ public sealed class SchemaReferenceConformanceTests
         ];
 
         SchemaNameRegistry registry = new(names);
-        SchemaNameRegistry reordered = new(names.Reverse());
+        SchemaNameRegistry reordered = new(new[]
+        {
+            "urn:fournisseurs:Adresse",
+            "urn:clients:Adresse",
+            "urn:clients:Adresse",
+        });
 
         registry.Reference("urn:clients:Adresse")
             .Should().Be(reordered.Reference("urn:clients:Adresse"));
