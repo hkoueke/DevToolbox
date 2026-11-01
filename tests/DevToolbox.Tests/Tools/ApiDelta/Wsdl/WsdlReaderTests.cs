@@ -186,6 +186,30 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public void Undeclared_message_prefix_is_refused_instead_of_resolving_locally()
+    {
+        const string source = """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:root">
+              <wsdl:message name="Request" />
+              <wsdl:portType name="Port">
+                <wsdl:operation name="Call">
+                  <wsdl:input message="missing:Request" />
+                </wsdl:operation>
+              </wsdl:portType>
+            </wsdl:definitions>
+            """;
+
+        WsdlReadResult result = _reader.ReadBytes(
+            Encoding.UTF8.GetBytes(source), "entry.wsdl", WsdlLimits.Default, Policy());
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.StructuralViolation, StringComparison.Ordinal)
+            && diagnostic.Message.Contains("missing", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Qualified_message_reference_never_resolves_from_another_namespace()
     {
         const string source = """
