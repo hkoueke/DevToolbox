@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISuppressionStore, SuppressionStore>();
 
         services.AddSingleton<IWsdlReader, WsdlReader>();
+        services.AddSingleton<IWsdlOpenApiExporter, WsdlOpenApiExporter>();
         services.AddSingleton<AddressGuard>();
 
         HttpServices.Add(services);
