@@ -97,11 +97,19 @@ internal sealed class WsdlImportWalker(
             return;
         }
 
+        if (ValidateImported(imported, path, targetNamespace))
+        {
+            Register(path, imported, bytes, targetNamespace, depth);
+        }
+    }
+
+    private bool ValidateImported(XElement imported, string path, string targetNamespace)
+    {
         if (ExceedsDepth(imported))
         {
             Refuse(DiagnosticCodes.LimitReached,
                 "Limite de profondeur d'imbrication du document WSDL importé atteinte.", path);
-            return;
+            return false;
         }
 
         if (!string.Equals(imported.Attribute("targetNamespace")?.Value,
@@ -109,10 +117,10 @@ internal sealed class WsdlImportWalker(
         {
             Refuse(WsdlDiagnosticCodes.StructuralViolation,
                 "Le targetNamespace du WSDL importé ne correspond pas au namespace déclaré.", path);
-            return;
+            return false;
         }
 
-        Register(path, imported, bytes, targetNamespace, depth);
+        return true;
     }
 
     private bool ExceedsDepth(XElement root)
