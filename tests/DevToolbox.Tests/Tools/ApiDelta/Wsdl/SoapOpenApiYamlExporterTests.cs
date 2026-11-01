@@ -43,6 +43,43 @@ public sealed class SoapOpenApiYamlExporterTests
         }
     }
 
+    [Theory]
+    [InlineData("https://user:password@private.example.test/soap")]
+    [InlineData("https://private.example.test/soap?token=secret")]
+    [InlineData("https://private.example.test/soap#fragment")]
+    [InlineData("file:///tmp/soap")]
+    public async Task Rejects_unsafe_soap_addresses_without_leaking_credentials(string endpoint)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "soap-security-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string path = Path.Combine(directory, "service.wsdl");
+            string xml = "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/'"
+                + " xmlns:tns='urn:test' xmlns:soap='http://schemas.xmlsoap.org/wsdl/soap/'"
+                + " targetNamespace='urn:test'>"
+                + "<message name='Input'/><portType name='PortType'>"
+                + "<operation name='Ping'><input message='tns:Input'/></operation></portType>"
+                + "<binding name='Binding' type='tns:PortType'>"
+                + "<soap:binding transport='http://schemas.xmlsoap.org/soap/http'/>"
+                + "<operation name='Ping'><soap:operation soapAction='urn:ping'/>"
+                + "<input><soap:body use='literal'/></input></operation></binding>"
+                + "<service name='Service'><port name='Port' binding='tns:Binding'>"
+                + "<soap:address location='" + endpoint + "'/>"
+                + "</port></service></definitions>";
+            await File.WriteAllTextAsync(path, xml);
+
+            Func<Task> export = () => SoapOpenApiYamlExporter.ExportFileAsync(
+                path, "Test SOAP", "1.0", CancellationToken.None);
+
+            await export.Should().ThrowAsync<InvalidOperationException>();
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     [Fact]
     public void Refuses_contracts_without_soap_endpoints_instead_of_exporting_empty_paths()
     {
