@@ -19,6 +19,7 @@ internal sealed class WsdlImportWalker(
 {
     private static readonly XNamespace Wsdl = WsdlNamespaces.Wsdl11;
     private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _namespaces = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<(string Path, XElement Root, WsdlDocument Document)> _documents = [];
 
     internal IReadOnlyList<(string Path, XElement Root, WsdlDocument Document)> Documents => _documents;
@@ -63,6 +64,15 @@ internal sealed class WsdlImportWalker(
 
         if (!_seen.Add(path))
         {
+            if (_namespaces.TryGetValue(path, out string? previous)
+                && !string.Equals(previous, targetNamespace, StringComparison.Ordinal))
+            {
+                Refuse(WsdlDiagnosticCodes.StructuralViolation,
+                    "Un même WSDL est importé sous deux namespaces différents : "
+                        + previous + " et " + targetNamespace, path);
+                return;
+            }
+
             diagnostics.Add(new Diagnostic(WsdlDiagnosticCodes.ImportCycle,
                 DiagnosticSeverity.Information, "Import WSDL déjà parcouru : " + Path.GetFileName(path)));
             return;
@@ -99,6 +109,7 @@ internal sealed class WsdlImportWalker(
 
         if (ValidateImported(imported, path, targetNamespace))
         {
+            _namespaces[path] = targetNamespace;
             Register(path, imported, bytes, targetNamespace, depth);
         }
     }
