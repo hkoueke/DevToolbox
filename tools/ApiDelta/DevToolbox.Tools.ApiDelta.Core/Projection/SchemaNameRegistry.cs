@@ -9,7 +9,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Projection;
 /// </summary>
 public sealed class SchemaNameRegistry
 {
-    private readonly IReadOnlyDictionary<string, string> _names;
+    private readonly Dictionary<string, string> _names;
 
     /// <summary>Construit une correspondance déterministe et sans collisions pour les types fournis.</summary>
     /// <param name="qualifiedNames">Les noms qualifiés XSD à enregistrer.</param>
@@ -44,12 +44,9 @@ public sealed class SchemaNameRegistry
                 .Where(group => group.Count() > 1)
                 .Select(group => group.Key)
                 .ToHashSet(StringComparer.Ordinal);
-            foreach (string name in names)
+            foreach (string name in names.Where(name => collisions.Contains(mapped[name])))
             {
-                if (collisions.Contains(mapped[name]))
-                {
-                    mapped[name] = "qname__" + Convert.ToHexString(Encoding.UTF8.GetBytes(name));
-                }
+                mapped[name] = "qname__" + Convert.ToHexString(Encoding.UTF8.GetBytes(name));
             }
         }
 
