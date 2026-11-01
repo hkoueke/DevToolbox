@@ -42,86 +42,102 @@ internal sealed class WsdlImportWalker(
                 continue;
             }
 
-            if (depth >= limits.MaxImportChainDepth)
-            {
-                Refuse(DiagnosticCodes.LimitReached, "Limite de profondeur des wsdl:import atteinte.", containing);
-                continue;
-            }
+            ProcessImport(containing, depth, location, targetNamespace);
 
-            string? path = Resolve(containing, location);
-            if (path is null)
-            {
-                continue;
-            }
-
-            if (!_seen.Add(path))
-            {
-                diagnostics.Add(new Diagnostic(WsdlDiagnosticCodes.ImportCycle,
-                    DiagnosticSeverity.Information, "Import WSDL déjà parcouru : " + Path.GetFileName(path)));
-                continue;
-            }
-
-            if (_documents.Count + 2 > limits.MaxDocumentCount)
-            {
-                Refuse(DiagnosticCodes.LimitReached, "Limite de documents WSDL atteinte.", path);
-                continue;
-            }
-
-            byte[] bytes;
-            try
-            {
-                bytes = File.ReadAllBytes(path);
-            }
-            catch (IOException failure)
-            {
-                Refuse(WsdlDiagnosticCodes.ImportUnresolved, failure.Message, path);
-                continue;
-            }
-
-            if (bytes.LongLength > limits.MaxDocumentBytes)
-            {
-                Refuse(DiagnosticCodes.LimitReached, "Document WSDL importé trop volumineux.", path);
-                continue;
-            }
-
-            XElement? imported;
-            try
-            {
-                using XmlReader reader = XmlReader.Create(new MemoryStream(bytes),
-                    new XmlReaderSettings
-                    {
-                        DtdProcessing = DtdProcessing.Prohibit,
-                        XmlResolver = null,
-                        MaxCharactersFromEntities = 0,
-                    });
-                imported = XDocument.Load(reader, LoadOptions.SetLineInfo).Root;
-            }
-            catch (XmlException failure)
-            {
-                Refuse(WsdlDiagnosticCodes.ParseFailed, failure.Message, path);
-                continue;
-            }
-
-            if (imported?.Name != Wsdl + "definitions")
-            {
-                Refuse(WsdlDiagnosticCodes.StructuralViolation,
-                    "L'import ne contient pas de racine wsdl:definitions WSDL 1.1.", path);
-                continue;
-            }
-
-            if (!string.Equals(imported.Attribute("targetNamespace")?.Value,
-                    targetNamespace, StringComparison.Ordinal))
-            {
-                Refuse(WsdlDiagnosticCodes.StructuralViolation,
-                    "Le targetNamespace du WSDL importé ne correspond pas au namespace déclaré.", path);
-                continue;
-            }
-
-            _documents.Add((path, imported, new WsdlDocument(
-                path, WsdlDocumentKind.Definitions, bytes.LongLength,
-                Convert.ToHexStringLower(SHA256.HashData(bytes)), targetNamespace)));
-            Follow(imported, path, depth + 1);
         }
+    }
+
+
+    private void ProcessImport(string containing, int depth, string location, string targetNamespace)
+    {
+        if (depth >= limits.MaxImportChainDepth)
+        {
+            Refuse(DiagnosticCodes.LimitReached, "Limite de profondeur des wsdl:import atteinte.", containing);
+            return;
+        }
+
+        string? path = Resolve(containing, location);
+        if (path is null)
+        {
+            return;
+        }
+
+        if (!_seen.Add(path))
+        {
+            diagnostics.Add(new Diagnostic(WsdlDiagnosticCodes.ImportCycle,
+                DiagnosticSeverity.Information, "Import WSDL déjà parcouru : " + Path.GetFileName(path)));
+            return;
+        }
+
+        if (_documents.Count + 2 > limits.MaxDocumentCount)
+        {
+            Refuse(DiagnosticCodes.LimitReached, "Limite de documents WSDL atteinte.", path);
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (IOException failure)
+        {
+            Refuse(WsdlDiagnosticCodes.ImportUnresolved, failure.Message, path);
+            return;
+        }
+
+        if (bytes.LongLength > limits.MaxDocumentBytes)
+        {
+            Refuse(DiagnosticCodes.LimitReached, "Document WSDL importé trop volumineux.", path);
+            return;
+        }
+
+        XElement? imported = Load(path, bytes);
+        if (imported is null)
+        {
+            return;
+        }
+
+        if (!string.Equals(imported.Attribute("targetNamespace")?.Value,
+                targetNamespace, StringComparison.Ordinal))
+        {
+            Refuse(WsdlDiagnosticCodes.StructuralViolation,
+                "Le targetNamespace du WSDL importé ne correspond pas au namespace déclaré.", path);
+            return;
+        }
+
+        _documents.Add((path, imported, new WsdlDocument(
+            path, WsdlDocumentKind.Definitions, bytes.LongLength,
+            Convert.ToHexStringLower(SHA256.HashData(bytes)), targetNamespace)));
+        Follow(imported, path, depth + 1);
+    }
+
+    private XElement? Load(string path, byte[] bytes)
+    {
+        try
+        {
+            using XmlReader reader = XmlReader.Create(new MemoryStream(bytes),
+                new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    XmlResolver = null,
+                    MaxCharactersFromEntities = 0,
+                });
+            XElement? root = XDocument.Load(reader, LoadOptions.SetLineInfo).Root;
+            if (root?.Name == Wsdl + "definitions")
+            {
+                return root;
+            }
+
+            Refuse(WsdlDiagnosticCodes.StructuralViolation,
+                "L'import ne contient pas de racine wsdl:definitions WSDL 1.1.", path);
+        }
+        catch (XmlException failure)
+        {
+            Refuse(WsdlDiagnosticCodes.ParseFailed, failure.Message, path);
+        }
+
+        return null;
     }
 
     private string? Resolve(string containing, string location)
