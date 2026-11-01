@@ -37,6 +37,7 @@ internal sealed class DefinitionsReader
 
     /// <summary>Lit la structure, ou rend <see langword="null"/> si elle n'est pas lisible.</summary>
     /// <param name="root">La racine du document.</param>
+    /// <param name="importsResolved">Indique que les imports ont été résolus et validés en amont.</param>
     /// <returns>Ce que le document déclare, ou rien.</returns>
     internal Definitions? Read(XElement root, bool importsResolved = false)
     {
