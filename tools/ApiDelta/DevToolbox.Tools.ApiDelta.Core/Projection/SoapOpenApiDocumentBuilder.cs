@@ -27,34 +27,82 @@ public static class SoapOpenApiDocumentBuilder
         info.Set("title", title);
         info.Set("version", version);
 
-        SchemaDraft paths = document.Section("paths");
-        HashSet<string> routes = new(StringComparer.Ordinal);
+        List<WsdlOperation> operations =
+        [
+            .. contract.Operations.Where(operation =>
+                operation.Binding is { Soap: not SoapVersion.None }
+                && operation.Pattern is MessagePattern.OneWay or MessagePattern.RequestResponse),
+        ];
 
-        foreach (WsdlOperation operation in contract.Operations)
+        if (operations.Count > 0)
         {
-            WsdlBinding? binding = operation.Binding;
-            if (binding is null || operation.Pattern is MessagePattern.Notification or MessagePattern.SolicitResponse)
-            {
-                continue;
-            }
+            SchemaDraft post = document.Section("paths")
+                .Section(endpointPath).Section(SoapOpenApiOperation.HttpMethod);
 
-            string? mediaType = SoapOpenApiOperation.RequestMediaType(binding.Soap);
-            if (mediaType is null)
+            if (operations.Count == 1)
             {
-                continue;
+                WsdlOperation operation = operations[0];
+                PopulateOperation(
+                    post, operation, operation.Binding!,
+                    SoapOpenApiOperation.RequestMediaType(operation.Binding!.Soap)!);
             }
-
-            string path = endpointPath;
-            if (!routes.Add(path))
+            else
             {
-                throw new InvalidOperationException(
-                    "Plusieurs opérations SOAP utilisent la même route OpenAPI : " + path);
+                PopulateSharedEndpoint(post, operations);
             }
-
-            PopulateOperation(paths.Section(path).Section(SoapOpenApiOperation.HttpMethod), operation, binding, mediaType);
         }
 
         return document;
+    }
+
+    /// <summary>
+    /// Un endpoint SOAP peut exposer plusieurs actions. OpenAPI n'autorise qu'un POST
+    /// par chemin : les actions sont conservées dans une extension documentée, sans
+    /// inventer d'URL ou de schéma discriminant qui n'existe pas dans le WSDL.
+    /// </summary>
+    private static void PopulateSharedEndpoint(SchemaDraft post, List<WsdlOperation> operations)
+    {
+        post.Set("operationId", "soapEndpoint");
+        post.Set("summary", "Point d'accès SOAP partagé");
+        post.Set("description",
+            "Plusieurs opérations SOAP partagent ce point d'accès. " +
+            "L'extension x-soap-operations conserve leur identité et leurs actions.");
+
+        HashSet<string> mediaTypes = new(StringComparer.Ordinal);
+        SchemaDraft content = post.Section("requestBody").Section("content");
+        post.Section("requestBody").Set("required", true);
+
+        foreach (WsdlOperation operation in operations)
+        {
+            WsdlBinding binding = operation.Binding!;
+            string mediaType = SoapOpenApiOperation.RequestMediaType(binding.Soap)!;
+            if (mediaTypes.Add(mediaType))
+            {
+                SetXmlContent(content.Section(mediaType), binding.Soap);
+            }
+
+            SchemaDraft entry = new();
+            entry.Set("name", operation.Name);
+            entry.Set("pattern", operation.Pattern.ToString());
+            if (binding.SoapAction is not null)
+            {
+                entry.Set("soapAction", binding.SoapAction);
+            }
+
+            entry.Set("mediaType", mediaType);
+            post.Append("x-soap-operations", entry);
+        }
+
+        SchemaDraft success = post.Section("responses").Section("200");
+        success.Set("description", "Réponse SOAP, si l'opération en produit une");
+        SchemaDraft responseContent = success.Section("content");
+        foreach (WsdlOperation operation in operations.Where(operation => operation.HasResponse))
+        {
+            WsdlBinding binding = operation.Binding!;
+            SetXmlContent(
+                responseContent.Section(SoapOpenApiOperation.RequestMediaType(binding.Soap)!),
+                binding.Soap);
+        }
     }
 
     private static void PopulateOperation(
