@@ -62,23 +62,28 @@ internal static class WsdlGraphBinding
         List<WsdlBinding> matches = [];
         foreach (Definitions document in documents)
         {
-            if (!document.Bindings.TryGetValue(operation.Name, out WsdlBinding? binding))
+            if (document.QualifiedBindings is null || document.BindingPortTypes is null)
             {
                 continue;
             }
 
-            string key = (document.TargetNamespace ?? string.Empty)
-                + ":" + binding.Name + ":" + operation.Name;
-            if (document.BindingPortTypes is null
-                || !document.BindingPortTypes.TryGetValue(key, out string? portType))
+            foreach (KeyValuePair<string, WsdlBinding> entry in document.QualifiedBindings)
             {
-                Refuse(diagnostics, "Le binding SOAP ne déclare pas de portType : " + key);
-                continue;
-            }
+                if (!entry.Key.EndsWith(":" + operation.Name, StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-            if (string.Equals(portType, operation.PortType, StringComparison.Ordinal))
-            {
-                matches.Add(binding);
+                if (!document.BindingPortTypes.TryGetValue(entry.Key, out string? portType))
+                {
+                    Refuse(diagnostics, "Le binding SOAP ne déclare pas de portType : " + entry.Key);
+                    continue;
+                }
+
+                if (string.Equals(portType, operation.PortType, StringComparison.Ordinal))
+                {
+                    matches.Add(entry.Value);
+                }
             }
         }
 
