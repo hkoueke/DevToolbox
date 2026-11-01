@@ -167,7 +167,7 @@ public sealed class WsdlReader : IWsdlReader
     }
 
     /// <summary>Lit les définitions importées sous les limites et la politique courantes.</summary>
-    private static IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> ReadImports(
+    private static List<(string Path, Definitions Definitions, WsdlDocument Document)> ReadImports(
         XElement root, string name, WsdlLimits limits, ImportPolicy policy,
         RetrievalMap retrieved, List<Diagnostic> diagnostics)
     {
