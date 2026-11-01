@@ -151,7 +151,15 @@ internal sealed class WsdlImportWalker(
             if (Uri.TryCreate(origin, location, out Uri? remote)
                 && retrieved.Local(remote) is { } materialized)
             {
-                return Path.GetFullPath(materialized);
+                string local = Path.GetFullPath(materialized);
+                if (!InsideRoot(local))
+                {
+                    Refuse(WsdlDiagnosticCodes.ImportOutsideRoot,
+                        "Import WSDL matérialisé hors de la racine de confinement : " + location, containing);
+                    return null;
+                }
+
+                return local;
             }
 
             Refuse(WsdlDiagnosticCodes.ImportUnresolved,
@@ -170,11 +178,7 @@ internal sealed class WsdlImportWalker(
 
         string candidate = Path.GetFullPath(Path.Combine(
             Path.GetDirectoryName(Path.GetFullPath(containing)) ?? ".", location));
-        string root = Path.GetFullPath(policy.ConfinementRoot);
-        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root : root + Path.DirectorySeparatorChar;
-        if (!string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
-            && !candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (!InsideRoot(candidate))
         {
             Refuse(WsdlDiagnosticCodes.ImportOutsideRoot,
                 "Import WSDL hors de la racine de confinement : " + location, containing);
@@ -189,6 +193,15 @@ internal sealed class WsdlImportWalker(
         }
 
         return candidate;
+    }
+
+    private bool InsideRoot(string candidate)
+    {
+        string root = Path.GetFullPath(policy.ConfinementRoot);
+        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root : root + Path.DirectorySeparatorChar;
+        return string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Refuse(string code, string message, string document) =>
