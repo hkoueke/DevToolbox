@@ -41,33 +41,13 @@ public static class SoapEndpointPathReader
                         continue;
                     }
 
-                    string localBinding = bindingQName.Split(':').Last();
-                    XElement[] addresses =
-                    [
-                        .. port.Elements().Where(element =>
-                            element.Name.LocalName == "address"
-                            && (element.Name.NamespaceName == "http://schemas.xmlsoap.org/wsdl/soap/"
-                                || element.Name.NamespaceName == "http://schemas.xmlsoap.org/wsdl/soap12/")),
-                    ];
-                    if (addresses.Length == 0)
+                    string localBinding = bindingQName[(bindingQName.LastIndexOf(':') + 1)..];
+                    string? path = ReadPath(port, localBinding);
+                    if (path is null)
                     {
                         continue;
                     }
 
-                    if (addresses.Length != 1
-                        || !Uri.TryCreate(addresses[0].Attribute("location")?.Value,
-                            UriKind.Absolute, out Uri? endpoint)
-                        || endpoint.Scheme is not ("http" or "https")
-                        || !string.IsNullOrEmpty(endpoint.UserInfo)
-                        || !string.IsNullOrEmpty(endpoint.Query)
-                        || !string.IsNullOrEmpty(endpoint.Fragment)
-                        || endpoint.AbsolutePath.StartsWith("//", StringComparison.Ordinal))
-                    {
-                        throw new InvalidOperationException(
-                            "Adresse SOAP non exploitable pour le binding " + localBinding);
-                    }
-
-                    string path = endpoint.AbsolutePath;
                     if (paths.TryGetValue(localBinding, out string? previous)
                         && !string.Equals(previous, path, StringComparison.Ordinal))
                     {
@@ -81,5 +61,36 @@ public static class SoapEndpointPathReader
         }
 
         return paths;
+    }
+    private static string? ReadPath(XElement port, string binding)
+    {
+        XElement[] addresses =
+        [
+            .. port.Elements().Where(element =>
+                string.Equals(element.Name.LocalName, "address", StringComparison.Ordinal)
+                && (string.Equals(element.Name.NamespaceName,
+                    "http://schemas.xmlsoap.org/wsdl/soap/", StringComparison.Ordinal)
+                    || string.Equals(element.Name.NamespaceName,
+                        "http://schemas.xmlsoap.org/wsdl/soap12/", StringComparison.Ordinal))),
+        ];
+        if (addresses.Length == 0)
+        {
+            return null;
+        }
+
+        if (addresses.Length != 1
+            || !Uri.TryCreate(addresses[0].Attribute("location")?.Value,
+                UriKind.Absolute, out Uri? endpoint)
+            || endpoint.Scheme is not ("http" or "https")
+            || !string.IsNullOrEmpty(endpoint.UserInfo)
+            || !string.IsNullOrEmpty(endpoint.Query)
+            || !string.IsNullOrEmpty(endpoint.Fragment)
+            || endpoint.AbsolutePath.StartsWith("//", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Adresse SOAP non exploitable pour le binding " + binding);
+        }
+
+        return endpoint.AbsolutePath;
     }
 }

@@ -1,4 +1,5 @@
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
+using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using FluentAssertions;
@@ -25,6 +26,9 @@ public sealed class SoapEndpointPathReaderTests
             IReadOnlyDictionary<string, string> endpoints = SoapEndpointPathReader.Read(result.Contract!);
             endpoints.Should().Contain("OrdersBinding", "/services/orders");
             endpoints.Should().Contain("AccountsBinding", "/services/accounts");
+            SchemaDraft projected = SoapOpenApiDocumentBuilder.Build(
+                result.Contract!, "SOAP", "1.0", endpoints);
+            projected.Section("paths").Keywords.Should().BeEmpty();
             string.Join(" ", endpoints.Values).Should().NotContain("example.test");
         }
         finally
