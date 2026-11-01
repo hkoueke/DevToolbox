@@ -69,7 +69,7 @@ public sealed class SoapOpenApiYamlExporterTests
                 + "</port></service></definitions>";
             await File.WriteAllTextAsync(path, xml);
 
-            Func<Task> export = () => SoapOpenApiYamlExporter.ExportFileAsync(
+            Func<Task<string>> export = () => SoapOpenApiYamlExporter.ExportFileAsync(
                 path, "Test SOAP", "1.0", CancellationToken.None);
 
             await export.Should().ThrowAsync<InvalidOperationException>();
