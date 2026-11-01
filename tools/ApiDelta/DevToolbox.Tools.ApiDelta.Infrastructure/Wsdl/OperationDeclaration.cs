@@ -9,6 +9,7 @@ namespace DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
 /// <param name="OutputMessage">Le nom qualifié du message de sortie, le cas échéant.</param>
 /// <param name="FaultMessages">Les noms qualifiés des messages de défaut.</param>
 /// <param name="Documentation">Sa documentation, le cas échéant.</param>
+/// <param name="PortType">Nom qualifié du portType déclarant l’opération.</param>
 /// <param name="Location">Où elle est déclarée.</param>
 internal sealed record OperationDeclaration(
     string Name,
