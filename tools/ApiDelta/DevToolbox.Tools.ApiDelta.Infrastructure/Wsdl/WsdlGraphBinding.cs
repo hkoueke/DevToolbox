@@ -23,14 +23,15 @@ internal static class WsdlGraphBinding
         }
 
         List<WsdlOperation> operations = [];
-        HashSet<string> names = new(StringComparer.Ordinal);
+        Dictionary<string, string?> names = new(StringComparer.Ordinal);
         foreach (Definitions document in documents)
         {
             foreach (OperationDeclaration declaration in document.Operations)
             {
-                if (!names.Add(declaration.Name))
+                if (!names.TryAdd(declaration.Name, declaration.PortType))
                 {
-                    Refuse(diagnostics, "Nom d'opération WSDL ambigu entre documents : " + declaration.Name);
+                    Refuse(diagnostics, "Nom d'opération WSDL ambigu entre portTypes : " + declaration.Name
+                        + " (" + names[declaration.Name] + " / " + declaration.PortType + ")");
                     continue;
                 }
 
