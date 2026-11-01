@@ -275,6 +275,23 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_wsdl_import_outside_the_confinement_root_is_refused()
+    {
+        string entry = Write("root.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:root">
+              <wsdl:import namespace="urn:other" location="../outside.wsdl" />
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.ImportOutsideRoot, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void A_wsdl_two_document_is_refused_by_naming_the_versions_supported()
     {
         const string Wsdl20 = """
