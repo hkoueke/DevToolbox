@@ -286,13 +286,23 @@ internal sealed class DefinitionsReader
     }
 
     /// <summary>Refuse un contrat réparti, sous le code qui dit qu'un import n'a pas été résolu.</summary>
-    private void RefuseImport(XElement imported) =>
+    private void RefuseImport(XElement imported)
+    {
+        WsdlImport declaration = new(
+            imported.Attribute("namespace")?.Value,
+            imported.Attribute("location")?.Value);
+        string reason = declaration.HasRequiredAttributes
+            ? Split(imported)
+            : "Un « wsdl:import » doit déclarer un « namespace » et un « location » non vides. "
+                + "La référence incomplète ne peut pas être résolue fidèlement.";
+
         _diagnostics.Add(new Diagnostic(
             WsdlDiagnosticCodes.ImportUnresolved,
             DiagnosticSeverity.Error,
-            Split(imported) + " (" + At(imported, "import").Display + ")",
+            reason + " (" + At(imported, "import").Display + ")",
             Position: new Core.Syntax.SourcePosition(
                 ((IXmlLineInfo)imported).LineNumber, ((IXmlLineInfo)imported).LinePosition)));
+    }
 
     private void Refuse(XElement root, string message) =>
         _diagnostics.Add(new Diagnostic(
