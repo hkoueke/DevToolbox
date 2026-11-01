@@ -18,8 +18,8 @@ internal sealed class WsdlImportWalker(
     List<Diagnostic> diagnostics)
 {
     private static readonly XNamespace Wsdl = WsdlNamespaces.Wsdl11;
-    private readonly HashSet<string> _seen = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, string> _namespaces = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _seen = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _namespaces = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     private readonly List<(string Path, XElement Root, WsdlDocument Document)> _documents = [];
 
     internal IReadOnlyList<(string Path, XElement Root, WsdlDocument Document)> Documents => _documents;
@@ -27,6 +27,7 @@ internal sealed class WsdlImportWalker(
     internal void Walk(XElement root, string containing)
     {
         _seen.Add(Path.GetFullPath(containing));
+        _namespaces[Path.GetFullPath(containing)] = root.Attribute("targetNamespace")?.Value ?? string.Empty;
         Follow(root, containing, 0);
     }
 
@@ -254,14 +255,8 @@ internal sealed class WsdlImportWalker(
         return candidate;
     }
 
-    private bool InsideRoot(string candidate)
-    {
-        string root = Path.GetFullPath(policy.ConfinementRoot);
-        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root : root + Path.DirectorySeparatorChar;
-        return string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
-            || candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
-    }
+    private bool InsideRoot(string candidate) =>
+        ImportConfinement.Contains(policy.ConfinementRoot, candidate);
 
     private void Refuse(string code, string message, string document) =>
         diagnostics.Add(new Diagnostic(code, DiagnosticSeverity.Error,

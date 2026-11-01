@@ -756,6 +756,50 @@ public sealed class WsdlReaderTests : IDisposable
         result.Diagnostics.Should().BeEmpty(Said(result));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Imported_documents_cannot_escape_through_file_or_directory_links(bool xsd, bool directoryLink)
+    {
+        string outside = Path.Combine(Path.GetTempPath(), "wsdl-external-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outside);
+        try
+        {
+            string name = xsd ? "external.xsd" : "external.wsdl";
+            string external = Path.Combine(outside, name);
+            await File.WriteAllTextAsync(external, xsd
+                ? "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:external'/>"
+                : "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/' targetNamespace='urn:external'/>");
+            string location = directoryLink ? "linked/" + name : name;
+            if (directoryLink)
+            {
+                Directory.CreateSymbolicLink(Path.Combine(_root, "linked"), outside);
+            }
+            else
+            {
+                File.CreateSymbolicLink(Path.Combine(_root, name), external);
+            }
+
+            string directive = xsd
+                ? "<types><xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:import namespace='urn:external' schemaLocation='" + location + "'/></xs:schema></types>"
+                : "<import namespace='urn:external' location='" + location + "'/>";
+            string entry = Write("entry.wsdl", "<definitions xmlns='http://schemas.xmlsoap.org/wsdl/' targetNamespace='urn:entry'>"
+                + directive + "</definitions>");
+
+            WsdlReadResult result = await ReadAsync(entry);
+
+            result.IsFaithful.Should().BeFalse();
+            result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == WsdlDiagnosticCodes.ImportOutsideRoot);
+            result.Contract?.Documents.Should().NotContain(document => document.Path == external);
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
