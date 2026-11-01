@@ -11,6 +11,8 @@ public sealed class SchemaNameRegistry
 {
     private readonly IReadOnlyDictionary<string, string> _names;
 
+    /// <summary>Construit une correspondance déterministe et sans collisions pour les types fournis.</summary>
+    /// <param name="qualifiedNames">Les noms qualifiés XSD à enregistrer.</param>
     public SchemaNameRegistry(IEnumerable<string> qualifiedNames)
     {
         ArgumentNullException.ThrowIfNull(qualifiedNames);
@@ -54,11 +56,18 @@ public sealed class SchemaNameRegistry
         _names = mapped;
     }
 
+    /// <summary>Retourne la clé du composant OpenAPI associé à un type enregistré.</summary>
+    /// <param name="qualifiedName">Nom qualifié XSD.</param>
+    /// <returns>La clé du composant.</returns>
+    /// <exception cref="KeyNotFoundException">Le type n’est pas enregistré.</exception>
     public string Key(string qualifiedName) =>
         _names.TryGetValue(qualifiedName, out string? name)
             ? name
             : throw new KeyNotFoundException("Type XSD inconnu : " + qualifiedName);
 
+    /// <summary>Construit un pointeur JSON vers le schéma, avec échappement RFC 6901.</summary>
+    /// <param name="qualifiedName">Nom qualifié XSD.</param>
+    /// <returns>Un pointeur local OpenAPI.</returns>
     public string Reference(string qualifiedName) =>
         "#/components/schemas/" + (_names.TryGetValue(qualifiedName, out string? name)
             ? name : Local(qualifiedName)).Replace("~", "~0", StringComparison.Ordinal)
