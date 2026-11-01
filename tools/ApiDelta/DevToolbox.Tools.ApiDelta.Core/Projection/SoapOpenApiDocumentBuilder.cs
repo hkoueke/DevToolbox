@@ -34,6 +34,7 @@ public static class SoapOpenApiDocumentBuilder
                 && operation.Pattern is MessagePattern.OneWay or MessagePattern.RequestResponse),
         ];
 
+        document.Section("paths");
         if (operations.Count > 0)
         {
             SchemaDraft post = document.Section("paths")
@@ -55,54 +56,51 @@ public static class SoapOpenApiDocumentBuilder
         return document;
     }
 
-    /// <summary>
-    /// Un endpoint SOAP peut exposer plusieurs actions. OpenAPI n'autorise qu'un POST
-    /// par chemin : les actions sont conservées dans une extension documentée, sans
-    /// inventer d'URL ou de schéma discriminant qui n'existe pas dans le WSDL.
-    /// </summary>
+    /// <summary>Représente les opérations par un POST standard sur leur endpoint commun.</summary>
     private static void PopulateSharedEndpoint(SchemaDraft post, List<WsdlOperation> operations)
     {
         post.Set("operationId", "soapEndpoint");
         post.Set("summary", "Point d'accès SOAP partagé");
-        post.Set("description",
-            "Plusieurs opérations SOAP partagent ce point d'accès. " +
-            "L'extension x-soap-operations conserve leur identité et leurs actions.");
+        post.Set("description", DescribeOperations(operations));
 
-        HashSet<string> mediaTypes = new(StringComparer.Ordinal);
-        SchemaDraft content = post.Section("requestBody").Section("content");
-        post.Section("requestBody").Set("required", true);
-
+        SchemaDraft request = post.Section("requestBody");
+        request.Set("required", true);
+        SchemaDraft content = request.Section("content");
         foreach (WsdlOperation operation in operations)
         {
             WsdlBinding binding = operation.Binding!;
-            string mediaType = SoapOpenApiOperation.RequestMediaType(binding.Soap)!;
-            if (mediaTypes.Add(mediaType))
-            {
-                SetXmlContent(content.Section(mediaType), binding.Soap);
-            }
-
-            SchemaDraft entry = new();
-            entry.Set("name", operation.Name);
-            entry.Set("pattern", operation.Pattern.ToString());
-            if (binding.SoapAction is not null)
-            {
-                entry.Set("soapAction", binding.SoapAction);
-            }
-
-            entry.Set("mediaType", mediaType);
-            post.Append("x-soap-operations", entry);
+            SetXmlContent(
+                content.Section(SoapOpenApiOperation.RequestMediaType(binding.Soap)!),
+                binding.Soap);
         }
 
-        SchemaDraft success = post.Section("responses").Section("200");
-        success.Set("description", "Réponse SOAP, si l'opération en produit une");
-        SchemaDraft responseContent = success.Section("content");
+        SchemaDraft responses = post.Section("responses");
+        responses.Section("200").Set("description", "Réponse SOAP pour les opérations avec réponse");
+        responses.Section("202").Set("description", "Message SOAP accepté sans réponse métier");
         foreach (WsdlOperation operation in operations.Where(operation => operation.HasResponse))
         {
             WsdlBinding binding = operation.Binding!;
             SetXmlContent(
-                responseContent.Section(SoapOpenApiOperation.RequestMediaType(binding.Soap)!),
+                responses.Section("200").Section("content")
+                    .Section(SoapOpenApiOperation.RequestMediaType(binding.Soap)!),
                 binding.Soap);
         }
+    }
+
+    private static string DescribeOperations(List<WsdlOperation> operations)
+    {
+        List<string> descriptions = ["Opérations SOAP exposées par ce point d'accès :"];
+        foreach (WsdlOperation operation in operations)
+        {
+            WsdlBinding binding = operation.Binding!;
+            string action = binding.SoapAction is null
+                ? "SOAPAction non spécifiée"
+                : "SOAPAction = \\"" + binding.SoapAction + "\\"";
+            descriptions.Add(
+                "- " + operation.Name + " (" + operation.Pattern + ", " + action + ")");
+        }
+
+        return string.Join("\\n", descriptions);
     }
 
     private static void PopulateOperation(
@@ -131,7 +129,8 @@ public static class SoapOpenApiDocumentBuilder
 
         if (binding.SoapAction is not null)
         {
-            post.Set("x-soap-action", binding.SoapAction);
+            post.Set("description",
+                (operation.Documentation ?? operation.Name) + "\\nSOAPAction = \\"" + binding.SoapAction + "\\"");
         }
     }
 
