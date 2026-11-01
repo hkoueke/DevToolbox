@@ -133,7 +133,7 @@ public static class SoapOpenApiDocumentBuilder
         && !path.StartsWith("//", StringComparison.Ordinal)
         && !path.Contains('?', StringComparison.Ordinal)
         && !path.Contains('#', StringComparison.Ordinal)
-        && !path.Contains('\\\\', StringComparison.Ordinal)
+        && !path.Contains((char)92)
         && !path.Any(char.IsControl);
 
     /// <summary>Représente les opérations par un POST standard sur leur endpoint commun.</summary>
