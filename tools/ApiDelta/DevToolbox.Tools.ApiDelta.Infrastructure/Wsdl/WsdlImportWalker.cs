@@ -97,6 +97,13 @@ internal sealed class WsdlImportWalker(
             return;
         }
 
+        if (ExceedsDepth(imported))
+        {
+            Refuse(DiagnosticCodes.LimitReached,
+                "Limite de profondeur d'imbrication du document WSDL importé atteinte.", path);
+            return;
+        }
+
         if (!string.Equals(imported.Attribute("targetNamespace")?.Value,
                 targetNamespace, StringComparison.Ordinal))
         {
@@ -106,6 +113,27 @@ internal sealed class WsdlImportWalker(
         }
 
         Register(path, imported, bytes, targetNamespace, depth);
+    }
+
+    private bool ExceedsDepth(XElement root)
+    {
+        Queue<(XElement Element, int Depth)> pending = new();
+        pending.Enqueue((root, 1));
+        while (pending.Count > 0)
+        {
+            (XElement element, int depth) = pending.Dequeue();
+            if (depth > limits.MaxNestingDepth)
+            {
+                return true;
+            }
+
+            foreach (XElement child in element.Elements())
+            {
+                pending.Enqueue((child, depth + 1));
+            }
+        }
+
+        return false;
     }
 
     private void Register(string path, XElement imported, byte[] bytes, string targetNamespace, int depth)
