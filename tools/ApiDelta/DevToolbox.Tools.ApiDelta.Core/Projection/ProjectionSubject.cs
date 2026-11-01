@@ -13,6 +13,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Projection;
 /// <param name="Operation">L'opération, si c'en est une.</param>
 /// <param name="Version">La version qu'annonce la production, dont « nillable » dépend.</param>
 /// <param name="KnownTypes">Les types nommés du contrat.</param>
+/// <param name="SchemaNames">Le registre des clés OpenAPI associées aux noms qualifiés XSD.</param>
 /// <remarks>
 /// Un porteur à membres facultatifs plutôt qu'une hiérarchie. Chaque règle de la table publiée regarde une
 /// sorte de construction différente — une facette, une particule, un type, une liaison — et une règle par
