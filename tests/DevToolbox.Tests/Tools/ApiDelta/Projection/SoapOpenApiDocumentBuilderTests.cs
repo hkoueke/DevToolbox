@@ -27,7 +27,9 @@ public sealed class SoapOpenApiDocumentBuilderTests
 
         document.Get("openapi").Should().Be("3.0.3");
         post.Get("operationId").Should().Be("Read");
-        post.Get("x-soap-action").Should().Be("urn:read");
+        post.Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("urn:read");
+        post.Keywords.Keys.Should().NotContain(key => key.StartsWith("x-", StringComparison.Ordinal));
         SchemaDraft request = post.Section("requestBody");
         request.Get("required").Should().Be(true);
         request.Section("content").Section(mediaType).Section("schema")
@@ -50,7 +52,8 @@ public sealed class SoapOpenApiDocumentBuilderTests
         SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
 
         document.Section("paths").Section("/soap").Section("post")
-            .Get("x-soap-action").Should().Be("");
+            .Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("SOAPAction = \\"\\"");
     }
 
     [Theory]
@@ -86,8 +89,9 @@ public sealed class SoapOpenApiDocumentBuilderTests
         paths.Keywords.Should().ContainSingle();
         SchemaDraft post = paths.Section("/soap").Section("post");
         post.Get("operationId").Should().Be("soapEndpoint");
-        post.Get("x-soap-operations").Should().BeOfType<List<object?>>()
-            .Which.Should().HaveCount(2);
+        post.Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("Read").And.Contain("Write");
+        post.Keywords.Keys.Should().NotContain(key => key.StartsWith("x-", StringComparison.Ordinal));
         post.Section("requestBody").Section("content").Section("text/xml")
             .Section("schema").Get("type").Should().Be("string");
     }
