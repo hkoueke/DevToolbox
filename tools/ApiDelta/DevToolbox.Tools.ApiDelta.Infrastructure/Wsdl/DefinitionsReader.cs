@@ -69,7 +69,8 @@ internal sealed class DefinitionsReader
             Bindings(root),
             [.. Services(root)],
             [.. InlineSchemas(root)],
-            BindingPortTypes(root));
+            BindingPortTypes(root),
+            QualifiedBindings(root));
     }
 
     /// <summary>
@@ -235,6 +236,28 @@ internal sealed class DefinitionsReader
         }
 
         return result;
+    }
+
+    private Dictionary<string, WsdlBinding> QualifiedBindings(XElement root)
+    {
+        Dictionary<string, WsdlBinding> bindings = new(StringComparer.Ordinal);
+        foreach (XElement binding in root.Elements(Wsdl + "binding"))
+        {
+            string name = binding.Attribute("name")?.Value ?? "(sans nom)";
+            XElement? soap = binding.Elements().FirstOrDefault(child =>
+                string.Equals(child.Name.LocalName, "binding", StringComparison.Ordinal) && IsSoap(child));
+            foreach (XElement operation in binding.Elements(Wsdl + "operation"))
+            {
+                string key = (root.Attribute("targetNamespace")?.Value ?? string.Empty)
+                    + ":" + name + ":" + (operation.Attribute("name")?.Value ?? string.Empty);
+                if (!bindings.TryAdd(key, Describe(name, binding, soap, operation)))
+                {
+                    Refuse(operation, "Binding SOAP déclaré plusieurs fois : " + key);
+                }
+            }
+        }
+
+        return bindings;
     }
 
     private Dictionary<string, WsdlBinding> Bindings(XElement root)
