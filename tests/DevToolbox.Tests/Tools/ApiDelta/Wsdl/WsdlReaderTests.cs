@@ -275,6 +275,29 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_repeated_wsdl_import_with_conflicting_namespaces_is_refused()
+    {
+        _ = Write("shared.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:shared" />
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:shared" location="shared.wsdl" />
+              <wsdl:import namespace="urn:other" location="shared.wsdl" />
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.StructuralViolation, StringComparison.Ordinal)
+            && diagnostic.Message.Contains("urn:other", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task An_imported_wsdl_exceeding_nesting_budget_is_refused()
     {
         string nested = "<wsdl:documentation>" + new string(' ', 1)
