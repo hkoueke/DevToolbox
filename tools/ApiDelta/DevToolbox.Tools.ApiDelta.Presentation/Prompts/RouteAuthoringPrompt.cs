@@ -76,14 +76,14 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
     {
         _console.MarkupLine(
             CultureInfo.InvariantCulture,
-            "Le contrat porte [bold]{0}[/] opération(s).",
+            "Le WSDL contient [bold]{0}[/] opération(s). Choisissez celles à ajouter, puis définissez leur appel HTTP.",
             subjects.Count.ToString(CultureInfo.InvariantCulture));
 
         IReadOnlyList<string> chosen =
         [
             .. _console.Prompt(
                 new MultiSelectionPrompt<string>()
-                    .Title("Lesquelles voulez-vous ajouter ? [grey](espace pour cocher, entrée pour valider)[/]")
+                    .Title("Quelles opérations ajouter ? [grey](espace : cocher · entrée : valider)[/]")
                     .NotRequired()
                     .PageSize(15)
                     .AddChoices(subjects.Select(subject => subject.Operation))),
@@ -167,27 +167,36 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
         IReadOnlyList<ParameterLocation> possible =
         [
             .. Enum.GetValues<ParameterLocation>()
-                .Where(location => PlacementRules.Allows(proposed.IsComposite, location)),
+                .Where(location => PlacementRules.Allows(proposed.IsComposite, location))
+                .OrderBy(location => location == proposed.Location ? 0 : 1),
         ];
 
         if (PlacementDefaults.AwaitsDecision(method, proposed))
         {
             _console.MarkupLine(
                 "[yellow]« " + Markup.Escape(proposed.Field) + " » est de type "
-                + Markup.Escape(proposed.Declared) + ", qui n'est pas un scalaire : sous ce verbe, "
-                + "l'outil n'a pas de destination à proposer.[/]");
+                + Markup.Escape(proposed.Declared) + ", un objet ou une liste. Choisissez où envoyer ce champ, ou écartez-le.[/]");
         }
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
                 .Title("Où va « " + Markup.Escape(proposed.Field) + " » ? [grey]("
                     + Markup.Escape(proposed.Declared) + ")[/]")
-                .AddChoices(possible.Select(FieldPlacement.Where))
+                .AddChoices(possible.Select(LocationLabel))
                 .UseConverter(label => label));
 
         return possible.First(location =>
-            string.Equals(FieldPlacement.Where(location), chosen, StringComparison.Ordinal));
+            string.Equals(LocationLabel(location), chosen, StringComparison.Ordinal));
     }
+
+    private static string LocationLabel(ParameterLocation location) => location switch
+    {
+        ParameterLocation.Path => "Dans l’adresse (ex. /clients/{id})",
+        ParameterLocation.Query => "Après le ? dans l’adresse (ex. ?page=2)",
+        ParameterLocation.Body => "Dans le contenu envoyé (corps de la requête)",
+        ParameterLocation.Header => "Dans un en-tête HTTP",
+        _ => "Ne pas inclure ce champ",
+    };
 
     /// <summary>Demande si un champ placé est obligatoire, sauf dans le chemin.</summary>
     /// <remarks>
@@ -204,7 +213,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
 
         _console.MarkupLine(
             "[grey]Le contrat ne dit pas si « " + Markup.Escape(field)
-            + " » est obligatoire : tout y est optionnel et nillable.[/]");
+            + " » doit être fourni. Choisissez selon les besoins de votre API.[/]");
 
         return _console.Prompt(
             new ConfirmationPrompt("« " + Markup.Escape(field) + " » est-il obligatoire ?")
@@ -219,7 +228,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
         while (true)
         {
             string typed = _console.Prompt(
-                new TextPrompt<string>("Quel chemin ?")
+                new TextPrompt<string>("Adresse de l’appel, sans le serveur (ex. /clients/{id}) :")
                     .DefaultValue(subject.Suggested.Path)
                     .ShowDefaultValue());
 
@@ -240,7 +249,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
         while (true)
         {
             string typed = _console.Prompt(
-                new TextPrompt<string>("Quel verbe ?")
+                new TextPrompt<string>("Méthode HTTP (ex. GET pour lire, POST pour envoyer) :")
                     .DefaultValue(subject.Suggested.Method.ToString().ToUpperInvariant())
                     .ShowDefaultValue());
 
@@ -280,7 +289,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Où placer cette route dans votre production ?")
+                .Title("Où ranger cet appel dans le fichier fusionné ?")
                 .PageSize(15)
                 .AddChoices(choices));
 
@@ -292,8 +301,8 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
     /// <summary>Ce que vaut la suggestion, dans les mots du développeur.</summary>
     private static string Worth(AuthoringSubject subject) => subject.Worth switch
     {
-        Core.Projection.RouteDerivationKind.Derived => "dérivée du nom de l'opération",
-        Core.Projection.RouteDerivationKind.Partial => "partielle — aucun verbe reconnu",
-        _ => "repli — rien de reconnaissable dans le nom",
+        Core.Projection.RouteDerivationKind.Derived => "déduite du nom, à vérifier",
+        Core.Projection.RouteDerivationKind.Partial => "méthode HTTP à vérifier",
+        _ => "proposition par défaut, à vérifier",
     };
 }

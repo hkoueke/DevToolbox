@@ -43,6 +43,15 @@ Ce qu'il promet, et ce qu'il refuse :
   est identique à l'octet et que ce que vous avez choisi ne diffère que comme demandé. Faute de quoi rien
   n'est écrit, et le rapport dit pourquoi.
 
+### Parcours guidé d’apidelta
+
+Dans **OpenAPI → apidelta**, choisissez votre objectif :
+
+- **Comparer deux fichiers et choisir les changements à reprendre** : indiquez le fichier OpenAPI de référence, puis le nouveau fichier OpenAPI ou WSDL. Vérifiez les correspondances proposées si le nouveau fichier est un WSDL, puis choisissez les changements à inclure. La confirmation crée un fichier fusionné distinct de l’original.
+- **Vérifier un fichier et préparer son nettoyage** : commencez par le rapport seul, ou demandez une copie nettoyée. Le remplacement de l’original reste une option explicite, avec sauvegarde proposée et confirmation finale nommant le fichier.
+
+Les réglages personnalisés sont facultatifs. Si un fichier de configuration est trouvé à côté de votre fichier, l’outil le nomme et vous demande s’il faut l’utiliser. Les choix de placement des champs donnent des exemples d’adresses et de paramètres HTTP. Les bilans indiquent les fichiers réellement écrits ; **Continuer** passe au bilan suivant, puis **Entrée** ramène au menu à la fin. Les rapports conservent les identifiants techniques nécessaires à une analyse détaillée.
+
 ### Le fichier compagnon peut aussi être un WSDL
 
 `apidelta` accepte un contrat de service WSDL 1.1 comme fichier compagnon, en face d'une production OpenAPI.

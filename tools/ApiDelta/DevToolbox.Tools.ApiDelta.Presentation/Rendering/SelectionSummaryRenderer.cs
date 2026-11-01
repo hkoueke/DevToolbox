@@ -1,6 +1,5 @@
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
-using DevToolbox.Tools.ApiDelta.Core.Steps;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation.Rendering;
@@ -9,8 +8,8 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Rendering;
 /// Dit ce qui a été retenu, et ce que l'exécution va — ou ne va pas — en faire.
 /// </summary>
 /// <remarks>
-/// Les étapes sautées sont nommées avec leur raison. Une étape passée en silence laisserait croire qu'elle
-/// a été accomplie, et c'est précisément la confusion que la liste d'étapes existe pour éviter.
+/// Le bilan explique les étapes non demandées selon le mode choisi. Les erreurs restent détaillées ;
+/// les fichiers produits ne sont annoncés qu’à partir des écritures réellement terminées.
 /// </remarks>
 public sealed class SelectionSummaryRenderer
 {
@@ -36,15 +35,15 @@ public sealed class SelectionSummaryRenderer
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
 
-        grid.AddRow("[grey]ce qui est fait[/]", Markup.Escape(RunModeNames.Of(selection.Mode)));
-        grid.AddRow("[grey]fichier de production[/]", Describe(selection.ProductionPath, selection.ProductionHash));
+        grid.AddRow("[grey]objectif[/]", Markup.Escape(RunModeNames.Of(selection.Mode)));
+        grid.AddRow("[grey]fichier de référence[/]", Markup.Escape(selection.ProductionPath));
 
         if (selection.CandidatePath is { } candidate)
         {
-            grid.AddRow("[grey]fichier compagnon[/]", Describe(candidate, selection.CandidateHash));
+            grid.AddRow("[grey]fichier à comparer[/]", Markup.Escape(candidate));
         }
 
-        grid.AddRow("[grey]rapports écrits dans[/]", Markup.Escape(selection.OutputDirectory));
+        grid.AddRow("[grey]dossier des résultats[/]", Markup.Escape(selection.OutputDirectory));
 
         _console.Write(new Panel(grid)
             .Header("[bold]apidelta[/]")
@@ -52,20 +51,62 @@ public sealed class SelectionSummaryRenderer
 
         RenderSteps(run, selection.Mode);
 
-        // La production n'est pas touchée, et le dire explicitement vaut mieux que de le laisser déduire.
-        _console.MarkupLine(
-            "[grey]Aucun de vos fichiers n'est modifié : l'outil ne fait que lire et écrire des rapports.[/]");
     }
+
+    /// <summary>Affiche les fichiers réellement écrits après une exécution réussie.</summary>
+    public void RenderWritten(RunSelection selection, IReadOnlyList<Artifact> artifacts)
+    {
+        ArgumentNullException.ThrowIfNull(selection);
+        ArgumentNullException.ThrowIfNull(artifacts);
+        bool optimized = artifacts.Any(artifact => artifact.Kind == ArtifactKind.OptimizedDocument);
+        _console.MarkupLine(optimized && selection.InPlace
+            ? "[yellow]Votre fichier d’origine a été remplacé par la version nettoyée.[/]"
+            : "[green]Votre fichier d’origine est conservé.[/]");
+        if (selection.NeedsCorrection && !artifacts.Any(artifact => artifact.Kind == ArtifactKind.ConsolidatedDocument))
+        {
+            _console.MarkupLine("[grey]Aucun fichier fusionné n’a été créé.[/]");
+        }
+
+        if (selection.ApplySafeOptimizations && !optimized)
+        {
+            _console.MarkupLine("[grey]Aucun fichier nettoyé n’a été créé. Consultez le bilan du nettoyage.[/]");
+        }
+
+        foreach (Artifact artifact in artifacts.OrderBy(artifact => artifact.Kind == ArtifactKind.DeltaJson ? 1 : 0))
+        {
+            _console.MarkupLine("[grey]" + ArtifactLabel(artifact.Kind) + " :[/] " + Markup.Escape(artifact.Path));
+        }
+    }
+
+    private static string ArtifactLabel(ArtifactKind kind) => kind switch
+    {
+        ArtifactKind.ConsolidatedDocument => "Fichier fusionné",
+        ArtifactKind.OptimizedDocument => "Fichier nettoyé",
+        ArtifactKind.AuditReport => "Rapport de vérification",
+        ArtifactKind.OptimizationPlan => "Propositions de nettoyage",
+        ArtifactKind.DeltaReport => "Rapport de comparaison",
+        ArtifactKind.Manifest => "Détail des modifications appliquées",
+        _ => "Résultat pour les outils automatiques",
+    };
 
     private void RenderSteps(ToolRun run, RunMode mode)
     {
-        foreach (StepState step in run.Steps)
+        if (run.Outcome == RunOutcome.Success)
+        {
+            _console.MarkupLine("[green]Traitement terminé.[/]");
+        }
+
+        if (run.Steps.Any(step => step.Status == StepStatus.Skipped))
+        {
+            _console.MarkupLine(mode == RunMode.Analyse
+                ? "[grey]Ce parcours vérifie un seul fichier ; il ne compare pas deux versions.[/]"
+                : "[grey]Ce parcours compare deux fichiers. Le nettoyage se demande depuis l’autre choix du menu.[/]");
+        }
+
+        foreach (StepState step in run.Steps.Where(step => step.Status is not (StepStatus.Completed or StepStatus.Skipped)))
         {
             _console.MarkupLine(step.Status switch
             {
-                StepStatus.Completed => "[green]✓[/] " + Markup.Escape(step.Name),
-                StepStatus.Skipped => "[grey]–[/] [grey]" + Markup.Escape(step.Name) + " · "
-                    + Markup.Escape(ApiDeltaStepNames.SkipReason(mode)) + "[/]",
                 StepStatus.Failed => "[red]×[/] " + Markup.Escape(step.Name)
                     + " · " + Markup.Escape(step.FailureReason ?? string.Empty),
                 _ => "[grey]·[/] [grey]" + Markup.Escape(step.Name) + "[/]",
@@ -73,9 +114,4 @@ public sealed class SelectionSummaryRenderer
         }
     }
 
-    private static string Describe(string path, string? hash) =>
-        string.IsNullOrWhiteSpace(hash)
-            ? Markup.Escape(path)
-            : Markup.Escape(path) + " [grey]· sha256:" + Markup.Escape(hash[..Math.Min(12, hash.Length)])
-                + "[/]";
 }

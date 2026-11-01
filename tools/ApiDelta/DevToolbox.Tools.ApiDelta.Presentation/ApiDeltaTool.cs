@@ -92,7 +92,7 @@ public sealed class ApiDeltaTool : ITool
 
     /// <inheritdoc />
     public string Description =>
-        "fusionner ou nettoyer un fichier OpenAPI (Swagger)";
+        "comparer, vérifier et nettoyer des fichiers OpenAPI (Swagger)";
 
     /// <inheritdoc />
     /// <remarks>
@@ -141,6 +141,7 @@ public sealed class ApiDeltaTool : ITool
 
         if (run.Outcome != RunOutcome.Success)
         {
+            Pause();
             return run;
         }
 
@@ -168,6 +169,7 @@ public sealed class ApiDeltaTool : ITool
                 cancellationToken);
         }
 
+        Pause();
         return run;
     }
 
@@ -193,25 +195,19 @@ public sealed class ApiDeltaTool : ITool
         }
         else if (selection is not null)
         {
-            // Ce qui a réellement eu lieu, et non une phrase toute faite. L'ancienne annonçait un
-            // examen et un chiffrage même quand les deux étapes avaient été sautées : un message qui
-            // décrit une autre exécution que celle qu'on vient de regarder apprend à ne plus le lire.
-            _console.MarkupLine(
-                selection.Mode == RunMode.Consolidate
-                    ? "[grey]Votre fichier de production et le fichier compagnon ont été lus et "
-                        + "comparés, et les rapports sont écrits. Votre fichier de production n'a pas "
-                        + "été modifié : ce qui a été retenu est allé dans le fichier consolidé, à "
-                        + "côté.[/]"
-                    : "[grey]Votre fichier a été lu, examiné, et ce qu'un nettoyage lui gagnerait est "
-                        + "chiffré. Votre fichier n'a pas été modifié.[/]");
+            _summary.RenderWritten(selection,
+                context.Get<IReadOnlyList<Artifact>>(ApiDeltaContextKeys.Artifacts) ?? []);
         }
+    }
 
+    private void Pause()
+    {
         _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir au menu.[/]");
         _console.Input.ReadKey(intercept: true);
     }
 
     /// <summary>
-    /// Affiche l'issue dans le vocabulaire publié.
+    /// Explique le résultat en français ; les codes des rapports restent inchangés.
     /// </summary>
     /// <remarks>
     /// Affichée et écrite dans le rapport lisible par une machine, et nulle part ailleurs. Ce n'est pas
@@ -226,11 +222,20 @@ public sealed class ApiDeltaTool : ITool
             return;
         }
 
-        string name = Markup.Escape(code);
+        string label = code switch
+        {
+            "clean" => "Aucun problème au-dessus du seuil choisi.",
+            "thresholdExceeded" => "Des points à vérifier dépassent le seuil choisi.",
+            "breakingChange" => "Des changements incompatibles avec l’ancien contrat ont été détectés.",
+            "invalidUsage" => "La demande est incomplète ou invalide.",
+            "loadFailure" => "Un fichier n’a pas pu être lu correctement.",
+            "outputFailure" => "Un résultat n’a pas pu être écrit ou vérifié.",
+            _ => "Une erreur interne a interrompu le traitement.",
+        };
 
         _console.MarkupLine(
             string.Equals(code, OutcomeCodeNames.Of(OutcomeCode.Clean), StringComparison.Ordinal)
-                ? "[grey]Issue :[/] " + name
-                : "[yellow]Issue :[/] " + name);
+                ? "[grey]" + label + "[/]"
+                : "[yellow]" + label + "[/]");
     }
 }

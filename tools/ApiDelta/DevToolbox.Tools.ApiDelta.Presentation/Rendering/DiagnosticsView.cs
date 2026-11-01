@@ -89,8 +89,8 @@ public sealed class DiagnosticsView
             : string.Empty;
 
         _console.MarkupLine(
-            $"[{colour}]{word}[/] [grey]{Markup.Escape(diagnostic.Code)}[/]{place} "
-            + Markup.Escape(diagnostic.Message));
+            $"[{colour}]{word}[/] " + Markup.Escape(diagnostic.Message) + place
+            + " [grey](référence : " + Markup.Escape(diagnostic.Code) + ")[/]");
 
         if (diagnostic.Location is { } location && location.Display.Length > 0)
         {

@@ -20,9 +20,11 @@ public sealed class FindingsView
 {
     private const int PageSize = 10;
 
-    private const string Everything = "Voir tous les constats, un par un";
+    private const string Everything = "Voir tous les points à vérifier";
 
-    private const string ByRule = "Choisir une règle à regarder";
+    private const string ByRule = "Voir les résultats par vérification";
+
+    private const string NextView = "Continuer";
 
     private readonly IAnsiConsole _console;
 
@@ -53,16 +55,16 @@ public sealed class FindingsView
             string chosen = _console.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Que souhaitez-vous regarder ?")
-                    .AddChoices(Everything, ByRule, NavigationLabels.Back));
+                    .AddChoices(Everything, ByRule, NextView));
 
-            if (string.Equals(chosen, NavigationLabels.Back, StringComparison.Ordinal))
+            if (string.Equals(chosen, NextView, StringComparison.Ordinal))
             {
                 return;
             }
 
             if (string.Equals(chosen, Everything, StringComparison.Ordinal))
             {
-                RenderPaged(audit.Findings, "Tous les constats", cancellationToken);
+                RenderPaged(audit.Findings, "Points à vérifier", cancellationToken);
                 continue;
             }
 
@@ -103,7 +105,7 @@ public sealed class FindingsView
         }
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Ce que le fichier de production a accumulé[/]")
+            .Header("[bold]Bilan de vérification[/]")
             .Border(BoxBorder.Rounded));
 
         RenderIncomplete(audit);
@@ -159,7 +161,7 @@ public sealed class FindingsView
 
         string chosen = _console.Prompt(
             new SelectionPrompt<string>()
-                .Title("Quelle règle ?")
+                .Title("Quelle vérification voulez-vous consulter ?")
                 .PageSize(Math.Max(3, Math.Min(rules.Count + 1, 20)))
                 .AddChoices([.. rules, NavigationLabels.Back]));
 
@@ -263,7 +265,7 @@ public sealed class FindingsView
 
         if (finding.Evidence?.Reasoning is { } reasoning)
         {
-            _console.MarkupLine("  [yellow]déduction :[/] [grey]" + Markup.Escape(reasoning) + "[/]");
+            _console.MarkupLine("  [yellow]pourquoi ce résultat :[/] [grey]" + Markup.Escape(reasoning) + "[/]");
         }
 
         _console.MarkupLine(

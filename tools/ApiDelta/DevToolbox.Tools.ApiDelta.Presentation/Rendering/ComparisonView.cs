@@ -19,9 +19,11 @@ public sealed class ComparisonView
 {
     private const int PageSize = 15;
 
-    private const string BreakingOnly = "Voir seulement ce qui casse les appels existants";
+    private const string BreakingOnly = "Voir les changements incompatibles";
 
-    private const string Everything = "Voir toutes les différences, une par une";
+    private const string Everything = "Voir toutes les différences";
+
+    private const string NextView = "Continuer";
 
     private readonly IAnsiConsole _console;
 
@@ -58,9 +60,9 @@ public sealed class ComparisonView
                     .AddChoices(
                         BreakingOnly,
                         Everything,
-                        NavigationLabels.Back));
+                        NextView));
 
-            if (string.Equals(chosen, NavigationLabels.Back, StringComparison.Ordinal))
+            if (string.Equals(chosen, NextView, StringComparison.Ordinal))
             {
                 return;
             }
@@ -102,8 +104,7 @@ public sealed class ComparisonView
             _console.MarkupLine(
                 "[yellow]" + version.Unreviewed.Count.ToString(
                     System.Globalization.CultureInfo.InvariantCulture)
-                + " changement(s) n'ont pas pu être classés : la recommandation ne vaut qu'autant "
-                + "qu'ils auront été relus.[/]");
+                + " changement(s) ont un effet incertain. Vérifiez-les avant de retenir la version proposée.[/]");
         }
 
         _console.WriteLine();
@@ -129,7 +130,7 @@ public sealed class ComparisonView
         }
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Ce que le fichier compagnon change[/]")
+            .Header("[bold]Résultat de la comparaison[/]")
             .Border(BoxBorder.Rounded));
 
         foreach (Artifact artifact in artifacts)
@@ -263,9 +264,9 @@ public sealed class ComparisonView
     /// </remarks>
     private static string Label(ChangeImpact impact) => impact switch
     {
-        ChangeImpact.Breaking => "casse les appels existants",
-        ChangeImpact.NonBreaking => "sans effet sur les appels existants",
-        ChangeImpact.DocumentationOnly => "texte seul",
-        _ => "à relire, non tranché",
+        ChangeImpact.Breaking => "changements incompatibles",
+        ChangeImpact.NonBreaking => "changements compatibles",
+        ChangeImpact.DocumentationOnly => "documentation seulement",
+        _ => "effet à vérifier",
     };
 }
