@@ -17,35 +17,41 @@ internal sealed class SoapExportGraph
     internal readonly List<XElement> Ports = [];
     internal XmlSchemaSet Schemas { get; private set; } = new();
 
-    internal static SoapExportGraph Read(string path)
+    internal static SoapExportGraph Read(string path, WsdlLimits? limits = null)
     {
+        WsdlLimits budget = limits ?? WsdlLimits.Default;
         string absolute = Path.GetFullPath(path);
         string rootDirectory = Path.GetDirectoryName(absolute)!;
         XElement root;
         try
         {
-            root = Load(absolute);
+            root = Load(absolute, budget);
         }
         catch (XmlException)
         {
             throw new WsdlExportException("XML_DTD_OR_PARSE_INVALID");
         }
         List<Diagnostic> diagnostics = [];
-        WsdlImportWalker walker = new(WsdlLimits.Default,
+        WsdlImportWalker walker = new(budget,
             ImportPolicy.ConfinedTo(rootDirectory), RetrievalMap.Empty, diagnostics);
         walker.Walk(root, absolute);
         List<(string Path, XElement Root)> documents = [(absolute, root)];
         documents.AddRange(walker.Documents.Select(item => (item.Path, item.Root)));
-        return Assemble(documents, rootDirectory, diagnostics);
+        return Assemble(documents, rootDirectory, diagnostics, budget);
     }
 
     private static SoapExportGraph Assemble(
-        List<(string Path, XElement Root)> documents, string directory, List<Diagnostic> diagnostics)
+        List<(string Path, XElement Root)> documents, string directory, List<Diagnostic> diagnostics, WsdlLimits budget)
     {
         SoapExportGraph graph = new();
         List<InlineSchema> schemas = [];
         foreach (var document in documents)
         {
+            if (document.Root.DescendantsAndSelf().Any(element => element.Attribute(XNamespace.Xml + "base") is not null))
+            {
+                throw new WsdlExportException("XML_BASE_UNSUPPORTED");
+            }
+
             if (document.Root.Name != Wsdl + "definitions"
                 || document.Root.Elements(Wsdl + "import").Any(import =>
                     string.IsNullOrWhiteSpace(import.Attribute("namespace")?.Value)
@@ -63,9 +69,9 @@ internal sealed class SoapExportGraph
         Definitions combined = new(null, [], [],
             new Dictionary<string, WsdlBinding>(StringComparer.Ordinal), [], schemas);
         SchemaSetResult compiled = SchemaCompiler.Compile(documents[0].Path, combined,
-            WsdlLimits.Default, ImportPolicy.ConfinedTo(directory), RetrievalMap.Empty, diagnostics);
+            budget, ImportPolicy.ConfinedTo(directory), RetrievalMap.Empty, diagnostics);
         if (diagnostics.Any(item => item.IsBlocking) || compiled.Unresolved.Count > 0
-            || documents.Count + compiled.Documents.Count > WsdlLimits.Default.MaxDocumentCount)
+            || documents.Count + compiled.Documents.Count > budget.MaxDocumentCount)
         {
             throw new WsdlExportException("WSDL_XSD_GRAPH_UNRESOLVED_OR_INVALID");
         }
@@ -96,25 +102,23 @@ internal sealed class SoapExportGraph
         }
     }
 
-    internal static XElement Load(string path)
+    internal static XElement Load(string path, WsdlLimits? limits = null)
     {
-        if (new FileInfo(path).Length > WsdlLimits.Default.MaxDocumentBytes)
-        {
-            throw new WsdlExportException("DOCUMENT_BYTE_LIMIT");
-        }
-
-        using XmlReader reader = XmlReader.Create(path, new XmlReaderSettings
+        WsdlLimits budget = limits ?? WsdlLimits.Default;
+        byte[] content = BoundedDocumentReader.Read(path, budget.MaxDocumentBytes)
+            ?? throw new WsdlExportException("DOCUMENT_BYTE_LIMIT");
+        using XmlReader reader = XmlReader.Create(new MemoryStream(content, writable: false), new XmlReaderSettings
         {
             DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null,
             MaxCharactersFromEntities = 0,
-            MaxCharactersInDocument = WsdlLimits.Default.MaxDocumentBytes,
-        });
+            MaxCharactersInDocument = budget.MaxDocumentBytes,
+        }, new Uri(Path.GetFullPath(path)).ToString());
         XElement root = XElement.Load(reader, LoadOptions.SetLineInfo);
         Queue<(XElement Element, int Depth)> pending = new();
         pending.Enqueue((root, 1));
         while (pending.TryDequeue(out var item))
         {
-            if (item.Depth > WsdlLimits.Default.MaxNestingDepth)
+            if (item.Depth > budget.MaxNestingDepth)
             {
                 throw new WsdlExportException("DOCUMENT_DEPTH_LIMIT");
             }

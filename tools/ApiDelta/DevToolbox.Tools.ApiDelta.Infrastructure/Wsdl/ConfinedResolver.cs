@@ -43,6 +43,11 @@ internal sealed class ConfinedResolver : XmlResolver
     }
 
     /// <inheritdoc />
-    public override Uri ResolveUri(Uri? baseUri, string? relativeUri) =>
-        base.ResolveUri(baseUri, relativeUri);
+    public override Uri ResolveUri(Uri? baseUri, string? relativeUri)
+    {
+        Uri resolved = base.ResolveUri(baseUri, relativeUri);
+        // All aliases of a validated snapshot share one identity in XmlSchemaSet.
+        return _allowed.TryGetValue(resolved.ToString(), out string? path) && _contents.ContainsKey(path)
+            ? new Uri(Path.GetFullPath(path)) : resolved;
+    }
 }

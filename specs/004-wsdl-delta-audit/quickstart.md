@@ -3,6 +3,22 @@
 Runnable scenarios that prove the feature end to end. Shapes live in [data-model.md](data-model.md); the
 projection table lives in [contracts/projection.md](contracts/projection.md). Nothing is duplicated here.
 
+## Delivered interactive export scope
+
+**OpenAPI → WSDL vers OpenAPI** exports a local WSDL, collects an authorized URL graph, or replays a
+saved `manifest.json`. It validates SOAP document/literal XML projection and OpenAPI 3.0.3 before
+publishing. URL collections retain unchanged inputs, self-contained offline copies, SHA-256 hashes and
+a validation report; failed collections leave no final bundle. Source hosts, redirects, DNS answers,
+private IP confirmations and collection budgets are checked. Query forms are limited to WSDL/XSD
+metadata selectors; credentials and arbitrary query parameters are refused. Proxies preventing DNS
+pinning are refused rather than bypassed. The collected source files can contain private information.
+
+The comparison, production editing, mapping confirmation and resumable apidelta sessions below are
+separate workflows. They are not acceptance evidence for the interactive export. The export's
+[reproducible acceptance evidence and remaining Sparky checks](acceptance.md) distinguish standard
+OpenAPI validation from a real import into a configured Sparky instance. No such instance is available
+here; no real Sparky import is claimed and the PR remains in draft.
+
 ## Prerequisites
 
 ```bash

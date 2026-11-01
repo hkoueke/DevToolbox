@@ -32,7 +32,8 @@ public sealed class RetrievalMap
         foreach (KeyValuePair<Uri, string> pair in pairs)
         {
             _toLocal[pair.Key.ToString()] = pair.Value;
-            _toOrigin[System.IO.Path.GetFullPath(pair.Value)] = pair.Key.ToString();
+            // The first address is canonical; later entries may be redirect aliases.
+            _ = _toOrigin.TryAdd(System.IO.Path.GetFullPath(pair.Value), pair.Key.ToString());
         }
     }
 

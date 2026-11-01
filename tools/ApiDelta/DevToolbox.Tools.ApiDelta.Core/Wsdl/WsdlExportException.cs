@@ -11,7 +11,17 @@ public sealed class WsdlExportException : InvalidOperationException
 
     private static string Explain(string reason) => reason switch
     {
+        "COLLECTION_PERMISSIONDENIED" => "la destination, une redirection ou une adresse IP n'est pas autorisée pour cette collecte",
+        "COLLECTION_AUTHENTICATIONFAILED" => "le serveur demande une authentification ; utilisez un fichier téléchargé séparément",
+        "COLLECTION_SERVICEUNAVAILABLE" or "COLLECTION_SERVERUNREACHABLE" => "la collecte a échoué ou a dépassé son délai",
+        "COLLECTION_REDIRECTREFUSED" => "le budget de redirections est dépassé",
+        "COLLECTION_INVALIDINPUT" => "un document téléchargé est invalide ou dépasse les budgets de collecte",
+        "COLLECTION_DESTINATION_EXISTS_OR_INVALID" => "choisissez un nouveau dossier de collecte dans un dossier existant, sans lien symbolique",
+        "COLLECTION_HOST_INVALID" or "COLLECTION_SOURCE_INVALID" or "COLLECTION_LIMITS_INVALID" => "la source, les hôtes autorisés ou les budgets de collecte sont invalides",
+        "SNAPSHOT_CHANGED" => "la collecte a été modifiée ; les empreintes ne correspondent plus",
+        "SNAPSHOT_INVALID" or "SNAPSHOT_UNRESOLVED_IMPORT" => "la collecte est incomplète, invalide ou sort de son dossier",
         "SOAP_ACTION_UNSAFE" => "la SOAPAction contient une autorité, des données sensibles ou une forme d'URI non exportable",
+        "XML_BASE_UNSUPPORTED" => "xml:base n'est pas pris en charge ; les imports ne sont pas réinterprétés silencieusement",
         "XSD_BINARY_FACET_UNSUPPORTED" => "les facettes binaires portent sur les octets décodés et ne peuvent pas être traduites en contraintes de chaîne",
         "XSD_ATTRIBUTES_UNSUPPORTED" => "les attributs XML ne sont pas pris en charge",
         "XSD_MIXED_CONTENT_UNSUPPORTED" => "le contenu XML mixte ne peut pas être représenté",

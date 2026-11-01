@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
+using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
@@ -16,12 +17,12 @@ public static class SoapOpenApiYamlExporter
     /// Aucune écriture de fichier ni récupération distante implicite.
     /// </summary>
     public static async Task<string> ExportFileAsync(
-        string wsdlPath, string title, string version, CancellationToken cancellationToken)
+        string wsdlPath, string title, string version, CancellationToken cancellationToken, WsdlLimits? limits = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(wsdlPath);
         cancellationToken.ThrowIfCancellationRequested();
         // Confined readers are synchronous; keep cancellation boundaries around graph projection.
-        SchemaDraft draft = new SoapDocumentExporter(SoapExportGraph.Read(wsdlPath)).Build(title, version);
+        SchemaDraft draft = new SoapDocumentExporter(SoapExportGraph.Read(wsdlPath, limits)).Build(title, version);
         cancellationToken.ThrowIfCancellationRequested();
         await Task.CompletedTask.ConfigureAwait(false);
         return Serialize(draft);

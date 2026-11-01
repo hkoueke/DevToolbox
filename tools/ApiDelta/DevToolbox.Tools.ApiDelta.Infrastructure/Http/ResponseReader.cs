@@ -49,7 +49,7 @@ internal static class ResponseReader
 
         byte[] received = bytes.Value;
 
-        return WellFormed(received, response, origin)
+        return WellFormed(received, response, origin, limits)
             ?? Result.Success(new RetrievedContent(origin, received, chain));
     }
 
@@ -85,7 +85,8 @@ internal static class ResponseReader
     private static async Task<Result<byte[]>> BoundedAsync(
         HttpResponseMessage response, WsdlLimits limits, CancellationToken cancellationToken)
     {
-        if (response.Content.Headers.ContentLength > limits.MaxResponseBytes)
+        long maximum = Math.Min(limits.MaxResponseBytes, limits.MaxDocumentBytes);
+        if (response.Content.Headers.ContentLength > maximum)
         {
             return TooLarge(limits, response.Content.Headers.ContentLength.Value);
         }
@@ -100,9 +101,10 @@ internal static class ResponseReader
         byte[] buffer = new byte[81920];
         int read;
 
-        while ((read = await body.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        while ((read = await body.ReadAsync(buffer.AsMemory(0,
+            (int)Math.Min(buffer.Length, maximum - collected.Length + 1)), cancellationToken).ConfigureAwait(false)) > 0)
         {
-            if (collected.Length + read > limits.MaxResponseBytes)
+            if (collected.Length + read > maximum)
             {
                 // Un en-tête de taille absent ou menteur ne doit pas suffire à dépasser le budget : il
                 // est donc vérifié aussi pendant la lecture, et non seulement avant.
@@ -120,12 +122,12 @@ internal static class ResponseReader
         Result.Fail<byte[]>(
             FailureReason.InvalidInput,
             "La réponse pèse au moins " + observed + " octets, au-delà du budget de "
-                + limits.MaxResponseBytes + ". La limite est nommée plutôt que la récupération "
+                + Math.Min(limits.MaxResponseBytes, limits.MaxDocumentBytes) + ". La limite est nommée plutôt que la récupération "
                 + "abandonnée sans raison.");
 
     /// <summary>Refuse une réponse qui n'est pas un document XML, en nommant ce qui est arrivé.</summary>
     private static Result<RetrievedContent>? WellFormed(
-        byte[] bytes, HttpResponseMessage response, Uri origin)
+        byte[] bytes, HttpResponseMessage response, Uri origin, WsdlLimits limits)
     {
         try
         {
@@ -136,10 +138,22 @@ internal static class ResponseReader
                     DtdProcessing = DtdProcessing.Prohibit,
                     XmlResolver = null,
                     MaxCharactersFromEntities = 0,
+                    MaxCharactersInDocument = limits.MaxDocumentBytes,
                 });
 
             while (reader.Read())
             {
+                if (reader.GetAttribute("base", System.Xml.Linq.XNamespace.Xml.NamespaceName) is not null)
+                {
+                    return Result.Fail<RetrievedContent>(FailureReason.InvalidInput,
+                        "xml:base n'est pas pris en charge dans la collecte de contrats.");
+                }
+
+                if (reader.Depth > limits.MaxNestingDepth)
+                {
+                    return Result.Fail<RetrievedContent>(FailureReason.InvalidInput,
+                        "La profondeur XML dépasse le budget de collecte.");
+                }
                 // Parcouru entièrement : un document bien formé jusqu'à la racine mais tronqué ensuite
                 // doit être refusé ici, où l'on peut encore dire que la récupération est en cause.
             }

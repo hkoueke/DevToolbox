@@ -1,0 +1,8 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:b="urn:binding"
+ xmlns:s11="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:s12="http://schemas.xmlsoap.org/wsdl/soap12/" targetNamespace="urn:service">
+ <import namespace="urn:binding" location="bindings/shared.wsdl"/>
+ <service name="Example">
+  <port name="Soap11" binding="b:Soap11"><s11:address location="https://private.example/soap"/></port>
+  <port name="Soap12" binding="b:Soap12"><s12:address location="https://private.example/soap"/></port>
+ </service>
+</definitions>

@@ -42,9 +42,9 @@ public sealed class CanonicalEmitter : ISpecEmitter
             text += "\n";
         }
 
-        if (formatting.LineEndings == LineEndingStyle.Crlf)
+        if (formatting.LineEndings != LineEndingStyle.Preserve)
         {
-            text = text.ReplaceLineEndings("\r\n");
+            text = text.ReplaceLineEndings(formatting.LineEndings == LineEndingStyle.Crlf ? "\r\n" : "\n");
         }
 
         return Encoding.UTF8.GetBytes(text);

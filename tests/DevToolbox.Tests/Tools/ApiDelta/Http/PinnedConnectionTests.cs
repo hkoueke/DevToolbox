@@ -10,6 +10,7 @@ using DevToolbox.Tools.ApiDelta.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using DevToolbox.Tests.Tools.ApiDelta.Corpus;
 
 namespace DevToolbox.Tests.Tools.ApiDelta.Http;
 
@@ -36,6 +37,8 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
     private string _origin = null!;
     private Task _serving = null!;
     private TimeSpan _delay = TimeSpan.Zero;
+    private bool _exportGraph;
+    private readonly List<string> _requested = [];
 
     public Task InitializeAsync()
     {
@@ -111,6 +114,26 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
         fetched.Failure!.Message.Should().Contain("fetchTimeoutSeconds");
     }
 
+    [Fact]
+    public async Task The_registered_exporter_collects_a_real_multi_document_URL_graph_and_replays_it()
+    {
+        _exportGraph = true;
+        using ServiceProvider provider = Provider();
+        IWsdlOpenApiExporter exporter = provider.GetRequiredService<IWsdlOpenApiExporter>();
+        string collection = Path.Combine(_root, "capture");
+
+        string yaml = await exporter.ExportUrlAsync(new Uri(_origin + "/service.wsdl"),
+            new(collection, ConfirmedAddresses: ["127.0.0.1"], AllowPlainHttp: true),
+            "SOAP acceptance", "1.0", CancellationToken.None);
+
+        yaml.Should().Be(CorpusLoader.Read("Wsdl.url.expected.openapi.yaml"));
+        _requested.Should().HaveCount(6);
+        string replay = await exporter.ExportAsync(Path.Combine(collection, "manifest.json"),
+            "SOAP acceptance", "1.0", CancellationToken.None);
+        replay.Should().Be(yaml);
+        _requested.Should().HaveCount(6, "le rejeu n'ouvre aucune connexion");
+    }
+
     public async Task DisposeAsync()
     {
         _listener.Stop();
@@ -181,7 +204,10 @@ public sealed class PinnedConnectionTests : IAsyncLifetime, IDisposable
                     await Task.Delay(_delay).ConfigureAwait(false);
                 }
 
-                byte[] body = Encoding.UTF8.GetBytes(Contract);
+                string path = context.Request.Url!.AbsolutePath.TrimStart('/');
+                _requested.Add(path);
+                byte[] body = Encoding.UTF8.GetBytes(_exportGraph
+                    ? CorpusLoader.Read("Wsdl.url." + path.Replace('/', '.')) : Contract);
 
                 context.Response.ContentType = "text/xml";
                 context.Response.ContentLength64 = body.Length;

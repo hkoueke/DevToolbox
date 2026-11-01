@@ -73,6 +73,8 @@ public static class ServiceCollectionExtensions
         // est posé ici, au puits, et non à chaque appel : un garde-fou qu'il faut penser à invoquer
         // n'en est pas un, et la ligne de journalisation qui le contournera n'est pas encore écrite.
         registry.Forbid<Core.Wsdl.WsdlContract>();
+        registry.Forbid<Core.Wsdl.CollectedWsdlGraph>();
+        registry.Forbid<Core.Wsdl.RetrievalMap>();
         registry.Forbid<Core.Wsdl.WsdlDocument>();
         registry.Forbid<Core.Wsdl.WsdlService>();
         registry.Forbid<Core.Wsdl.WsdlPort>();

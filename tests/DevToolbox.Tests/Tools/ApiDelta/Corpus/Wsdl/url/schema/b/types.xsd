@@ -1,0 +1,3 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:types:b" elementFormDefault="qualified">
+ <xs:element name="Reply" type="xs:string"/>
+</xs:schema>

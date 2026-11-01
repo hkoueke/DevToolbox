@@ -193,6 +193,13 @@ internal sealed class ImportWalker
         Accept(
             materialised, Path.GetFileName(materialised),
             Path.GetDirectoryName(Path.GetFullPath(materialised)) ?? ".", containing, location, depth);
+        if (_contents.ContainsKey(materialised))
+        {
+            // The compiler resolves the original schemaLocation against its local base URI.
+            // This is an alias to validated bytes, never an additional filesystem permission.
+            _resolved[new Uri(new Uri(Path.GetFullPath(containing)), where).ToString()] = materialised;
+            _resolved[designated.ToString()] = materialised;
+        }
     }
 
     /// <summary>Résout l'import d'un document donné par chemin, contre son dossier.</summary>
