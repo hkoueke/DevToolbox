@@ -44,10 +44,20 @@ public sealed class Projector : Abstractions.IWsdlProjector
         // niveau est une façon d'écrire, pas une partie du contrat : deux livraisons du même service
         // qui les auraient rangées autrement produiraient sinon deux documents différents, et la
         // comparaison annoncerait un changement là où personne n'en a fait.
+        HashSet<string> occupiedRoutes = new(StringComparer.OrdinalIgnoreCase);
+
         foreach (WsdlOperation operation in contract.Operations.OrderBy(
             one => one.Name, StringComparer.Ordinal))
         {
             DerivedRoute route = RouteDerivation.Derive(operation.Name, verbs);
+
+            string routeKey = route.Method + " " + route.Path;
+            if (!occupiedRoutes.Add(routeKey))
+            {
+                throw new InvalidOperationException(
+                    "Projection OpenAPI ambiguë : plusieurs opérations WSDL correspondent à "
+                    + routeKey + ". Une correspondance explicite est nécessaire.");
+            }
 
             routes[operation.Name] = route;
 
