@@ -64,17 +64,7 @@ internal sealed class WsdlImportWalker(
 
         if (!_seen.Add(path))
         {
-            if (_namespaces.TryGetValue(path, out string? previous)
-                && !string.Equals(previous, targetNamespace, StringComparison.Ordinal))
-            {
-                Refuse(WsdlDiagnosticCodes.StructuralViolation,
-                    "Un même WSDL est importé sous deux namespaces différents : "
-                        + previous + " et " + targetNamespace, path);
-                return;
-            }
-
-            diagnostics.Add(new Diagnostic(WsdlDiagnosticCodes.ImportCycle,
-                DiagnosticSeverity.Information, "Import WSDL déjà parcouru : " + Path.GetFileName(path)));
+            AlreadySeen(path, targetNamespace);
             return;
         }
 
@@ -112,6 +102,21 @@ internal sealed class WsdlImportWalker(
             _namespaces[path] = targetNamespace;
             Register(path, imported, bytes, targetNamespace, depth);
         }
+    }
+
+    private void AlreadySeen(string path, string targetNamespace)
+    {
+        if (_namespaces.TryGetValue(path, out string? previous)
+            && !string.Equals(previous, targetNamespace, StringComparison.Ordinal))
+        {
+            Refuse(WsdlDiagnosticCodes.StructuralViolation,
+                "Un même WSDL est importé sous deux namespaces différents : "
+                    + previous + " et " + targetNamespace, path);
+            return;
+        }
+
+        diagnostics.Add(new Diagnostic(WsdlDiagnosticCodes.ImportCycle,
+            DiagnosticSeverity.Information, "Import WSDL déjà parcouru : " + Path.GetFileName(path)));
     }
 
     private bool ValidateImported(XElement imported, string path, string targetNamespace)
