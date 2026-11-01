@@ -33,7 +33,8 @@ public sealed class ExtensionRule : ProjectionRule
 
         SchemaDraft reference = new();
 
-        reference.Set("$ref", "#/components/schemas/" + Local(subject.Type!.BaseType!));
+        reference.Set("$ref", subject.SchemaNames?.Reference(subject.Type!.BaseType!)
+            ?? "#/components/schemas/" + Local(subject.Type.BaseType!));
 
         into.Append("allOf", reference);
 
