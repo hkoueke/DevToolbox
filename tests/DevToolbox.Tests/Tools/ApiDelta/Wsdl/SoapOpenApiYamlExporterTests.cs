@@ -1,6 +1,7 @@
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
 using DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
 using FluentAssertions;
+using YamlDotNet.RepresentationModel;
 using Xunit;
 
 namespace DevToolbox.Tests.Tools.ApiDelta.Wsdl;
@@ -36,6 +37,24 @@ public sealed class SoapOpenApiYamlExporterTests
             yaml.Should().Contain("/soap/ping");
             yaml.Should().Contain("post:");
             yaml.Should().NotContain("private.example.test");
+
+            using StringReader input = new(yaml);
+            YamlStream parsed = new();
+            parsed.Load(input);
+            parsed.Documents.Should().ContainSingle();
+            YamlMappingNode root = (YamlMappingNode)parsed.Documents[0].RootNode;
+            root.Children[new YamlScalarNode("openapi")].ToString().Should().Be("3.0.3");
+            YamlMappingNode info = (YamlMappingNode)root.Children[new YamlScalarNode("info")];
+            info.Children[new YamlScalarNode("title")].ToString().Should().Be("Test SOAP");
+            YamlMappingNode paths = (YamlMappingNode)root.Children[new YamlScalarNode("paths")];
+            paths.Children.Should().ContainSingle();
+            YamlMappingNode endpoint = (YamlMappingNode)paths.Children[new YamlScalarNode("/soap/ping")];
+            YamlMappingNode post = (YamlMappingNode)endpoint.Children[new YamlScalarNode("post")];
+            YamlMappingNode request = (YamlMappingNode)post.Children[new YamlScalarNode("requestBody")];
+            YamlMappingNode content = (YamlMappingNode)request.Children[new YamlScalarNode("content")];
+            content.Children.Should().ContainKey(new YamlScalarNode("text/xml"));
+            YamlMappingNode responses = (YamlMappingNode)post.Children[new YamlScalarNode("responses")];
+            responses.Children.Should().ContainKey(new YamlScalarNode("202"));
         }
         finally
         {

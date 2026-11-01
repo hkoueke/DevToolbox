@@ -223,3 +223,12 @@ Celles que le compilateur ne peut pas tenir sont écrites dans **[CONCEPTION.md]
 règles, chacune avec sa raison, sur les points de reprise, l'arbre de syntaxe et l'écriture d'un document.
 Lisez-les avant d'y toucher — ce sont les endroits où rien ne vous arrêtera, et où une erreur produit un
 fichier valide qui décrit autre chose.
+
+
+## Export WSDL vers OpenAPI (expérimental)
+
+L'outil autonome **WSDL vers OpenAPI**, dans l'onglet **OpenAPI**, lit un fichier WSDL 1.1 local et les imports WSDL/XSD autorisés dans son répertoire. Il demande le chemin source, le chemin du YAML de sortie, le titre et la version du service, puis produit un document **OpenAPI 3.0.3**. Il fonctionne hors ligne, refuse d'écraser un fichier existant et n'exporte pas l'hôte des adresses SOAP.
+
+L'export ne crée **aucune route REST fictive** : chaque adresse SOAP exploitable est représentée par une opération HTTP `POST` sur son chemin déclaré. Les messages sont décrits comme **XML opaque**, avec le type de média SOAP et les faults connus ; il ne s'agit pas d'une conversion exhaustive des structures XML en schémas OpenAPI. Les endpoints contenant des identifiants, paramètres de requête, fragments ou protocoles non HTTP(S) sont refusés. Les imports distants ne sont pas récupérés implicitement.
+
+**Limite d'interopérabilité :** la génération de YAML ne garantit pas son acceptation par **Sparky API Manager**. Vérifier la validité OpenAPI du document généré et réaliser un essai d'import dans l'environnement Sparky cible avant publication. Les constructions WSDL/XSD non représentables fidèlement doivent être examinées manuellement.
