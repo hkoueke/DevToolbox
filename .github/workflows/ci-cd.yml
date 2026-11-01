@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Extraire le dépôt
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Historique complet : le contrôle de balise a besoin de savoir où mène la balise.
           fetch-depth: 0
@@ -87,12 +87,12 @@ jobs:
           "Version $version (préversion : $prerelease)" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Installer le SDK .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Mettre en cache les paquets NuGet
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.NUGET_PACKAGES }}
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
@@ -123,7 +123,7 @@ jobs:
 
       - name: Publier les résultats de tests
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: artifacts/test-results
@@ -150,7 +150,7 @@ jobs:
 
       - name: Transmettre la publication à la livraison
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publish-win-x64
           path: artifacts/publish
@@ -169,7 +169,7 @@ jobs:
 
     steps:
       - name: Récupérer la publication
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: publish-win-x64
           path: artifacts/publish
@@ -195,7 +195,7 @@ jobs:
           "| $name.zip | ``$hash`` |" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Conserver l'archive comme artefact de build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.package.outputs.name }}
           path: artifacts/release
