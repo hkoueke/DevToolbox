@@ -21,4 +21,5 @@ internal sealed record Definitions(
     IReadOnlyList<OperationDeclaration> Operations,
     IReadOnlyDictionary<string, WsdlBinding> Bindings,
     IReadOnlyList<WsdlService> Services,
-    IReadOnlyList<InlineSchema> InlineSchemas);
+    IReadOnlyList<InlineSchema> InlineSchemas,
+    IReadOnlyDictionary<string, string>? BindingPortTypes = null);
