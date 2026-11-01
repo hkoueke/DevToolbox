@@ -17,4 +17,5 @@ internal sealed record OperationDeclaration(
     string? OutputMessage,
     IReadOnlyList<string> FaultMessages,
     string? Documentation,
-    WsdlLocation Location);
+    WsdlLocation Location,
+    string? PortType = null);
