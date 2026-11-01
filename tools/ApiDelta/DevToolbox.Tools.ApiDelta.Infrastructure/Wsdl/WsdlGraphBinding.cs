@@ -34,7 +34,7 @@ internal static class WsdlGraphBinding
                     continue;
                 }
 
-                document.Bindings.TryGetValue(declaration.Name, out WsdlBinding? binding);
+                WsdlBinding? binding = Binding(documents, declaration.Name, diagnostics);
                 WsdlMessage? input = Resolve(messages, document, declaration.InputMessage, diagnostics);
                 WsdlMessage? output = Resolve(messages, document, declaration.OutputMessage, diagnostics);
                 List<WsdlMessage> faults = [];
@@ -53,6 +53,27 @@ internal static class WsdlGraphBinding
         }
 
         return operations;
+    }
+
+    private static WsdlBinding? Binding(
+        IReadOnlyList<Definitions> documents, string name, List<Diagnostic> diagnostics)
+    {
+        List<WsdlBinding> matches = [];
+        foreach (Definitions document in documents)
+        {
+            if (document.Bindings.TryGetValue(name, out WsdlBinding? binding))
+            {
+                matches.Add(binding);
+            }
+        }
+
+        if (matches.Count > 1)
+        {
+            Refuse(diagnostics, "Plusieurs bindings SOAP correspondent à l'opération : " + name);
+            return null;
+        }
+
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     private static WsdlMessage? Resolve(
