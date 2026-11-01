@@ -106,6 +106,11 @@ internal sealed class WsdlImportWalker(
             return;
         }
 
+        Register(path, imported, bytes, targetNamespace, depth);
+    }
+
+    private void Register(string path, XElement imported, byte[] bytes, string targetNamespace, int depth)
+    {
         _documents.Add((path, imported, new WsdlDocument(
             path, WsdlDocumentKind.Definitions, bytes.LongLength,
             Convert.ToHexStringLower(SHA256.HashData(bytes)), targetNamespace)));
