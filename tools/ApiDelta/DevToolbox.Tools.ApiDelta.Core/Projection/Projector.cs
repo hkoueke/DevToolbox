@@ -220,7 +220,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
         }
 
         return contract.Elements.TryGetValue(Qualified(contract, element), out string? type)
-            ? Pointer(type)
+            ? schemaNames.Reference(type)
             : null;
     }
 
