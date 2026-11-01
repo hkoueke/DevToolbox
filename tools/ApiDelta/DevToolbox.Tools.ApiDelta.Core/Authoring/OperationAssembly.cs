@@ -28,14 +28,14 @@ public static class OperationAssembly
     /// <param name="projected">L'opération telle que la projection l'a produite.</param>
     /// <param name="route">Ce que le développeur a arrêté.</param>
     /// <param name="headers">Les références d'en-tête acceptées, déjà résolues en composants.</param>
+    /// <param name="document">La projection complète pour résoudre les références de schémas.</param>
     /// <returns>L'objet à écrire.</returns>
     /// <remarks>
-    /// Rend l'opération projetée inchangée lorsqu'aucun champ n'est placé ailleurs que dans le corps :
-    /// il n'y a alors rien à redistribuer, et réassembler pour rien changerait des octets que personne
-    /// n'a demandé de changer.
+    /// Sans décision sur les champs ni ajout d'en-tête, l'opération reste inchangée. Dès qu'un placement
+    /// est arrêté, ses champs et son caractère obligatoire déterminent l'entrée reconstruite.
     /// </remarks>
     public static SpecNode Compose(
-        SpecNode projected, AuthoredRoute route, IReadOnlyList<string> headers)
+        SpecNode projected, AuthoredRoute route, IReadOnlyList<string> headers, SpecNode? document = null)
     {
         ArgumentNullException.ThrowIfNull(projected);
         ArgumentNullException.ThrowIfNull(route);
@@ -46,7 +46,7 @@ public static class OperationAssembly
             return projected;
         }
 
-        if (!Redistributes(route) && headers.Count == 0)
+        if (route.Placements.Count == 0 && headers.Count == 0)
         {
             return projected;
         }
@@ -57,24 +57,21 @@ public static class OperationAssembly
             .. operation.Entries.Where(entry => !IsInput(entry.Key.Text)),
         ];
 
-        SpecNode? listed = Listed(route, headers);
+        ProjectedInput input = new(operation, document ?? projected);
+        SpecNode? listed = Listed(route, headers, input);
 
         if (listed is not null)
         {
             entries.Add(new MappingEntry(TreeEdits.Key(Parameters), listed));
         }
 
-        if (Body(route, operation) is { } body)
+        if (Body(route, input) is { } body)
         {
             entries.Add(new MappingEntry(TreeEdits.Key(RequestBody), body));
         }
 
         return TreeEdits.Mapping(operation.Location, entries);
     }
-
-    /// <summary>Indique qu'au moins un champ voyage ailleurs que dans le corps.</summary>
-    private static bool Redistributes(AuthoredRoute route) =>
-        route.Placements.Any(placement => placement.Location is not ParameterLocation.Body);
 
     /// <summary>Indique qu'un membre de l'opération décrit son entrée.</summary>
     private static bool IsInput(string key) =>
@@ -86,13 +83,13 @@ public static class OperationAssembly
     /// Les en-têtes viennent après les champs, et par référence : ce sont des composants que la
     /// production déclare déjà, et les redéclarer ferait deux définitions d'une même chose.
     /// </remarks>
-    private static SequenceNode? Listed(AuthoredRoute route, IReadOnlyList<string> headers)
+    private static SequenceNode? Listed(AuthoredRoute route, IReadOnlyList<string> headers, ProjectedInput input)
     {
         List<SpecNode> items = [];
 
         foreach (FieldPlacement placement in route.AsParameters)
         {
-            items.Add(Parameter(placement));
+            items.Add(Parameter(placement, input));
         }
 
         foreach (string component in headers)
@@ -108,60 +105,49 @@ public static class OperationAssembly
     /// Le schéma est repris du champ : un scalaire, puisque seul un scalaire peut être un paramètre. Le
     /// type déclaré du contrat n'est pas inscrit tel quel — « xs:string » n'est pas un type OpenAPI.
     /// </remarks>
-    private static MappingNode Parameter(FieldPlacement placement) => TreeEdits.Mapping(
+    private static MappingNode Parameter(FieldPlacement placement, ProjectedInput input) => TreeEdits.Mapping(
         SpecPointer.Root,
         [
             new MappingEntry(TreeEdits.Key(Name), TreeEdits.Key(placement.Effective)),
             new MappingEntry(TreeEdits.Key(In), TreeEdits.Key(Wire(placement.Location))),
-            new MappingEntry(TreeEdits.Key(Required), TreeEdits.Flag(placement.Required)),
+            new MappingEntry(TreeEdits.Key(Required), TreeEdits.Flag(placement.Location is ParameterLocation.Path || placement.Required)),
             new MappingEntry(
                 TreeEdits.Key(Schema),
-                TreeEdits.Mapping(
-                    SpecPointer.Root,
-                    [new MappingEntry(TreeEdits.Key("type"), TreeEdits.Key("string"))])),
+                input.Field(placement)),
         ]);
 
-    /// <summary>Le corps, repris de l'opération projetée, ou rien si aucun champ n'y va.</summary>
+    /// <summary>Le corps limité aux champs retenus, ou rien si tous sont placés ailleurs ou écartés.</summary>
     /// <remarks>
-    /// Repris et non reconstruit : il porte la référence que la projection a dérivée, et la refabriquer
-    /// ici reviendrait à redire ce qu'elle a déjà établi — avec le risque de le dire autrement.
+    /// Le schéma de chaque propriété vient de la projection ; le composant d'entrée partagé reste intact.
     /// </remarks>
-    private static SpecNode? Body(AuthoredRoute route, MappingNode projected)
+    private static MappingNode? Body(AuthoredRoute route, ProjectedInput input)
     {
-        if (!route.InBody.Any())
+        if (route.Placements.Count == 0)
+        {
+            return input.RequestBody;
+        }
+
+        FieldPlacement[] fields = [.. route.InBody];
+        if (fields.Length == 0)
         {
             return null;
         }
 
-        return projected.Find(RequestBody) ?? Empty();
-    }
-
-    /// <summary>Un corps vide mais bien formé, pour l'opération projetée qui n'en portait pas.</summary>
-    private static MappingNode Empty() => TreeEdits.Mapping(
-        SpecPointer.Root,
+        SpecNode schema = input.BodySchema(fields);
+        List<MappingEntry> media = input.Content is { } content
+            ? [.. content.Entries.Select(entry => new MappingEntry(entry.Key,
+                TreeEdits.Mapping(SpecPointer.Root,
+                    [.. (entry.Value as MappingNode)?.Entries.Where(value => !string.Equals(value.Key.Text, Schema, StringComparison.Ordinal)) ?? [],
+                    new MappingEntry(TreeEdits.Key(Schema), schema)])))]
+            : [new MappingEntry(TreeEdits.Key(Json), TreeEdits.Mapping(SpecPointer.Root, [new MappingEntry(TreeEdits.Key(Schema), schema)]))];
+        return TreeEdits.Mapping(SpecPointer.Root,
         [
-            new MappingEntry(
-                TreeEdits.Key(Content),
-                TreeEdits.Mapping(
-                    SpecPointer.Root,
-                    [
-                        new MappingEntry(
-                            TreeEdits.Key(Json),
-                            TreeEdits.Mapping(
-                                SpecPointer.Root,
-                                [
-                                    new MappingEntry(
-                                        TreeEdits.Key(Schema),
-                                        TreeEdits.Mapping(
-                                            SpecPointer.Root,
-                                            [
-                                                new MappingEntry(
-                                                    TreeEdits.Key("type"),
-                                                    TreeEdits.Key("object")),
-                                            ])),
-                                ])),
-                    ])),
+            .. input.RequestBody?.Entries.Where(entry => !string.Equals(entry.Key.Text, Required, StringComparison.Ordinal)
+                && !string.Equals(entry.Key.Text, Content, StringComparison.Ordinal)) ?? [],
+            new MappingEntry(TreeEdits.Key(Required), TreeEdits.Flag(fields.Any(field => field.Required))),
+            new MappingEntry(TreeEdits.Key(Content), TreeEdits.Mapping(SpecPointer.Root, media)),
         ]);
+    }
 
     /// <summary>Le nom de la destination, tel qu'OpenAPI l'écrit.</summary>
     private static string Wire(ParameterLocation location) => location switch

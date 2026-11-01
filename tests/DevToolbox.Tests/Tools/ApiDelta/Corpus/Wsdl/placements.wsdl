@@ -1,0 +1,24 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn:placements"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" targetNamespace="urn:placements">
+ <types><xs:schema targetNamespace="urn:placements" elementFormDefault="qualified">
+  <xs:simpleType name="Identifier"><xs:restriction base="xs:int"><xs:minInclusive value="1"/><xs:maxInclusive value="99"/></xs:restriction></xs:simpleType>
+  <xs:simpleType name="Code"><xs:restriction base="xs:string"><xs:minLength value="2"/><xs:maxLength value="4"/><xs:enumeration value="AA"/><xs:enumeration value="BB"/></xs:restriction></xs:simpleType>
+  <xs:complexType name="Child"><xs:sequence><xs:element name="value" type="xs:string"/></xs:sequence></xs:complexType>
+  <xs:complexType name="Input"><xs:sequence>
+   <xs:element name="id" type="tns:Identifier"/><xs:element name="enabled" type="xs:boolean"/>
+   <xs:element name="code" type="tns:Code"/><xs:element name="label" type="xs:string"/>
+   <xs:element name="child" type="tns:Child"/><xs:element name="ignored" type="xs:string"/>
+   <xs:element name="tags" type="tns:Code" minOccurs="0" maxOccurs="2"/>
+  </xs:sequence></xs:complexType>
+  <xs:element name="Request" type="tns:Input"/>
+ </xs:schema></types>
+ <message name="Input"><part name="body" element="tns:Request"/></message>
+ <portType name="Port">
+  <operation name="creerClient"><input message="tns:Input"/></operation>
+  <operation name="modifierClient"><input message="tns:Input"/></operation>
+ </portType>
+ <binding name="Binding" type="tns:Port"><soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+  <operation name="creerClient"><soap:operation soapAction="urn:create"/><input><soap:body use="literal"/></input></operation>
+  <operation name="modifierClient"><soap:operation soapAction="urn:update"/><input><soap:body use="literal"/></input></operation>
+ </binding>
+</definitions>

@@ -74,7 +74,7 @@ public sealed class SplicingEmitter : ISplicingEmitter
     /// <summary>Assemble la sortie : les octets d'origine, coupés aux endroits des épissures.</summary>
     private static Result<ReadOnlyMemory<byte>> Apply(SpecDocument document, List<Edit> edits)
     {
-        edits.Sort((left, right) => left.Start.CompareTo(right.Start));
+        edits = [.. edits.OrderBy(edit => edit.Start)];
 
         for (int at = 1; at < edits.Count; at++)
         {

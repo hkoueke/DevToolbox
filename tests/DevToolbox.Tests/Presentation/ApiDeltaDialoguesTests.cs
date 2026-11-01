@@ -119,6 +119,39 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
         console.Output.Should().Contain("?page=2").And.NotContain("scalaire").And.NotContain("nillable");
     }
 
+    [Fact]
+    public async Task Newly_authored_paths_are_not_offered_as_insertion_anchors()
+    {
+        using TestConsole console = NewConsole();
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.Enter);
+        for (int route = 0; route < 2; route++)
+        {
+            console.Input.PushKey(ConsoleKey.Enter); // path
+            console.Input.PushKey(ConsoleKey.Enter); // method
+            if (route == 1)
+            {
+                console.Input.PushKey(ConsoleKey.DownArrow); // end, rather than an authored path
+            }
+
+            console.Input.PushKey(ConsoleKey.Enter); // insertion
+        }
+
+        AuthoringSubject[] subjects =
+        [
+            new("First", [], new OperationSelector("/first", HttpOperationMethod.Post), RouteDerivationKind.Derived),
+            new("Second", [], new OperationSelector("/second", HttpOperationMethod.Post), RouteDerivationKind.Derived),
+        ];
+        var result = await new RouteAuthoringPrompt(console).AuthorAsync(subjects, ["/existing"], [], CancellationToken.None);
+
+        result.Routes.Should().HaveCount(2);
+        result.Routes[0].Insertion.AfterPath.Should().Be("/existing");
+        result.Routes[1].Insertion.AfterPath.Should().BeNull();
+        console.Output.Should().NotContain("après /first");
+    }
+
     [Theory]
     [InlineData(false, false, false, "Aucun fichier fusionné")]
     [InlineData(false, true, false, "Fichier fusionné")]

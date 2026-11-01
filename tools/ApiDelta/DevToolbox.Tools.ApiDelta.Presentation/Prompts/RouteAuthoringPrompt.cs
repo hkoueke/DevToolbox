@@ -18,9 +18,7 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 /// finirait par en avoir d'autres que celles du cœur, et le document écrit obéirait aux siennes.
 /// </para>
 /// <para>
-/// Le placement des champs n'est pas encore demandé : il est pris au défaut que le verbe permet. C'est la
-/// tranche suivante qui le demandera, et la séparation est volontaire — une route posée au bon chemin
-/// vaut déjà d'être livrée.
+/// Chaque champ peut être placé dans le corps ou dans un paramètre compatible avec son type.
 /// </para>
 /// </remarks>
 public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
@@ -62,7 +60,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
                 break;
             }
 
-            if (Compose(subject, productionPaths, authored) is { } route)
+            if (Compose(subject, productionPaths) is { } route)
             {
                 authored.Add(route);
             }
@@ -97,8 +95,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
     /// <summary>Compose une route : son chemin, son verbe, et où elle se place.</summary>
     private AuthoredRoute? Compose(
         AuthoringSubject subject,
-        IReadOnlyList<string> productionPaths,
-        IReadOnlyList<AuthoredRoute> already)
+        IReadOnlyList<string> productionPaths)
     {
         _console.MarkupLine(
             "[grey]Suggestion pour[/] [bold]" + Markup.Escape(subject.Operation) + "[/] : "
@@ -118,7 +115,7 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
             method.Value,
             AskForPlacements(subject, method.Value, path),
             [],
-            AskForPlace(productionPaths, already),
+            AskForPlace(productionPaths),
             subject.Worth,
             TookSuggestion: string.Equals(path, subject.Suggested.Path, StringComparison.Ordinal)
                 && method.Value == subject.Suggested.Method);
@@ -267,18 +264,16 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
     /// <summary>Demande où la route se place, dans l'ordre du document.</summary>
     /// <remarks>
     /// Dans l'ordre où la production écrit ses chemins, pour que le développeur choisisse un voisin qu'il
-    /// lit. Les routes composées plus tôt dans la même séance s'ajoutent à la liste : une famille se
-    /// compose souvent d'affilée.
+    /// lit. Seuls les chemins présents dans le document d'origine peuvent servir d'ancres d'épissage.
     /// </remarks>
     private InsertionPoint AskForPlace(
-        IReadOnlyList<string> productionPaths, IReadOnlyList<AuthoredRoute> already)
+        IReadOnlyList<string> productionPaths)
     {
         const string End = "à la fin";
 
         IReadOnlyList<string> choices =
         [
             .. productionPaths.Select(path => "après " + path),
-            .. already.Select(route => "après " + route.Path),
             End,
         ];
 

@@ -274,12 +274,18 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         SpecPointer item = SpecPointer.Root.Child(Paths).Child(target.Path);
         bool pathHeld = PointerNavigator.Find(request.Production.Root, item.Json) is not null;
 
-        // L'entrée est redistribuée là où le développeur l'a placée. Sans registre, ou quand tout va
-        // dans le corps, l'opération projetée passe inchangée : réassembler pour rien changerait des
-        // octets que personne n'a demandé de changer.
-        SpecNode marked = authored is { } composed
-            ? OperationAssembly.Compose(source, composed, composed.Headers)
-            : source;
+        SpecNode marked;
+        try
+        {
+            marked = authored is { } composed
+                ? OperationAssembly.Compose(source, composed, composed.Headers, request.Candidate.Root)
+                : source;
+        }
+        catch (InvalidOperationException exception)
+        {
+            ledger.Declined.Add(new DeclinedCorrection(target.Display, exception.Message));
+            return;
+        }
 
         ledger.Splices.Add(Grafted(item, target, marked, pathHeld, authored));
 

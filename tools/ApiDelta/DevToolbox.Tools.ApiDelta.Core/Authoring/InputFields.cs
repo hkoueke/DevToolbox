@@ -8,9 +8,8 @@ namespace DevToolbox.Tools.ApiDelta.Core.Authoring;
 /// type porte les champs. Ce sont ces champs que le développeur place — et rien dans le contrat ne dit où
 /// chacun doit aller, ce qui est la raison d'être de toute cette fonctionnalité.
 /// <para>
-/// Un champ est dit composite quand son type est déclaré par le contrat. Les scalaires d'un XSD
-/// (<c>xs:string</c> et les siens) n'y figurent pas : ils viennent de l'espace de noms du schéma, non du
-/// contrat. La distinction est donc une lecture du contrat et non une liste de noms à tenir à jour.
+/// Un tableau ou un type composé est composite. Les types simples nommés et restreints restent des
+/// scalaires : leur déclaration dans le contrat ne les transforme pas en objets.
 /// </para>
 /// </remarks>
 public static class InputFields
@@ -39,17 +38,14 @@ public static class InputFields
 
         foreach (WsdlPart part in input.Parts)
         {
-            foreach ((string field, string declared) in Particles(contract, part))
-            {
-                fields.Add((field, declared, contract.Types.ContainsKey(declared)));
-            }
+            fields.AddRange(Particles(contract, part));
         }
 
         return fields;
     }
 
     /// <summary>Les éléments du type qu'une partie désigne.</summary>
-    private static IEnumerable<(string Field, string Declared)> Particles(
+    private static IEnumerable<(string Field, string Declared, bool IsComposite)> Particles(
         WsdlContract contract, WsdlPart part)
     {
         if (Typed(contract, part) is not { } typeName
@@ -58,7 +54,9 @@ public static class InputFields
             return [];
         }
 
-        return type.Particles.Select(particle => (particle.Name, particle.TypeName));
+        return type.Particles.Select(particle => (particle.Name, particle.TypeName,
+            particle.IsCollection || (contract.Types.TryGetValue(particle.TypeName, out XsdType? declared)
+                && declared.Content is not XsdContentKind.Simple)));
     }
 
     /// <summary>Le type que porte une partie : le sien, ou celui de l'élément qu'elle nomme.</summary>

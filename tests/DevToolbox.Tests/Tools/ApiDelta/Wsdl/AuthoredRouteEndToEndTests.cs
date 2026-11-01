@@ -205,10 +205,7 @@ public sealed class AuthoredRouteEndToEndTests
         // entrée — ce que la première version de cet essai a appris en échouant sur elle.
         AuthoringRecord authored = new(
         [
-            Authored("archiverDocument", "/Document/Archiver", HttpOperationMethod.Post) with
-            {
-                Placements = [Composite("corps", ParameterLocation.Body)],
-            },
+            Authored("archiverDocument", "/Document/Archiver", HttpOperationMethod.Post),
         ]);
 
         Result<BuiltCorrection> built = run.Build(
@@ -282,6 +279,75 @@ public sealed class AuthoredRouteEndToEndTests
             .Should().NotContain("categorieDossier");
     }
 
+    [Fact]
+    public void Mixed_placements_survive_emission_with_restricted_scalar_schemas_and_filtered_body()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        var fields = InputFields.Of(run.Contract, run.Contract.Operations.Single(operation => string.Equals(operation.Name, "creerClient", StringComparison.Ordinal)));
+        fields.Single(field => string.Equals(field.Field, "code", StringComparison.Ordinal)).IsComposite.Should().BeFalse();
+        fields.Single(field => string.Equals(field.Field, "child", StringComparison.Ordinal)).IsComposite.Should().BeTrue();
+        fields.Single(field => string.Equals(field.Field, "tags", StringComparison.Ordinal)).IsComposite.Should().BeTrue();
+        FieldPlacement[] placements = [.. fields.Select(field => new FieldPlacement(field.Field, field.Declared,
+            field.IsComposite, field.Field switch
+            {
+                "id" => ParameterLocation.Path,
+                "enabled" => ParameterLocation.Query,
+                "code" => ParameterLocation.Header,
+                "ignored" => ParameterLocation.Nowhere,
+                _ => ParameterLocation.Body,
+            }, string.Equals(field.Field, "label", StringComparison.Ordinal), string.Equals(field.Field, "code", StringComparison.Ordinal) ? "X-Code" : null))];
+        AuthoringRecord authored = new([Authored("creerClient", "/Clients/{id}", HttpOperationMethod.Post)
+            with { Placements = placements }]);
+        var built = run.Build(new CorrectionSelection([run.Route("creerClient")]), authoring: authored);
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+        SpecNode root = run.Reread(built.Value.Serialized).Root;
+        const string Operation = "/paths/~1Clients~1{id}/post";
+        At<MappingNode>(root, Operation + "/requestBody/content/application~1json/schema/properties")
+            .Entries.Select(entry => entry.Key.Text).Should().Equal("label", "child", "tags");
+        At<SequenceNode>(root, Operation + "/requestBody/content/application~1json/schema/required")
+            .Items.Cast<ScalarNode>().Select(node => node.Text).Should().Equal("label");
+        At<ScalarNode>(root, Operation + "/parameters/1/schema/type").Text.Should().Be("boolean");
+        At<ScalarNode>(root, Operation + "/parameters/2/name").Text.Should().Be("X-Code");
+        string identifier = At<ScalarNode>(root, Operation + "/parameters/0/schema/$ref").Text[1..];
+        At<ScalarNode>(root, identifier + "/type").Text.Should().Be("integer");
+        At<ScalarNode>(root, identifier + "/minimum").Text.Should().Be("1");
+        At<ScalarNode>(root, identifier + "/maximum").Text.Should().Be("99");
+        string code = At<ScalarNode>(root, Operation + "/parameters/2/schema/$ref").Text[1..];
+        At<SequenceNode>(root, code + "/enum").Items.Cast<ScalarNode>().Select(node => node.Text).Should().Equal("AA", "BB");
+        At<ScalarNode>(root, code + "/minLength").Text.Should().Be("2");
+        At<ScalarNode>(root, code + "/maxLength").Text.Should().Be("4");
+        var verification = run.Verify(built.Value);
+        verification.Reparsed.Should().BeTrue();
+        verification.Revalidated.Should().BeTrue(string.Join(" · ", verification.Complaints));
+        verification.ReferencesResolved.Should().BeTrue(string.Join(" · ", verification.Complaints));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Multiple_new_paths_can_share_an_original_anchor_without_reordering_production(bool atEnd)
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        IReadOnlyList<string> before = Paths(run.Production);
+        InsertionPoint insertion = atEnd ? InsertionPoint.AtEnd : InsertionPoint.After(before[0]);
+        AuthoringRecord authored = new([
+            Authored("creerClient", "/First", HttpOperationMethod.Post) with { Insertion = insertion },
+            Authored("modifierClient", "/Second", HttpOperationMethod.Post) with { Insertion = insertion },
+        ]);
+        var built = run.Build(new CorrectionSelection([run.Route("creerClient"), run.Route("modifierClient")]), authoring: authored);
+        built.IsSuccess.Should().BeTrue(built.Failure?.Message);
+        IReadOnlyList<string> after = Paths(run.Reread(built.Value.Serialized));
+        after.Where(path => before.Contains(path, StringComparer.Ordinal)).Should().Equal(before);
+        after.Skip(atEnd ? before.Count : 1).Take(2).Should().Equal("/First", "/Second");
+        var verification = run.Verify(built.Value);
+        verification.Reparsed.Should().BeTrue();
+        verification.Revalidated.Should().BeTrue(string.Join(" · ", verification.Complaints));
+        verification.ReferencesResolved.Should().BeTrue(string.Join(" · ", verification.Complaints));
+    }
+
+    private static T At<T>(SpecNode root, string pointer) where T : SpecNode =>
+        PointerNavigator.Find(root, pointer).Should().BeOfType<T>().Subject;
+
     private static string Where(SequenceNode listed, string name) => Member(listed, name, "in");
 
     private static string Required(SequenceNode listed, string name) =>
@@ -300,9 +366,6 @@ public sealed class AuthoredRouteEndToEndTests
     private static FieldPlacement Scalar(
         string field, ParameterLocation location, bool required = false) =>
         new(field, "string", IsComposite: false, location, required);
-
-    private static FieldPlacement Composite(string field, ParameterLocation location) =>
-        new(field, "DossierModifieRequete", IsComposite: true, location, Required: true);
 
     private static string Pointer(OperationSelector route) =>
         SpecPointer.Root.Child("paths").Child(route.Path).Child(route.MethodKey).Json;

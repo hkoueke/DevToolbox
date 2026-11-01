@@ -52,6 +52,9 @@ Dans **OpenAPI → apidelta**, choisissez votre objectif :
 
 Les réglages personnalisés sont facultatifs. Si un fichier de configuration est trouvé à côté de votre fichier, l’outil le nomme et vous demande s’il faut l’utiliser. Les choix de placement des champs donnent des exemples d’adresses et de paramètres HTTP. Les bilans indiquent les fichiers réellement écrits ; **Continuer** passe au bilan suivant, puis **Entrée** ramène au menu à la fin. Les rapports conservent les identifiants techniques nécessaires à une analyse détaillée.
 
+Lors de la composition d’un appel, seuls les champs placés dans le corps y sont conservés, avec le caractère obligatoire choisi. Les paramètres du chemin, de la requête et des en-têtes conservent leurs types et contraintes issus du WSDL, y compris les types simples nommés. Les objets et collections restent dans le corps. L’insertion se fait après un chemin déjà présent dans le fichier de production, ou à la fin ; plusieurs nouveaux chemins au même emplacement gardent l’ordre de sélection.
+
+
 ### Le fichier compagnon peut aussi être un WSDL
 
 `apidelta` accepte un contrat de service WSDL 1.1 comme fichier compagnon, en face d'une production OpenAPI.
