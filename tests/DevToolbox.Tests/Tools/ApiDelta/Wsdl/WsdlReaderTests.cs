@@ -117,7 +117,7 @@ public sealed class WsdlReaderTests : IDisposable
 
         Diagnostic refusal = result.Diagnostics
             .Should().ContainSingle(diagnostic =>
-                diagnostic.Code == WsdlDiagnosticCodes.ImportUnresolved && diagnostic.IsBlocking)
+                string.Equals(diagnostic.Code, WsdlDiagnosticCodes.ImportUnresolved, StringComparison.Ordinal) && diagnostic.IsBlocking)
             .Subject;
 
         refusal.Message.Should().Contain("commun.xsd", "l'emplacement manquant est nommé");
