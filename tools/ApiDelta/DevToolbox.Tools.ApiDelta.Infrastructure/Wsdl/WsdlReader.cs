@@ -147,9 +147,20 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
-        // Discover the complete WSDL import graph before deciding whether the contract
-        // can be assembled. Until cross-document QName binding is implemented,
-        // DefinitionsReader still refuses imports rather than returning a partial contract.
+        ValidateImports(root, name, limits, policy, retrieved, diagnostics);
+
+        Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
+
+        return definitions is null
+            ? WsdlReadResult.Refused(diagnostics)
+            : Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+    }
+
+    /// <summary>Valide les imports sans assembler prématurément le contrat.</summary>
+    private static void ValidateImports(
+        XElement root, string name, WsdlLimits limits, ImportPolicy policy,
+        RetrievalMap retrieved, List<Diagnostic> diagnostics)
+    {
         if (root.Name == XNamespace.Get(WsdlNamespaces.Wsdl11) + "definitions"
             && root.Elements(XNamespace.Get(WsdlNamespaces.Wsdl11) + "import").Any())
         {
@@ -173,11 +184,6 @@ public sealed class WsdlReader : IWsdlReader
             }
         }
 
-        Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
-
-        return definitions is null
-            ? WsdlReadResult.Refused(diagnostics)
-            : Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
     }
 
     /// <summary>
