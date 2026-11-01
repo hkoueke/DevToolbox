@@ -299,6 +299,60 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Homonymous_operations_in_distinct_port_types_are_refused_without_guessing_routes()
+    {
+        _ = Write("other.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:other">
+              <wsdl:portType name="Other"><wsdl:operation name="Call" /></wsdl:portType>
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:other" location="other.wsdl" />
+              <wsdl:portType name="Main"><wsdl:operation name="Call" /></wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            diagnostic.Code == WsdlDiagnosticCodes.StructuralViolation
+            && diagnostic.Message.Contains("urn:entry:Main", StringComparison.Ordinal)
+            && diagnostic.Message.Contains("urn:other:Other", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_imported_binding_targeting_a_different_port_type_is_not_attached()
+    {
+        _ = Write("bindings.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                              xmlns:entry="urn:entry" targetNamespace="urn:bindings">
+              <wsdl:binding name="Wrong" type="entry:Other">
+                <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http" />
+                <wsdl:operation name="Call"><soap:operation soapAction="urn:wrong" /></wsdl:operation>
+              </wsdl:binding>
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:bindings" location="bindings.wsdl" />
+              <wsdl:portType name="Port"><wsdl:operation name="Call" /></wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeTrue(Said(result));
+        result.Contract!.Operations.Should().ContainSingle().Which.Binding.Should().BeNull();
+        result.Contract.Unreachable.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Distinct_imported_bindings_with_the_same_operation_name_match_only_the_target_port_type()
     {
         _ = Write("bindings.wsdl", """
