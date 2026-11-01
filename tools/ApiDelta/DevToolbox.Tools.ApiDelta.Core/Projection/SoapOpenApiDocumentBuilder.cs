@@ -16,9 +16,9 @@ public static class SoapOpenApiDocumentBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
         ArgumentException.ThrowIfNullOrWhiteSpace(endpointPath);
-        if (endpointPath[0] != '/')
+        if (!ValidEndpointPath(endpointPath))
         {
-            throw new ArgumentException("Le point d'accès doit être un chemin HTTP absolu.", nameof(endpointPath));
+            throw new ArgumentException("Le chemin SOAP doit être absolu, sans requête, fragment ni autorité.", nameof(endpointPath));
         }
 
         SchemaDraft document = new();
@@ -91,9 +91,7 @@ public static class SoapOpenApiDocumentBuilder
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(path) || path[0] != '/'
-                || path.Contains('?', StringComparison.Ordinal)
-                || path.Contains('#', StringComparison.Ordinal))
+            if (!ValidEndpointPath(path))
             {
                 throw new ArgumentException(
                     "Le chemin SOAP doit être absolu, sans requête ni fragment : " + binding.Name,
@@ -127,6 +125,16 @@ public static class SoapOpenApiDocumentBuilder
 
         return document;
     }
+
+    /// <summary>Accepte uniquement un chemin HTTP, jamais une URL avec autorité ou secrets.</summary>
+    private static bool ValidEndpointPath(string? path) =>
+        !string.IsNullOrWhiteSpace(path)
+        && path[0] == '/'
+        && !path.StartsWith("//", StringComparison.Ordinal)
+        && !path.Contains('?', StringComparison.Ordinal)
+        && !path.Contains('#', StringComparison.Ordinal)
+        && !path.Contains('\\\\', StringComparison.Ordinal)
+        && !path.Any(char.IsControl);
 
     /// <summary>Représente les opérations par un POST standard sur leur endpoint commun.</summary>
     private static void PopulateSharedEndpoint(SchemaDraft post, List<WsdlOperation> operations)
