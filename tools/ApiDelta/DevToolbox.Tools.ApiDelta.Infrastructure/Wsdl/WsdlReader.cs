@@ -292,7 +292,9 @@ public sealed class WsdlReader : IWsdlReader
         WsdlLimits limits,
         ImportPolicy policy,
         RetrievalMap retrieved,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        IReadOnlyList<WsdlDocument>? importedDocuments = null,
+        IReadOnlyList<WsdlOperation>? importedOperations = null)
     {
         SchemaSetResult schemas = SchemaCompiler.Compile(
             name, definitions, limits, policy, retrieved, diagnostics);
@@ -302,6 +304,7 @@ public sealed class WsdlReader : IWsdlReader
             new WsdlDocument(
                 name, WsdlDocumentKind.Definitions, content.LongLength, Hash(content),
                 definitions.TargetNamespace),
+            .. importedDocuments ?? [],
             .. schemas.Documents,
         ];
 
@@ -320,13 +323,38 @@ public sealed class WsdlReader : IWsdlReader
         return new WsdlReadResult(
             new WsdlContract(
                 documents,
-                [.. Operations(definitions)],
+                importedOperations ?? [.. Operations(definitions)],
                 schemas.Types,
                 definitions.Services,
                 schemas.Unresolved,
                 policy.ConfinementRoot,
                 schemas.Elements),
             diagnostics);
+    }
+
+    /// <summary>Assemble les documents du graphe après résolution stricte des messages.</summary>
+    private static WsdlReadResult AssembleGraph(
+        string name, byte[] content, Definitions root,
+        IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> imported,
+        WsdlLimits limits, ImportPolicy policy, RetrievalMap retrieved, List<Diagnostic> diagnostics)
+    {
+        List<Definitions> all = [root, .. imported.Select(item => item.Definitions)];
+        Definitions combined = new(
+            root.TargetNamespace,
+            [.. all.SelectMany(item => item.Messages)],
+            [.. all.SelectMany(item => item.Operations)],
+            new Dictionary<string, WsdlBinding>(StringComparer.Ordinal),
+            [.. all.SelectMany(item => item.Services)],
+            [.. all.SelectMany(item => item.InlineSchemas)]);
+
+        IReadOnlyList<WsdlOperation> operations = WsdlGraphBinding.Bind(all, diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.IsBlocking))
+        {
+            return WsdlReadResult.Refused(diagnostics);
+        }
+
+        return Assemble(name, content, combined, limits, policy, retrieved, diagnostics,
+            [.. imported.Select(item => item.Document)], operations);
     }
 
     /// <summary>Relie chaque opération à ses messages et à sa liaison.</summary>
