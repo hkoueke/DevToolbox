@@ -53,7 +53,7 @@ public sealed class SoapOpenApiDocumentBuilderTests
 
         document.Section("paths").Section("/soap").Section("post")
             .Get("description").Should().BeOfType<string>()
-            .Which.Should().Contain("SOAPAction = \\"\\"");
+            .Which.Should().Contain("SOAPAction = " + (char)34 + (char)34);
     }
 
     [Theory]
