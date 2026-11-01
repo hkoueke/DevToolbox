@@ -18,7 +18,7 @@ public sealed class OpenApiYamlExporterTests
         draft.Section("components").Section("schemas").Section("Envelope")
             .Set("$ref", "#/components/schemas/SoapBody");
 
-        string yaml = Encoding.UTF8.GetString(new OpenApiYamlExporter().Export(draft).Span);
+        string yaml = Encoding.UTF8.GetString(OpenApiYamlExporter.Export(draft).Span);
 
         yaml.Should().Contain("openapi: 3.0.3");
         yaml.Should().Contain("$ref: '#/components/schemas/SoapBody'");
