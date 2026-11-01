@@ -275,6 +275,64 @@ public sealed class WsdlReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Imported_wsdl_messages_are_bound_by_namespace()
+    {
+        _ = Write("shared.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:shared">
+              <wsdl:message name="Request" />
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              xmlns:shared="urn:shared" targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:shared" location="shared.wsdl" />
+              <wsdl:portType name="Port">
+                <wsdl:operation name="Call">
+                  <wsdl:input message="shared:Request" />
+                </wsdl:operation>
+              </wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeTrue(Said(result));
+        result.Contract!.Documents.Should().HaveCount(2);
+        result.Contract.Operations.Should().ContainSingle()
+            .Which.Input.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Imported_wsdl_does_not_bind_message_from_wrong_namespace()
+    {
+        _ = Write("shared.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              targetNamespace="urn:shared">
+              <wsdl:message name="Request" />
+            </wsdl:definitions>
+            """);
+        string entry = Write("entry.wsdl", """
+            <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                              xmlns:other="urn:other" targetNamespace="urn:entry">
+              <wsdl:import namespace="urn:shared" location="shared.wsdl" />
+              <wsdl:portType name="Port">
+                <wsdl:operation name="Call">
+                  <wsdl:input message="other:Request" />
+                </wsdl:operation>
+              </wsdl:portType>
+            </wsdl:definitions>
+            """);
+
+        WsdlReadResult result = await ReadAsync(entry);
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().Contain(diagnostic =>
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.StructuralViolation, StringComparison.Ordinal)
+            && diagnostic.Message.Contains("urn:other", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_repeated_wsdl_import_with_conflicting_namespaces_is_refused()
     {
         _ = Write("shared.wsdl", """
