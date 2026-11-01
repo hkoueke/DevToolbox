@@ -233,12 +233,26 @@ public sealed class Projector : Abstractions.IWsdlProjector
     /// le nom local reste pour le document qui n'a pu nommer aucun espace de noms — il était autrefois
     /// la seule voie, et une livraison écrite avec d'autres préfixes en dépendait.
     /// </remarks>
-    private static string Qualified(WsdlContract contract, string name) =>
-        contract.Elements.ContainsKey(name)
-            ? name
-            : contract.Elements.Keys.FirstOrDefault(known =>
-                string.Equals(Local(known), Local(name), StringComparison.Ordinal))
-                ?? name;
+    private static string Qualified(WsdlContract contract, string name)
+    {
+        if (contract.Elements.ContainsKey(name))
+        {
+            return name;
+        }
+
+        // Un QName explicite ne doit jamais être résolu vers un autre namespace.
+        // Pour les anciens contrats sans namespace, le repli n'est sûr que si
+        // le nom local correspond à un unique élément.
+        if (name.Contains(':', StringComparison.Ordinal))
+        {
+            return name;
+        }
+
+        string[] matches = [.. contract.Elements.Keys.Where(known =>
+            string.Equals(Local(known), name, StringComparison.Ordinal)).Take(2)];
+
+        return matches.Length == 1 ? matches[0] : name;
+    }
 
     
 
