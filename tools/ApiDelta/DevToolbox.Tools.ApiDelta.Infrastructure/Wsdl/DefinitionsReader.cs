@@ -38,7 +38,7 @@ internal sealed class DefinitionsReader
     /// <summary>Lit la structure, ou rend <see langword="null"/> si elle n'est pas lisible.</summary>
     /// <param name="root">La racine du document.</param>
     /// <returns>Ce que le document déclare, ou rien.</returns>
-    internal Definitions? Read(XElement root)
+    internal Definitions? Read(XElement root, bool importsResolved = false)
     {
         ArgumentNullException.ThrowIfNull(root);
 
@@ -51,7 +51,7 @@ internal sealed class DefinitionsReader
 
         XElement[] imports = [.. root.Elements(Wsdl + "import")];
 
-        if (imports.Length > 0)
+        if (imports.Length > 0 && !importsResolved)
         {
             foreach (XElement imported in imports)
             {
