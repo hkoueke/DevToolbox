@@ -60,7 +60,8 @@ public sealed class SchemaNameRegistry
             : throw new KeyNotFoundException("Type XSD inconnu : " + qualifiedName);
 
     public string Reference(string qualifiedName) =>
-        "#/components/schemas/" + Key(qualifiedName).Replace("~", "~0", StringComparison.Ordinal)
+        "#/components/schemas/" + (_names.TryGetValue(qualifiedName, out string? name)
+            ? name : Local(qualifiedName)).Replace("~", "~0", StringComparison.Ordinal)
             .Replace("/", "~1", StringComparison.Ordinal);
 
     private static string Local(string qualifiedName)
