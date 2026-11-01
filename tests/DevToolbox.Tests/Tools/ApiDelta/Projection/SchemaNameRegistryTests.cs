@@ -38,6 +38,20 @@ public sealed class SchemaNameRegistryTests
     }
 
     [Fact]
+    public void Local_name_matching_an_encoded_qualified_name_does_not_shadow_another_component()
+    {
+        const string first = "urn:clients:Adresse";
+        const string second = "urn:fournisseurs:Adresse";
+        string encoded = "Adresse__" + Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(first));
+
+        SchemaNameRegistry registry = new([first, second, "urn:other:" + encoded]);
+
+        registry.Key(first).Should().NotBe(registry.Key("urn:other:" + encoded));
+        registry.Key(second).Should().NotBe(registry.Key(first));
+        registry.Reference(first).Should().Be("#/components/schemas/" + registry.Key(first));
+    }
+
+    [Fact]
     public void Component_pointers_escape_json_pointer_special_characters()
     {
         SchemaNameRegistry registry = new(["urn:example:Path/Type~Version"]);
