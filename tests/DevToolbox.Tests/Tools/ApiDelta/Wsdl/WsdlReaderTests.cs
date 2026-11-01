@@ -304,8 +304,8 @@ public sealed class WsdlReaderTests : IDisposable
         _ = Write("binding.wsdl", """
             <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
                               xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-                              targetNamespace="urn:binding">
-              <wsdl:binding name="SoapBinding" type="urn:binding:Port">
+                              xmlns:entry="urn:entry" targetNamespace="urn:binding">
+              <wsdl:binding name="SoapBinding" type="entry:Port">
                 <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http" />
                 <wsdl:operation name="Call">
                   <soap:operation soapAction="urn:call" />
@@ -336,16 +336,16 @@ public sealed class WsdlReaderTests : IDisposable
     {
         _ = Write("first.wsdl", """
             <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
-                              targetNamespace="urn:first">
-              <wsdl:binding name="First" type="Port">
+                              xmlns:entry="urn:entry" targetNamespace="urn:first">
+              <wsdl:binding name="First" type="entry:Port">
                 <wsdl:operation name="Call" />
               </wsdl:binding>
             </wsdl:definitions>
             """);
         _ = Write("second.wsdl", """
             <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
-                              targetNamespace="urn:second">
-              <wsdl:binding name="Second" type="Port">
+                              xmlns:entry="urn:entry" targetNamespace="urn:second">
+              <wsdl:binding name="Second" type="entry:Port">
                 <wsdl:operation name="Call" />
               </wsdl:binding>
             </wsdl:definitions>
