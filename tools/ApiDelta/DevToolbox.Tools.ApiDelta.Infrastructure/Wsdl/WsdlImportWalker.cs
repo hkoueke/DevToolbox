@@ -37,8 +37,7 @@ internal sealed class WsdlImportWalker(
             string? targetNamespace = directive.Attribute("namespace")?.Value;
             if (string.IsNullOrWhiteSpace(location) || string.IsNullOrWhiteSpace(targetNamespace))
             {
-                Refuse(WsdlDiagnosticCodes.ImportUnresolved,
-                    "Un wsdl:import doit déclarer namespace et location.", containing);
+                // DefinitionsReader owns malformed-directive diagnostics.
                 continue;
             }
 
