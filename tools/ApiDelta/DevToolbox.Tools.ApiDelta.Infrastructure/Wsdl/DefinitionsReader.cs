@@ -68,7 +68,8 @@ internal sealed class DefinitionsReader
             [.. Operations(root)],
             Bindings(root),
             [.. Services(root)],
-            [.. InlineSchemas(root)]);
+            [.. InlineSchemas(root)],
+            BindingPortTypes(root));
     }
 
     /// <summary>
@@ -194,7 +195,9 @@ internal sealed class DefinitionsReader
             Text(operation, "documentation"),
             At(
                 operation,
-                "portType[" + (portType.Attribute("name")?.Value ?? "?") + "]/operation[" + name + "]"));
+                "portType[" + (portType.Attribute("name")?.Value ?? "?") + "]/operation[" + name + "]"),
+            ((portType.Parent?.Attribute("targetNamespace")?.Value is { Length: > 0 } space)
+                ? space + ":" : string.Empty) + (portType.Attribute("name")?.Value ?? string.Empty));
     }
 
     /// <summary>Le schéma d'échange, d'après l'ordre et la présence des deux messages.</summary>
@@ -211,6 +214,29 @@ internal sealed class DefinitionsReader
     }
 
     /// <summary>Les liaisons, par nom d'opération et par nom de liaison.</summary>
+    private Dictionary<string, string> BindingPortTypes(XElement root)
+    {
+        Dictionary<string, string> result = new(StringComparer.Ordinal);
+        foreach (XElement binding in root.Elements(Wsdl + "binding"))
+        {
+            string? type = Qualified(binding, binding.Attribute("type")?.Value);
+            if (type is null)
+            {
+                continue;
+            }
+
+            foreach (XElement operation in binding.Elements(Wsdl + "operation"))
+            {
+                string key = (root.Attribute("targetNamespace")?.Value ?? string.Empty)
+                    + ":" + (binding.Attribute("name")?.Value ?? string.Empty)
+                    + ":" + (operation.Attribute("name")?.Value ?? string.Empty);
+                result[key] = type;
+            }
+        }
+
+        return result;
+    }
+
     private Dictionary<string, WsdlBinding> Bindings(XElement root)
     {
         Dictionary<string, WsdlBinding> bindings = new(StringComparer.Ordinal);
