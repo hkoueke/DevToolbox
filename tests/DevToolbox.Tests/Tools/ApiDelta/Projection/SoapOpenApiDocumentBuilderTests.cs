@@ -71,7 +71,7 @@ public sealed class SoapOpenApiDocumentBuilderTests
     }
 
     [Fact]
-    public void Build_rejects_multiple_operations_on_one_http_post_endpoint()
+    public void Build_represents_multiple_operations_on_one_http_post_endpoint()
     {
         WsdlLocation location = new("service.wsdl", "operation", 1, 1);
         WsdlBinding binding = new("Port", "document", "literal", null, SoapVersion.Soap11, null, location);
@@ -81,10 +81,15 @@ public sealed class SoapOpenApiDocumentBuilderTests
         WsdlContract contract = new(
             [], [first, second], new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
 
-        Action build = () => SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
-
-        build.Should().Throw<InvalidOperationException>()
-            .WithMessage("*même route OpenAPI*");
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(contract, "Service", "1.0", "/soap");
+        SchemaDraft paths = document.Section("paths");
+        paths.Keywords.Should().ContainSingle();
+        SchemaDraft post = paths.Section("/soap").Section("post");
+        post.Get("operationId").Should().Be("soapEndpoint");
+        post.Get("x-soap-operations").Should().BeOfType<List<object?>>()
+            .Which.Should().HaveCount(2);
+        post.Section("requestBody").Section("content").Section("text/xml")
+            .Section("schema").Get("type").Should().Be("string");
     }
 
     [Fact]
