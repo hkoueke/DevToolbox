@@ -185,6 +185,25 @@ public sealed class WsdlReaderTests : IDisposable
                 DiagnosticSeverity.Information, "un cycle est légal : consigné, pas reproché");
     }
 
+    [Theory]
+    [InlineData("<wsdl:import namespace='urn:shared' />")]
+    [InlineData("<wsdl:import location='shared.wsdl' />")]
+    [InlineData("<wsdl:import namespace=' ' location='shared.wsdl' />")]
+    [InlineData("<wsdl:import namespace='urn:shared' location=' ' />")]
+    public void Malformed_wsdl_import_names_its_missing_required_attributes(string directive)
+    {
+        string source = "<wsdl:definitions xmlns:wsdl='http://schemas.xmlsoap.org/wsdl/' "
+            + "targetNamespace='urn:root'>" + directive + "</wsdl:definitions>";
+
+        WsdlReadResult result = _reader.ReadBytes(
+            Encoding.UTF8.GetBytes(source), "entry.wsdl", WsdlLimits.Default, Policy());
+
+        result.IsFaithful.Should().BeFalse();
+        result.Diagnostics.Should().ContainSingle(diagnostic =>
+            string.Equals(diagnostic.Code, WsdlDiagnosticCodes.ImportUnresolved, StringComparison.Ordinal))
+            .Which.Message.Should().Contain("namespace").And.Contain("location");
+    }
+
     [Fact]
     public void Every_unresolved_wsdl_import_is_reported()
     {
