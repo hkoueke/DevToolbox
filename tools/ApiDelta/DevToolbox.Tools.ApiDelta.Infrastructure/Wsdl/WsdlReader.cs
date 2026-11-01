@@ -147,7 +147,7 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
-        IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> imported =
+        List<(string Path, Definitions Definitions, WsdlDocument Document)> imported =
             ReadImports(root, name, limits, policy, retrieved, diagnostics);
 
         Definitions? definitions = new DefinitionsReader(name, diagnostics)
