@@ -53,6 +53,7 @@ public static class SoapOpenApiDocumentBuilder
             }
         }
 
+        EnsureUniqueOperationIds(document.Section("paths"));
         return document;
     }
 
@@ -123,7 +124,34 @@ public static class SoapOpenApiDocumentBuilder
             }
         }
 
+        EnsureUniqueOperationIds(paths);
         return document;
+    }
+
+    /// <summary>Garantit l'unicité des identifiants OpenAPI sur tous les chemins SOAP.</summary>
+    private static void EnsureUniqueOperationIds(SchemaDraft paths)
+    {
+        HashSet<string> used = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, object?> entry in paths.Keywords.OrderBy(
+            item => item.Key, StringComparer.Ordinal))
+        {
+            if (entry.Value is not SchemaDraft path
+                || path.Get(SoapOpenApiOperation.HttpMethod) is not SchemaDraft post
+                || post.Get("operationId") is not string original)
+            {
+                continue;
+            }
+
+            string candidate = original;
+            int suffix = 2;
+            while (!used.Add(candidate))
+            {
+                candidate = original + "_" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                suffix++;
+            }
+
+            post.Set("operationId", candidate);
+        }
     }
 
     /// <summary>Accepte uniquement un chemin HTTP, jamais une URL avec autorité ou secrets.</summary>
@@ -188,7 +216,7 @@ public static class SoapOpenApiDocumentBuilder
                 "- " + operation.Name + " (" + operation.Pattern + ", " + action + ")");
         }
 
-        return string.Join("\\n", descriptions);
+        return string.Join("\n", descriptions);
     }
 
     private static void PopulateOperation(

@@ -8,6 +8,67 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Projection;
 public sealed class SoapOpenApiDocumentBuilderTests
 {
     [Fact]
+    public void Build_assigns_unique_operation_ids_across_distinct_soap_endpoints()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding firstBinding = new("FirstBinding", "document", "literal",
+            null, SoapVersion.Soap11, null, location);
+        WsdlBinding secondBinding = firstBinding with { Name = "SecondBinding" };
+        WsdlOperation first = new("Ping", MessagePattern.OneWay,
+            null, null, [], firstBinding, null, location);
+        WsdlOperation second = first with { Binding = secondBinding };
+        WsdlContract contract = new([], [first, second],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+        Dictionary<string, string> endpoints = new(StringComparer.Ordinal)
+        {
+            ["FirstBinding"] = "/a",
+            ["SecondBinding"] = "/b",
+        };
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(
+            contract, "SOAP", "1.0", endpoints);
+
+        document.Section("paths").Section("/a").Section("post")
+            .Get("operationId").Should().Be("Ping");
+        document.Section("paths").Section("/b").Section("post")
+            .Get("operationId").Should().Be("Ping_2");
+    }
+
+    [Fact]
+    public void Build_assigns_unique_ids_to_shared_and_single_operation_endpoints()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding firstBinding = new("FirstBinding", "document", "literal",
+            null, SoapVersion.Soap11, null, location);
+        WsdlBinding secondBinding = firstBinding with { Name = "SecondBinding" };
+        WsdlBinding thirdBinding = firstBinding with { Name = "ThirdBinding" };
+        WsdlOperation first = new("First", MessagePattern.OneWay,
+            null, null, [], firstBinding, null, location);
+        WsdlOperation second = first with { Name = "Second", Binding = secondBinding };
+        WsdlOperation third = first with { Name = "soapEndpoint", Binding = thirdBinding };
+        WsdlContract contract = new([], [first, second, third],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+        Dictionary<string, string> endpoints = new(StringComparer.Ordinal)
+        {
+            ["FirstBinding"] = "/a",
+            ["SecondBinding"] = "/a",
+            ["ThirdBinding"] = "/b",
+        };
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(
+            contract, "SOAP", "1.0", endpoints);
+
+        SchemaDraft shared = document.Section("paths").Section("/a").Section("post");
+        shared.Get("operationId").Should().Be("soapEndpoint");
+        shared.Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("First").And.Contain("Second");
+        shared.Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("\n- Second");
+        document.Section("paths").Section("/b").Section("post")
+            .Get("operationId").Should().Be("soapEndpoint_2");
+    }
+
+    [Fact]
     public void Build_exposes_declared_soap_faults_as_default_response()
     {
         WsdlLocation location = new("service.wsdl", "operation", 1, 1);
