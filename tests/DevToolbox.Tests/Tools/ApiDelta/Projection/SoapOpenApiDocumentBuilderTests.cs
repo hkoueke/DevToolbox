@@ -7,6 +7,28 @@ namespace DevToolbox.Tests.Tools.ApiDelta.Projection;
 
 public sealed class SoapOpenApiDocumentBuilderTests
 {
+    [Fact]
+    public void Build_exposes_declared_soap_faults_as_default_response()
+    {
+        WsdlLocation location = new("service.wsdl", "operation", 1, 1);
+        WsdlBinding binding = new("Binding", "document", "literal",
+            null, SoapVersion.Soap11, null, location);
+        WsdlMessage fault = new("urn:test:ValidationFault", [], location);
+        WsdlOperation operation = new("Call", MessagePattern.OneWay,
+            null, null, [fault], binding, null, location);
+        WsdlContract contract = new([], [operation],
+            new Dictionary<string, XsdType>(StringComparer.Ordinal), [], [], ".");
+
+        SchemaDraft document = SoapOpenApiDocumentBuilder.Build(
+            contract, "SOAP", "1.0", "/soap");
+
+        SchemaDraft responses = document.Section("paths").Section("/soap")
+            .Section("post").Section("responses");
+        responses.Section("default").Get("description").Should().BeOfType<string>()
+            .Which.Should().Contain("ValidationFault");
+        responses.Section("default").Section("content").Keywords.Keys.Should().Contain("text/xml");
+    }
+
     [Theory]
     [InlineData("//secret.example/soap")]
     [InlineData("/soap?token=secret")]

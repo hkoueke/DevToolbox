@@ -164,6 +164,7 @@ public static class SoapOpenApiDocumentBuilder
         {
             responses.Section("202").Set("description", "Message SOAP accepté sans réponse métier");
         }
+        AddFaultResponse(responses, operations);
         foreach (WsdlOperation operation in operations.Where(operation => operation.HasResponse))
         {
             WsdlBinding binding = operation.Binding!;
@@ -214,10 +215,42 @@ public static class SoapOpenApiDocumentBuilder
             SetXmlContent(success.Section("content").Section(mediaType), binding.Soap);
         }
 
+        AddFaultResponse(post.Section("responses"), [operation]);
+
         if (binding.SoapAction is not null)
         {
             post.Set("description",
                 (operation.Documentation ?? operation.Name) + "\nSOAPAction = " + (char)34 + binding.SoapAction + (char)34);
+        }
+    }
+
+    /// <summary>Expose les faults déclarés sans supposer leur statut HTTP.</summary>
+    private static void AddFaultResponse(
+        SchemaDraft responses, IReadOnlyList<WsdlOperation> operations)
+    {
+        string[] names =
+        [
+            .. operations.SelectMany(operation => operation.Faults)
+                .Select(fault => fault.Name)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal),
+        ];
+        if (names.Length == 0)
+        {
+            return;
+        }
+
+        SchemaDraft fault = responses.Section("default");
+        fault.Set("description", "SOAP Faults déclarés dans le WSDL : "
+            + string.Join(", ", names)
+            + ". Aucun code HTTP particulier n'est garanti par le contrat.");
+        foreach (SoapVersion version in operations
+            .Where(operation => operation.Faults.Count > 0)
+            .Select(operation => operation.Binding!.Soap)
+            .Distinct())
+        {
+            SetXmlContent(fault.Section("content")
+                .Section(SoapOpenApiOperation.RequestMediaType(version)!), version);
         }
     }
 
