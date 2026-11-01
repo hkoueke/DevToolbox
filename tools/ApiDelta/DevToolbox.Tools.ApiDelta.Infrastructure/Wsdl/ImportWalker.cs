@@ -178,6 +178,14 @@ internal sealed class ImportWalker
             return;
         }
 
+        if (!Inside(materialised))
+        {
+            Decline(targeted, where, location,
+                "Le fichier matérialisé quitte la racine de confinement ou passe par un lien.",
+                WsdlDiagnosticCodes.ImportOutsideRoot);
+            return;
+        }
+
         Accept(
             materialised, Path.GetFileName(materialised),
             Path.GetDirectoryName(Path.GetFullPath(materialised)) ?? ".", containing, location, depth);
@@ -243,9 +251,8 @@ internal sealed class ImportWalker
             return;
         }
 
-        byte[] content = File.ReadAllBytes(path);
-
-        if (content.LongLength > _limits.MaxDocumentBytes)
+        byte[]? content = BoundedDocumentReader.Read(path, _limits.MaxDocumentBytes);
+        if (content is null)
         {
             _diagnostics.Add(Budget("la taille d'un document", _limits.MaxDocumentBytes, path));
 

@@ -82,10 +82,10 @@ internal sealed class WsdlImportWalker(
             return;
         }
 
-        byte[] bytes;
+        byte[]? bytes;
         try
         {
-            bytes = File.ReadAllBytes(path);
+            bytes = BoundedDocumentReader.Read(path, limits.MaxDocumentBytes);
         }
         catch (IOException failure)
         {
@@ -93,7 +93,7 @@ internal sealed class WsdlImportWalker(
             return;
         }
 
-        if (bytes.LongLength > limits.MaxDocumentBytes)
+        if (bytes is null)
         {
             Refuse(DiagnosticCodes.LimitReached, "Document WSDL importé trop volumineux.", path);
             return;

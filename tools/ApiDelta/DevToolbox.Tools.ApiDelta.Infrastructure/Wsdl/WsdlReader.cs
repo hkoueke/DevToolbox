@@ -40,7 +40,12 @@ public sealed class WsdlReader : IWsdlReader
         ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(policy);
 
-        byte[] content = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        byte[]? content = await BoundedDocumentReader.ReadAsync(path, limits.MaxDocumentBytes, cancellationToken)
+            .ConfigureAwait(false);
+        if (content is null)
+        {
+            return WsdlReadResult.Refused([Budget("la taille d'un document", limits.MaxDocumentBytes, path)]);
+        }
 
         return Read(content, path, limits, policy, retrieved ?? RetrievalMap.Empty);
     }
