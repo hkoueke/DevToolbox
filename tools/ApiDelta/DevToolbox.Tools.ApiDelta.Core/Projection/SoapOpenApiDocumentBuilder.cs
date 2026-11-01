@@ -95,7 +95,7 @@ public static class SoapOpenApiDocumentBuilder
             WsdlBinding binding = operation.Binding!;
             string action = binding.SoapAction is null
                 ? "SOAPAction non spécifiée"
-                : "SOAPAction = \\"" + binding.SoapAction + "\\"";
+                : "SOAPAction = " + (char)34 + binding.SoapAction + (char)34;
             descriptions.Add(
                 "- " + operation.Name + " (" + operation.Pattern + ", " + action + ")");
         }
@@ -130,7 +130,7 @@ public static class SoapOpenApiDocumentBuilder
         if (binding.SoapAction is not null)
         {
             post.Set("description",
-                (operation.Documentation ?? operation.Name) + "\\nSOAPAction = \\"" + binding.SoapAction + "\\"");
+                (operation.Documentation ?? operation.Name) + "\nSOAPAction = " + (char)34 + binding.SoapAction + (char)34);
         }
     }
 
