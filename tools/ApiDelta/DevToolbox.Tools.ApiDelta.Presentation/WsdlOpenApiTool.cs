@@ -1,3 +1,4 @@
+using System.Globalization;
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
@@ -31,10 +32,10 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
         try
         {
             console.Clear();
-            string source = console.Ask<string>("Fichier WSDL local :");
-            string target = console.Ask<string>("Fichier YAML de sortie :");
-            string title = console.Ask<string>("Titre OpenAPI :");
-            string version = console.Ask<string>("Version OpenAPI du service :", "1.0.0");
+            string source = await console.AskAsync<string>("Fichier WSDL local :", CultureInfo.InvariantCulture, cancellationToken: cancellationToken).ConfigureAwait(false);
+            string target = await console.AskAsync<string>("Fichier YAML de sortie :", CultureInfo.InvariantCulture, cancellationToken: cancellationToken).ConfigureAwait(false);
+            string title = await console.AskAsync<string>("Titre OpenAPI :", CultureInfo.InvariantCulture, cancellationToken: cancellationToken).ConfigureAwait(false);
+            string version = await console.AskAsync<string>("Version OpenAPI du service :", CultureInfo.InvariantCulture, cancellationToken: cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             string sourcePath = Path.GetFullPath(source);
             string targetPath = Path.GetFullPath(target);
@@ -52,12 +53,7 @@ public sealed class WsdlOpenApiTool(IWsdlOpenApiExporter exporter, IAnsiConsole 
             string yaml = await exporter.ExportAsync(
                 sourcePath, title, version, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            await using (FileStream output = new(
-                targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            await using (StreamWriter writer = new(output))
-            {
-                await writer.WriteAsync(yaml.AsMemory(), cancellationToken).ConfigureAwait(false);
-            }
+            await File.WriteAllTextAsync(targetPath, yaml, cancellationToken).ConfigureAwait(false);
 
             step.Complete(DateTimeOffset.UtcNow);
             run.End(RunOutcome.Success, DateTimeOffset.UtcNow);
