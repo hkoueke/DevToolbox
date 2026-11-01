@@ -96,7 +96,8 @@ public sealed class AuthorStep : IToolStep
     {
         try
         {
-            ProjectionResult authored = AuthoredProjection.Apply(projected, settled);
+            ProjectionResult authored = AuthoredProjection.Apply(projected, settled,
+                context.Get<SpecDocument>(ApiDeltaContextKeys.ProductionDocument)!);
             context.Set(ApiDeltaContextKeys.CandidateDocument, authored.Document);
             WsdlFooting footing = context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting) ?? WsdlFooting.None;
             context.Set(ApiDeltaContextKeys.WsdlFooting, footing with

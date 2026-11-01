@@ -64,6 +64,8 @@ public sealed class AuthoredPipelineTests
         // L’étendue YAML relue peut inclure l’indentation du nouveau membre suivant.
         Bytes(corrected, after).Should().StartWith(Bytes(run.Production, before));
         PointerNavigator.Find(corrected.Root, At(route.Selector).Json).Should().NotBeNull();
+        PointerNavigator.Find(corrected.Root, At(route.Selector).Child("operationId").Json).Should().BeNull();
+        (after as MappingNode)!.Find("operationId").Should().BeOfType<ScalarNode>().Which.Text.Should().Be("deposerDocument");
         built.Marks.Should().Contain(mark => mark.Derived != null && string.Equals(mark.Derived.Subject, "deposerDocument", StringComparison.Ordinal));
         var verification = run.Verify(built);
         verification.Established.Should().BeTrue(verification.Explanation);
@@ -92,6 +94,8 @@ public sealed class AuthoredPipelineTests
         item.Find("get").Should().NotBeNull();
         item.Find("put").Should().NotBeNull();
         item.Entries.Should().HaveCount(existingPath ? 3 : 2);
+        (item.Find("get") as MappingNode)!.Find("operationId").Should().BeOfType<ScalarNode>().Which.Text.Should().Be("creerClient");
+        (item.Find("put") as MappingNode)!.Find("operationId").Should().BeOfType<ScalarNode>().Which.Text.Should().Be("modifierClient");
         var verification = run.Verify(built);
         verification.Established.Should().BeTrue(verification.Explanation);
     }
