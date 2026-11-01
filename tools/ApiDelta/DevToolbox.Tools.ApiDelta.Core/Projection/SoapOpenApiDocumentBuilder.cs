@@ -56,6 +56,78 @@ public static class SoapOpenApiDocumentBuilder
         return document;
     }
 
+    /// <summary>
+    /// Projette plusieurs endpoints SOAP à partir d'une correspondance explicite
+    /// entre noms de bindings WSDL et chemins HTTP fournis par l'appelant.
+    /// </summary>
+    /// <remarks>
+    /// Aucun chemin n'est dérivé du nom d'une opération. Un binding non référencé
+    /// n'est pas exposé, et plusieurs bindings partageant un chemin sont regroupés
+    /// dans une seule opération HTTP POST.
+    /// </remarks>
+    public static SchemaDraft Build(
+        WsdlContract contract, string title, string version,
+        IReadOnlyDictionary<string, string> endpointPaths)
+    {
+        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(endpointPaths);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+
+        SchemaDraft document = new();
+        document.Set("openapi", "3.0.3");
+        SchemaDraft info = document.Section("info");
+        info.Set("title", title);
+        info.Set("version", version);
+        SchemaDraft paths = document.Section("paths");
+
+        Dictionary<string, List<WsdlOperation>> groups = new(StringComparer.Ordinal);
+        foreach (WsdlOperation operation in contract.Operations)
+        {
+            if (operation.Binding is not { Soap: not SoapVersion.None } binding
+                || operation.Pattern is not (MessagePattern.OneWay or MessagePattern.RequestResponse)
+                || !endpointPaths.TryGetValue(binding.Name, out string? path))
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(path) || path[0] != '/'
+                || path.Contains('?', StringComparison.Ordinal)
+                || path.Contains('#', StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "Le chemin SOAP doit être absolu, sans requête ni fragment : " + binding.Name,
+                    nameof(endpointPaths));
+            }
+
+            if (!groups.TryGetValue(path, out List<WsdlOperation>? group))
+            {
+                group = [];
+                groups.Add(path, group);
+            }
+
+            group.Add(operation);
+        }
+
+        foreach (KeyValuePair<string, List<WsdlOperation>> group in groups.OrderBy(
+            entry => entry.Key, StringComparer.Ordinal))
+        {
+            SchemaDraft post = paths.Section(group.Key).Section(SoapOpenApiOperation.HttpMethod);
+            if (group.Value.Count == 1)
+            {
+                WsdlOperation operation = group.Value[0];
+                PopulateOperation(post, operation, operation.Binding!,
+                    SoapOpenApiOperation.RequestMediaType(operation.Binding!.Soap)!);
+            }
+            else
+            {
+                PopulateSharedEndpoint(post, group.Value);
+            }
+        }
+
+        return document;
+    }
+
     /// <summary>Représente les opérations par un POST standard sur leur endpoint commun.</summary>
     private static void PopulateSharedEndpoint(SchemaDraft post, List<WsdlOperation> operations)
     {
