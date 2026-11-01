@@ -147,6 +147,16 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
+        // Discover the complete WSDL import graph before deciding whether the contract
+        // can be assembled. Until cross-document QName binding is implemented,
+        // DefinitionsReader still refuses imports rather than returning a partial contract.
+        if (root.Name == XNamespace.Get(WsdlNamespaces.Wsdl11) + "definitions"
+            && root.Elements(XNamespace.Get(WsdlNamespaces.Wsdl11) + "import").Any())
+        {
+            WsdlImportWalker imports = new(limits, policy, retrieved, diagnostics);
+            imports.Walk(root, name);
+        }
+
         Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
 
         return definitions is null
