@@ -3,9 +3,8 @@ namespace DevToolbox.Tools.ApiDelta.Core.Authoring;
 /// <summary>Toutes les routes composées d'une exécution.</summary>
 /// <param name="Routes">Dans l'ordre où le développeur les a composées.</param>
 /// <remarks>
-/// L'ordre de composition est gardé parce qu'il est celui des points d'insertion : une route placée
-/// « après la précédente » désigne la précédente de cette liste, et réordonner la liste changerait où les
-/// routes atterrissent.
+/// L'ordre de composition détermine celui des nouveaux chemins partageant une position d'insertion.
+/// Pour plusieurs méthodes d'un même chemin neuf, la première méthode retenue fixe cette position.
 /// </remarks>
 public sealed record AuthoringRecord(IReadOnlyList<AuthoredRoute> Routes)
 {

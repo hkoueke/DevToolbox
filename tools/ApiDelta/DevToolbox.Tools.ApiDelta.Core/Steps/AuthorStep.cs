@@ -3,6 +3,7 @@ using DevToolbox.Domain.Results;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core.Abstractions;
 using DevToolbox.Tools.ApiDelta.Core.Authoring;
+using DevToolbox.Tools.ApiDelta.Core.Correction;
 using DevToolbox.Tools.ApiDelta.Core.Operations;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Syntax;
@@ -44,7 +45,7 @@ public sealed class AuthorStep : IToolStep
     /// <inheritdoc />
     /// <remarks>
     /// Idempotente au sens de la chaîne : rejouée, elle repose les questions que le registre n'a pas
-    /// déjà résolues, et n'écrit rien d'autre que ce registre.
+    /// déjà résolues. Le candidat est toujours reconstruit depuis la projection source intacte.
     /// </remarks>
     public bool IsIdempotent => true;
 
@@ -87,7 +88,30 @@ public sealed class AuthorStep : IToolStep
 
         context.Set(ApiDeltaContextKeys.Authoring, settled);
 
-        return Established(settled, production);
+        Result established = Established(settled, production);
+        return established.IsFailure ? established : Apply(context, contract, projected, settled);
+    }
+
+    private static Result Apply(ToolRunContext context, WsdlContract contract, ProjectionResult projected, AuthoringRecord settled)
+    {
+        try
+        {
+            ProjectionResult authored = AuthoredProjection.Apply(projected, settled);
+            context.Set(ApiDeltaContextKeys.CandidateDocument, authored.Document);
+            WsdlFooting footing = context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting) ?? WsdlFooting.None;
+            context.Set(ApiDeltaContextKeys.WsdlFooting, footing with
+            {
+                Derivation = DerivationIndex.From(contract, authored),
+                Projection = authored,
+                AuthoringApplied = true,
+            });
+
+            return Result.Success();
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Result.Fail(FailureReason.InvalidInput, exception.Message);
+        }
     }
 
     /// <summary>Une entrée par opération du contrat, avec ses champs et sa suggestion.</summary>

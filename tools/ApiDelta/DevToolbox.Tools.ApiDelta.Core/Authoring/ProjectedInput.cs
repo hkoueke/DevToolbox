@@ -52,6 +52,13 @@ internal sealed class ProjectedInput(MappingNode operation, SpecNode document)
 
     internal MappingNode BodySchema(IReadOnlyList<FieldPlacement> fields)
     {
+        MappingNode? original = Content is { Entries.Count: > 0 } content && content.Entries[0].Value is MappingNode media
+            ? Resolve(media.Find("schema"), []) : null;
+        if (original is not null && Compositions.Any(keyword => original.Find(keyword) is SequenceNode))
+        {
+            return ComposedBody(original, fields);
+        }
+
         List<MappingEntry> properties = [];
         List<SpecNode> required = [];
         foreach (FieldPlacement field in fields)
@@ -68,8 +75,7 @@ internal sealed class ProjectedInput(MappingNode operation, SpecNode document)
             new(TreeEdits.Key("type"), TreeEdits.Key("object")),
             new(TreeEdits.Key("properties"), TreeEdits.Mapping(SpecPointer.Root, properties)),
         ];
-        if (Content is { Entries.Count: > 0 } content && content.Entries[0].Value is MappingNode media
-            && Resolve(media.Find("schema"), []) is { } original)
+        if (original is not null)
         {
             schema.AddRange(original.Entries.Where(entry => entry.Key.Text is "xml" or "nullable" or "additionalProperties"));
         }
@@ -80,6 +86,52 @@ internal sealed class ProjectedInput(MappingNode operation, SpecNode document)
         }
 
         return TreeEdits.Mapping(SpecPointer.Root, schema);
+    }
+
+    private MappingNode ComposedBody(MappingNode original, IReadOnlyList<FieldPlacement> fields)
+    {
+        HashSet<string> names = new(StringComparer.Ordinal);
+        PropertyNames(original, names, []);
+        if (!names.SetEquals(fields.Select(field => field.Field))
+            || fields.Any(field => !string.Equals(field.Field, field.Effective, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("Le corps utilise une composition (oneOf, anyOf ou allOf). "
+                + "Ses champs doivent rester ensemble dans le corps, sans déplacement, exclusion ou renommage ; "
+                + "ces choix feraient perdre les contraintes du contrat.");
+        }
+
+        List<MappingEntry> entries = [.. original.Entries.Where(entry => !string.Equals(entry.Key.Text, "required", StringComparison.Ordinal))];
+        SpecNode[] required = [.. fields.Where(field => field.Required).Select(field => TreeEdits.Key(field.Effective))];
+        if (required.Length > 0)
+        {
+            entries.Add(new MappingEntry(TreeEdits.Key("required"), TreeEdits.Sequence(SpecPointer.Root, required)));
+        }
+
+        return TreeEdits.Mapping(SpecPointer.Root, entries);
+    }
+
+    private void PropertyNames(SpecNode schema, HashSet<string> names, HashSet<string> seen)
+    {
+        if (Resolve(schema, seen) is not { } resolved)
+        {
+            return;
+        }
+
+        if (resolved.Find("properties") is MappingNode properties)
+        {
+            names.UnionWith(properties.Entries.Select(entry => entry.Key.Text));
+        }
+
+        foreach (string keyword in Compositions)
+        {
+            if (resolved.Find(keyword) is SequenceNode branches)
+            {
+                foreach (SpecNode branch in branches.Items)
+                {
+                    PropertyNames(branch, names, new HashSet<string>(seen, StringComparer.Ordinal));
+                }
+            }
+        }
     }
 
     private SpecNode? Find(SpecNode? schema, string field, HashSet<string> seen)

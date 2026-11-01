@@ -128,12 +128,12 @@ public static class OperationAssembly
         }
 
         FieldPlacement[] fields = [.. route.InBody];
+        SpecNode schema = input.BodySchema(fields);
         if (fields.Length == 0)
         {
             return null;
         }
 
-        SpecNode schema = input.BodySchema(fields);
         List<MappingEntry> media = input.Content is { } content
             ? [.. content.Entries.Select(entry => new MappingEntry(entry.Key,
                 TreeEdits.Mapping(SpecPointer.Root,

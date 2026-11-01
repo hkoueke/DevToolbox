@@ -153,6 +153,29 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
     }
 
     [Theory]
+    [InlineData("filter", "urn:types:Filter")]
+    [InlineData("tags", "xs:string")]
+    public async Task A_composite_placeholder_is_explained_and_the_path_can_be_corrected(string field, string declared)
+    {
+        using TestConsole console = NewConsole();
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushTextWithEnter("/items/{" + field + "}");
+        console.Input.PushTextWithEnter("/items");
+        console.Input.PushKey(ConsoleKey.Enter); // POST
+        console.Input.PushKey(ConsoleKey.Enter); // body
+        console.Input.PushKey(ConsoleKey.Enter); // optional
+        AuthoringSubject subject = new("Create", [(field, declared, true)],
+            new OperationSelector("/items", HttpOperationMethod.Post), RouteDerivationKind.Derived);
+
+        var result = await new RouteAuthoringPrompt(console).AuthorAsync([subject], [], [], CancellationToken.None);
+
+        result.Routes.Should().ContainSingle().Which.Path.Should().Be("/items");
+        result.Routes[0].Placements.Should().ContainSingle().Which.Location.Should().Be(ParameterLocation.Body);
+        console.Output.Should().Contain("Un objet ou une liste").And.Contain(field).And.Contain("Choisissez un chemin");
+    }
+
+    [Theory]
     [InlineData(false, false, false, "Aucun fichier fusionné")]
     [InlineData(false, true, false, "Fichier fusionné")]
     [InlineData(true, true, false, "Votre fichier d’origine est conservé")]

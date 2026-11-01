@@ -231,13 +231,32 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
 
             Result<string> read = RouteSyntax.Path(typed);
 
-            if (read.IsSuccess)
+            if (read.IsSuccess && CompatiblePath(subject, read.Value))
             {
                 return read.Value;
             }
 
-            _console.MarkupLine("[yellow]" + Markup.Escape(read.Failure!.Message) + "[/]");
+            if (read.IsFailure)
+            {
+                _console.MarkupLine("[yellow]" + Markup.Escape(read.Failure!.Message) + "[/]");
+            }
         }
+    }
+
+    private bool CompatiblePath(AuthoringSubject subject, string path)
+    {
+        HashSet<string> placeholders = new(RouteSyntax.Placeholders(path), StringComparer.Ordinal);
+        string[] invalid = [.. subject.Fields.Where(field => !PlacementRules.Allows(field.IsComposite, ParameterLocation.Path)
+                && placeholders.Contains(field.Field))
+            .Select(field => field.Field)];
+        if (invalid.Length == 0)
+        {
+            return true;
+        }
+
+        _console.MarkupLine("[yellow]Un objet ou une liste ne peut pas être placé dans l'adresse : "
+            + Markup.Escape(string.Join(", ", invalid)) + ". Choisissez un chemin sans ces paramètres.[/]");
+        return false;
     }
 
     /// <summary>Demande le verbe, en refusant ce qu'OpenAPI ne définit pas.</summary>

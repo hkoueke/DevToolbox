@@ -277,7 +277,7 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
         SpecNode marked;
         try
         {
-            marked = authored is { } composed
+            marked = authored is { } composed && request.Footing?.AuthoringApplied is not true
                 ? OperationAssembly.Compose(source, composed, composed.Headers, request.Candidate.Root)
                 : source;
         }
@@ -287,7 +287,7 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
             return;
         }
 
-        ledger.Splices.Add(Grafted(item, target, marked, pathHeld, authored));
+        Graft(ledger, item, target, marked, pathHeld, authored);
 
         if (pathHeld && origin is { } derived)
         {
@@ -304,20 +304,39 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
     /// La méthode est ajoutée sous le chemin que la production porte, et jamais à la place : c'est la
     /// forme de l'épissure qui le tient, et non une vérification qu'on pourrait oublier de faire.
     /// </remarks>
-    private static Splice Grafted(
+    private static void Graft(
+        Ledger ledger,
         SpecPointer item,
         OperationSelector target,
         SpecNode marked,
         bool pathHeld,
-        AuthoredRoute? authored) =>
-        pathHeld
-            ? new Splice(SpliceKind.Add, item, target.MethodKey, marked)
-            : new Splice(
+        AuthoredRoute? authored)
+    {
+        if (pathHeld)
+        {
+            ledger.Splices.Add(new Splice(SpliceKind.Add, item, target.MethodKey, marked));
+            return;
+        }
+
+        int existing = ledger.Splices.FindIndex(splice => splice.Kind is SpliceKind.Add
+            && string.Equals(splice.Target.Json, "/paths", StringComparison.Ordinal)
+            && string.Equals(splice.Key, target.Path, StringComparison.Ordinal));
+        if (existing >= 0 && ledger.Splices[existing].Value is MappingNode path)
+        {
+            ledger.Splices[existing] = ledger.Splices[existing] with
+            {
+                Value = TreeEdits.Mapping(item, [.. path.Entries, new MappingEntry(TreeEdits.Key(target.MethodKey), marked)]),
+            };
+            return;
+        }
+
+        ledger.Splices.Add(new Splice(
                 SpliceKind.Add,
                 SpecPointer.Root.Child(Paths),
                 target.Path,
                 TreeEdits.Mapping(item, [new MappingEntry(TreeEdits.Key(target.MethodKey), marked)]),
-                AfterKey: authored?.Insertion.AfterPath);
+                AfterKey: authored?.Insertion.AfterPath));
+    }
 
     /// <summary>La route composée pour l'opération dont une route projetée vient, s'il y en a une.</summary>
     /// <remarks>

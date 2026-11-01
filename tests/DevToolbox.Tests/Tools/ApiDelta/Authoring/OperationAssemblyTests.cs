@@ -111,6 +111,76 @@ public sealed class OperationAssemblyTests
         At<ScalarNode>(composed, "/parameters/0/$ref").Text.Should().Be("#/components/parameters/Trace");
     }
 
+    [Theory]
+    [InlineData("oneOf")]
+    [InlineData("anyOf")]
+    [InlineData("allOf")]
+    public void Whole_body_compositions_keep_their_branches_constraints_and_conditional_requiredness(string keyword)
+    {
+        var (root, operation) = Composed(keyword);
+        SpecNode composed = OperationAssembly.Compose(operation, Route([
+            new("left", "xs:string", false, ParameterLocation.Body, false),
+            new("right", "xs:int", false, ParameterLocation.Body, false),
+        ]), [], root);
+
+        const string Schema = "/requestBody/content/application~1json/schema";
+        At<SequenceNode>(composed, Schema + "/" + keyword).Items.Should().HaveCount(2);
+        At<ScalarNode>(composed, Schema + "/" + keyword + "/0/required/0").Text.Should().Be("left");
+        At<ScalarNode>(composed, Schema + "/" + keyword + "/1/required/0").Text.Should().Be("right");
+        At<ScalarNode>(composed, Schema + "/" + keyword + "/1/properties/right/minimum").Text.Should().Be("1");
+        PointerNavigator.Find(composed, Schema + "/required").Should().BeNull("les obligations conditionnelles restent dans les branches");
+        At<ScalarNode>(composed, "/requestBody/required").Text.Should().Be("false");
+        At<SequenceNode>(root, "/components/schemas/Input/" + keyword).Items.Should().HaveCount(2);
+    }
+
+    [Theory]
+    [InlineData(ParameterLocation.Path)]
+    [InlineData(ParameterLocation.Query)]
+    [InlineData(ParameterLocation.Header)]
+    [InlineData(ParameterLocation.Nowhere)]
+    public void Splitting_a_composition_is_refused_instead_of_flattened(ParameterLocation location)
+    {
+        var (root, operation) = Composed("oneOf");
+        Action compose = () => OperationAssembly.Compose(operation, Route([
+            new("left", "xs:string", false, location, false),
+            new("right", "xs:int", false, ParameterLocation.Body, false),
+        ]), [], root);
+
+        compose.Should().Throw<InvalidOperationException>().WithMessage("*composition*corps*");
+    }
+
+    [Fact]
+    public void Moving_every_composed_field_out_of_the_body_is_also_refused()
+    {
+        var (root, operation) = Composed("oneOf");
+        Action compose = () => OperationAssembly.Compose(operation, Route([
+            new("left", "xs:string", false, ParameterLocation.Query, false),
+            new("right", "xs:int", false, ParameterLocation.Query, false),
+        ]), [], root);
+
+        compose.Should().Throw<InvalidOperationException>().WithMessage("*composition*");
+    }
+
+    private static (SpecNode Root, MappingNode Operation) Composed(string keyword)
+    {
+        SchemaDraft draft = new();
+        SchemaDraft input = draft.Section("components").Section("schemas").Section("Input");
+        SchemaDraft left = new();
+        left.Property("left").Set("type", "string");
+        left.Append("required", "left");
+        SchemaDraft right = new();
+        right.Property("right").Set("type", "integer");
+        right.Property("right").Set("minimum", 1);
+        right.Append("required", "right");
+        input.Append(keyword, left);
+        input.Append(keyword, right);
+        SchemaDraft operation = draft.Section("paths").Section("/source").Section("post");
+        operation.Section("requestBody").Section("content").Section("application/json").Section("schema")
+            .Set("$ref", "#/components/schemas/Input");
+        SpecNode root = DraftWriter.Write(draft, SpecPointer.Root);
+        return (root, At<MappingNode>(root, "/paths/~1source/post"));
+    }
+
     private static (SpecNode Root, MappingNode Operation) Projected()
     {
         SchemaDraft draft = new();

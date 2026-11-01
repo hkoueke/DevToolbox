@@ -150,49 +150,49 @@ public sealed class AuthoredRouteEndToEndTests
     [Fact]
     public void A_get_with_placed_fields_declares_parameters_and_no_body()
     {
-        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
 
         // Le cas de la spécification : un champ dans le chemin, deux dans la requête, un écarté.
         AuthoringRecord authored = new(
         [
-            Authored("lireDocument", "/Document/{identifiant}", HttpOperationMethod.Get) with
+            Authored("creerClient", "/Document/{id}", HttpOperationMethod.Get) with
             {
                 Placements =
                 [
-                    Scalar("identifiant", ParameterLocation.Path),
-                    Scalar("date", ParameterLocation.Query, required: true),
-                    Scalar("groupes", ParameterLocation.Query),
-                    Scalar("categorieDossier", ParameterLocation.Nowhere),
+                    Scalar("id", ParameterLocation.Path),
+                    Scalar("enabled", ParameterLocation.Query, required: true),
+                    Scalar("label", ParameterLocation.Query),
+                    Scalar("ignored", ParameterLocation.Nowhere),
                 ],
             },
         ]);
 
         Result<BuiltCorrection> built = run.Build(
-            new CorrectionSelection([run.Route("lireDocument")]), authoring: authored);
+            new CorrectionSelection([run.Route("creerClient")]), authoring: authored);
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
 
         SpecDocument corrected = run.Reread(built.Value.Serialized);
-        const string Operation = "/paths/~1Document~1{identifiant}/get";
+        const string Operation = "/paths/~1Document~1{id}/get";
 
         SequenceNode listed = PointerNavigator.Find(corrected.Root, Operation + "/parameters")
             .Should().BeOfType<SequenceNode>().Subject;
 
         listed.Items.Should().HaveCount(3, "trois champs placés, le quatrième écarté");
 
-        Where(listed, "identifiant").Should().Be("path");
-        Where(listed, "date").Should().Be("query");
-        Where(listed, "groupes").Should().Be("query");
+        Where(listed, "id").Should().Be("path");
+        Where(listed, "enabled").Should().Be("query");
+        Where(listed, "label").Should().Be("query");
 
-        Required(listed, "identifiant").Should().Be("true", "un paramètre de chemin l'est toujours");
-        Required(listed, "date").Should().Be("true", "le développeur l'a dit");
-        Required(listed, "groupes").Should().Be("false", "le contrat ne dit rien, et il n'a rien dit");
+        Required(listed, "id").Should().Be("true", "un paramètre de chemin l'est toujours");
+        Required(listed, "enabled").Should().Be("true", "le développeur l'a dit");
+        Required(listed, "label").Should().Be("false", "le contrat ne dit rien, et il n'a rien dit");
 
         PointerNavigator.Find(corrected.Root, Operation + "/requestBody")
             .Should().BeNull("aucun champ ne va dans le corps");
 
-        Encoding.UTF8.GetString(built.Value.Serialized.Span)
-            .Should().NotContain("categorieDossier", "le champ écarté n'est pas écrit");
+        listed.Items.Cast<MappingNode>().Select(parameter => (parameter.Find("name") as ScalarNode)?.Text)
+            .Should().NotContain("ignored", "le champ écarté ne devient pas un paramètre");
     }
 
     [Fact]
@@ -249,22 +249,22 @@ public sealed class AuthoredRouteEndToEndTests
     [Fact]
     public void A_dropped_field_is_named_in_the_record_and_absent_from_the_document()
     {
-        using WsdlCorrectionRun run = WsdlCorrectionRun.Establish();
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
 
         AuthoringRecord authored = new(
         [
-            Authored("lireDocument", "/Document/Chercher", HttpOperationMethod.Get) with
+            Authored("creerClient", "/Document/Chercher", HttpOperationMethod.Get) with
             {
                 Placements =
                 [
-                    Scalar("identifiant", ParameterLocation.Query),
-                    Scalar("categorieDossier", ParameterLocation.Nowhere),
+                    Scalar("id", ParameterLocation.Query),
+                    Scalar("ignored", ParameterLocation.Nowhere),
                 ],
             },
         ]);
 
         Result<BuiltCorrection> built = run.Build(
-            new CorrectionSelection([run.Route("lireDocument")]), authoring: authored);
+            new CorrectionSelection([run.Route("creerClient")]), authoring: authored);
 
         built.IsSuccess.Should().BeTrue(built.Failure?.Message);
 
@@ -272,11 +272,12 @@ public sealed class AuthoredRouteEndToEndTests
         (string Operation, FieldPlacement Field) dropped =
             authored.Dropped().Should().ContainSingle().Which;
 
-        dropped.Operation.Should().Be("lireDocument");
-        dropped.Field.Field.Should().Be("categorieDossier");
+        dropped.Operation.Should().Be("creerClient");
+        dropped.Field.Field.Should().Be("ignored");
 
-        Encoding.UTF8.GetString(built.Value.Serialized.Span)
-            .Should().NotContain("categorieDossier");
+        SpecNode corrected = run.Reread(built.Value.Serialized).Root;
+        At<SequenceNode>(corrected, "/paths/~1Document~1Chercher/get/parameters").Items.Cast<MappingNode>()
+            .Select(parameter => (parameter.Find("name") as ScalarNode)?.Text).Should().NotContain("ignored");
     }
 
     [Fact]

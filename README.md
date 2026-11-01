@@ -54,6 +54,11 @@ Les réglages personnalisés sont facultatifs. Si un fichier de configuration es
 
 Lors de la composition d’un appel, seuls les champs placés dans le corps y sont conservés, avec le caractère obligatoire choisi. Les paramètres du chemin, de la requête et des en-têtes conservent leurs types et contraintes issus du WSDL, y compris les types simples nommés. Les objets et collections restent dans le corps. L’insertion se fait après un chemin déjà présent dans le fichier de production, ou à la fin ; plusieurs nouveaux chemins au même emplacement gardent l’ordre de sélection.
 
+Les chemins et méthodes choisis sont appliqués avant la comparaison et la sélection des corrections. Plusieurs méthodes sur un même chemin sont regroupées dans une seule entrée ; pour un chemin neuf, la première méthode retenue fixe sa position.
+
+Les contraintes `oneOf`/`anyOf`/`allOf`, y compris leurs obligations conditionnelles, sont conservées lorsque tous leurs champs restent ensemble dans le corps. Un déplacement, une exclusion ou un renommage incompatible est refusé explicitement ; le choix « facultatif » ne supprime pas les obligations conditionnelles des branches.
+
+Un objet ou une liste dans un paramètre de chemin fait redemander l’adresse, avec une explication.
 
 ### Le fichier compagnon peut aussi être un WSDL
 
