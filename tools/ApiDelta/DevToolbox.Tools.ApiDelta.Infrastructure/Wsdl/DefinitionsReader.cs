@@ -49,9 +49,14 @@ internal sealed class DefinitionsReader
             return null;
         }
 
-        if (Imported(root) is { } imported)
+        XElement[] imports = [.. root.Elements(Wsdl + "import")];
+
+        if (imports.Length > 0)
         {
-            RefuseImport(imported);
+            foreach (XElement imported in imports)
+            {
+                RefuseImport(imported);
+            }
 
             return null;
         }
@@ -64,19 +69,6 @@ internal sealed class DefinitionsReader
             [.. Services(root)],
             [.. InlineSchemas(root)]);
     }
-
-    /// <summary>
-    /// Le premier <c>wsdl:import</c> du document, s'il y en a un.
-    /// </summary>
-    /// <remarks>
-    /// Distinct d'un <c>xs:import</c>, et c'est tout le piège : celui-ci répartit les messages, les types
-    /// de port et les liaisons sur plusieurs documents WSDL, là où l'autre ne répartit que des schémas.
-    /// Le suiveur d'imports ne descend que dans les <c>xs:schema</c>, si bien qu'un <c>wsdl:import</c>
-    /// n'était ni suivi ni refusé : le contrat était bâti sur le seul document d'entrée, ses opérations
-    /// importées disparaissaient sans un mot, et la lecture se déclarait fidèle.
-    /// </remarks>
-    private static XElement? Imported(XElement root) =>
-        root.Elements(Wsdl + "import").FirstOrDefault();
 
     /// <summary>
     /// Le message de refus d'un contrat réparti sur plusieurs documents WSDL.
