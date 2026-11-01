@@ -147,43 +147,58 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
-        ValidateImports(root, name, limits, policy, retrieved, diagnostics);
+        IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> imported =
+            ReadImports(root, name, limits, policy, retrieved, diagnostics);
 
-        Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
+        Definitions? definitions = new DefinitionsReader(name, diagnostics)
+            .Read(root, importsResolved: imported.Count > 0 && !diagnostics.Any(d => d.IsBlocking));
 
-        return definitions is null
-            ? WsdlReadResult.Refused(diagnostics)
-            : Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+        if (definitions is null || diagnostics.Any(d => d.IsBlocking))
+        {
+            return WsdlReadResult.Refused(diagnostics);
+        }
+
+        if (imported.Count == 0)
+        {
+            return Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+        }
+
+        return AssembleGraph(name, content, definitions, imported, limits, policy, retrieved, diagnostics);
     }
 
-    /// <summary>Valide les imports sans assembler prématurément le contrat.</summary>
-    private static void ValidateImports(
+    /// <summary>Lit les définitions importées sous les limites et la politique courantes.</summary>
+    private static IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> ReadImports(
         XElement root, string name, WsdlLimits limits, ImportPolicy policy,
         RetrievalMap retrieved, List<Diagnostic> diagnostics)
     {
-        if (root.Name == XNamespace.Get(WsdlNamespaces.Wsdl11) + "definitions"
-            && root.Elements(XNamespace.Get(WsdlNamespaces.Wsdl11) + "import").Any())
+        List<(string Path, Definitions Definitions, WsdlDocument Document)> definitions = [];
+        XNamespace wsdl = WsdlNamespaces.Wsdl11;
+        if (root.Name != wsdl + "definitions" || !root.Elements(wsdl + "import").Any())
         {
-            WsdlImportWalker imports = new(limits, policy, retrieved, diagnostics);
-            imports.Walk(root, name);
-            foreach (var imported in imports.Documents)
-            {
-                if (Deeper(imported.Root, limits.MaxNestingDepth))
-                {
-                    diagnostics.Add(Budget(
-                        "la profondeur d'imbrication d'un document",
-                        limits.MaxNestingDepth, imported.Path));
-                    continue;
-                }
+            return definitions;
+        }
 
-                // Validate every imported definition independently. Cross-document
-                // QName binding is not yet available, so the root still refuses
-                // imports instead of assembling an incomplete contract.
-                _ = new DefinitionsReader(imported.Path, diagnostics)
-                    .Read(imported.Root, importsResolved: true);
+        WsdlImportWalker imports = new(limits, policy, retrieved, diagnostics);
+        imports.Walk(root, name);
+        foreach (var imported in imports.Documents)
+        {
+            if (Deeper(imported.Root, limits.MaxNestingDepth))
+            {
+                diagnostics.Add(Budget(
+                    "la profondeur d'imbrication d'un document",
+                    limits.MaxNestingDepth, imported.Path));
+                continue;
+            }
+
+            Definitions? read = new DefinitionsReader(imported.Path, diagnostics)
+                .Read(imported.Root, importsResolved: true);
+            if (read is not null)
+            {
+                definitions.Add((imported.Path, read, imported.Document));
             }
         }
 
+        return definitions;
     }
 
     /// <summary>
