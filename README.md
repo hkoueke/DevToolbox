@@ -234,3 +234,5 @@ L'export ne crée **aucune route REST fictive** : chaque adresse SOAP exploitabl
 **Limite d'interopérabilité :** la génération de YAML ne garantit pas son acceptation par **Sparky API Manager**. Vérifier la validité OpenAPI du document généré et réaliser un essai d'import dans l'environnement Sparky cible avant publication. Les constructions WSDL/XSD non représentables fidèlement doivent être examinées manuellement.
 
 L'export garantit l'unicité des `operationId` OpenAPI entre les endpoints SOAP, y compris lorsque plusieurs bindings ou opérations partagent un même chemin. Dans ce dernier cas, les opérations SOAP sont répertoriées dans la description du `POST` commun.
+
+Avant l'écriture du YAML, le générateur soumet également la structure JSON équivalente au lecteur sémantique **Microsoft.OpenApi** ; un document rejeté par ce lecteur n'est pas publié. Ce contrôle structurel ne prouve pas la fidélité des messages XSD ni la compatibilité avec une configuration Sparky donnée.

@@ -100,6 +100,25 @@ public sealed class SoapOpenApiYamlExporterTests
     }
 
     [Fact]
+    public void Refuses_structurally_invalid_generated_openapi_before_publication()
+    {
+        Dictionary<string, object?> malformed = new(StringComparer.Ordinal)
+        {
+            ["openapi"] = "3.0.3",
+            ["info"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["title"] = "SOAP",
+            },
+            ["paths"] = new Dictionary<string, object?>(StringComparer.Ordinal),
+        };
+
+        Action validate = () => SoapOpenApiYamlExporter.ValidateOpenApi(malformed);
+
+        validate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*OpenAPI*invalide*");
+    }
+
+    [Fact]
     public void Refuses_contracts_without_soap_endpoints_instead_of_exporting_empty_paths()
     {
         WsdlContract contract = new([], [],

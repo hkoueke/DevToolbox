@@ -1,6 +1,9 @@
+using System.Text.Json;
 using DevToolbox.Tools.ApiDelta.Core.Configuration;
 using DevToolbox.Tools.ApiDelta.Core.Projection;
 using DevToolbox.Tools.ApiDelta.Core.Wsdl;
+using Microsoft.OpenApi;
+using Microsoft.OpenApi.Reader;
 using YamlDotNet.Serialization;
 
 namespace DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
@@ -48,7 +51,30 @@ public static class SoapOpenApiYamlExporter
                 "Aucun endpoint SOAP exploitable n'a été trouvé dans le contrat WSDL.");
         }
 
-        return new SerializerBuilder().Build().Serialize(Convert(draft));
+        object? document = Convert(draft);
+        ValidateOpenApi(document);
+        return new SerializerBuilder().Build().Serialize(document);
+    }
+
+    /// <summary>Rejette un export dont la structure ne respecte pas OpenAPI.</summary>
+    internal static void ValidateOpenApi(object? document)
+    {
+        string json = JsonSerializer.Serialize(document);
+        ReadResult parsed;
+        try
+        {
+            parsed = OpenApiDocument.Parse(json, "json");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException
+            or ArgumentException or NotSupportedException)
+        {
+            throw new InvalidOperationException("Le document OpenAPI généré est invalide.", exception);
+        }
+
+        if (parsed.Document is null || parsed.Diagnostic?.Errors.Count > 0)
+        {
+            throw new InvalidOperationException("Le document OpenAPI généré est invalide.");
+        }
     }
 
     private static object? Convert(object? value) => value switch
