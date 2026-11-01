@@ -305,7 +305,8 @@ public sealed class Projector : Abstractions.IWsdlProjector
                     particle.Location,
                     Particle: particle,
                     Version: version,
-                    KnownTypes: known),
+                    KnownTypes: known,
+                    SchemaNames: schemaNames),
                 draft,
                 gaps);
         }
