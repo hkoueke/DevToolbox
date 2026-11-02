@@ -17,10 +17,10 @@ name: ci-cd
 
 on:
   push:
-    branches: [master, develop]
+    branches: [master, develop, 'release/**', 'hotfix/**']
     tags: ['v*']
   pull_request:
-    branches: [master, develop, feature/wsdl-openapi-export]
+    branches: [master, develop]
   workflow_dispatch:
 
 permissions:
@@ -59,16 +59,17 @@ jobs:
           # Historique complet : le contrôle de balise a besoin de savoir où mène la balise.
           fetch-depth: 0
 
-      - name: Vérifier que la balise est sur master
-        # Une version se coupe sur master, après le report de develop. Une balise posée sur une
-        # branche de travail ne produit pas de release : elle échoue ici, avant toute compilation.
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          $branches = git branch --remotes --contains $env:GITHUB_SHA
-          # -match sur un tableau retourne les lignes qui correspondent : un résultat vide est faux.
-          if (-not ($branches -match 'origin/master$')) {
-            throw "La balise '${{ github.ref_name }}' n'est pas contenue dans origin/master. Fusionnez develop dans master, puis reposez la balise."
-          }
+      - name: Valider GitFlow et provenance de la version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: ./scripts/gitflow/Validate-GitFlow.ps1
+
+      - name: Tester les scénarios GitFlow
+        run: ./scripts/gitflow/Test-GitFlow.ps1
 
       - name: Déduire la version de la balise
         id: version
