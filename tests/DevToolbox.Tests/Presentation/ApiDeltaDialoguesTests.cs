@@ -152,6 +152,32 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
         console.Output.Should().NotContain("après /first");
     }
 
+    [Fact]
+    public async Task A_shared_suggestion_is_explained_and_does_not_block_selecting_another_operation()
+    {
+        using TestConsole console = NewConsole();
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushTextWithEnter("/Document/Types");
+        console.Input.PushKey(ConsoleKey.Enter); // GET
+        console.Input.PushKey(ConsoleKey.Enter); // query
+        console.Input.PushKey(ConsoleKey.Enter); // optional
+        AuthoringSubject[] subjects = [
+            new("AjouterDocuments", [], new OperationSelector("/documents", HttpOperationMethod.Post), RouteDerivationKind.Derived),
+            new("CategoriserDocuments", [], new OperationSelector("/documents", HttpOperationMethod.Post), RouteDerivationKind.Partial),
+            new("ObtenirTypesDocuments", [("produit", "xs:string", false)],
+                new OperationSelector("/typesdocuments", HttpOperationMethod.Get), RouteDerivationKind.Derived),
+        ];
+
+        var result = await new RouteAuthoringPrompt(console).AuthorAsync(subjects, [], [], CancellationToken.None);
+
+        result.Routes.Should().ContainSingle().Which.Operation.Should().Be("ObtenirTypesDocuments");
+        result.Routes[0].Placements.Should().ContainSingle().Which.Location.Should().Be(ParameterLocation.Query);
+        console.Output.Should().Contain("même adresse suggérée").And.Contain("adresse différente");
+    }
+
     [Theory]
     [InlineData("filter", "urn:types:Filter")]
     [InlineData("tags", "xs:string")]

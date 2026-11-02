@@ -72,6 +72,12 @@ public sealed class RouteAuthoringPrompt : IRouteAuthoringPrompt
     /// <summary>Les opérations que le développeur retient.</summary>
     private IEnumerable<AuthoringSubject> Kept(IReadOnlyList<AuthoringSubject> subjects)
     {
+        if (subjects.GroupBy(subject => subject.Suggested).Any(group => group.Count() > 1))
+        {
+            _console.MarkupLine("[yellow]Plusieurs opérations ont la même adresse suggérée. Choisissez celles à ajouter ; "
+                + "vous pourrez définir une adresse différente pour chacune.[/]");
+        }
+
         _console.MarkupLine(
             CultureInfo.InvariantCulture,
             "Le WSDL contient [bold]{0}[/] opération(s). Choisissez celles à ajouter, puis définissez leur appel HTTP.",

@@ -21,8 +21,9 @@ internal static class XsdTypeReader
 {
     /// <summary>Relève les éléments globaux et le type de chacun.</summary>
     /// <param name="set">Le jeu compilé.</param>
+    /// <param name="names">Les noms stables des types globaux et en ligne.</param>
     /// <returns>Les éléments, par nom qualifié.</returns>
-    internal static IReadOnlyDictionary<string, string> Elements(XmlSchemaSet set)
+    internal static IReadOnlyDictionary<string, string> Elements(XmlSchemaSet set, XsdTypeNames names)
     {
         Dictionary<string, string> elements = new(StringComparer.Ordinal);
 
@@ -33,54 +34,47 @@ internal static class XsdTypeReader
                 continue;
             }
 
-            XmlQualifiedName? named = element.ElementSchemaType?.QualifiedName;
+            string named = names.NameOf(element.ElementSchemaType);
 
-            if (named is null || named.IsEmpty)
+            if (string.IsNullOrEmpty(named))
             {
                 continue;
             }
 
-            elements[element.QualifiedName.ToString()] = named.ToString();
+            elements[element.QualifiedName.ToString()] = named;
         }
 
         return elements;
     }
 
-    /// <summary>Relève les types globaux du jeu.</summary>
+    /// <summary>Relève les types globaux et en ligne du jeu.</summary>
     /// <param name="set">Le jeu compilé.</param>
+    /// <param name="names">Les noms stables des types globaux et en ligne.</param>
     /// <param name="document">Le document d'entrée, pour les emplacements.</param>
     /// <param name="limits">Le budget, dont celui des valeurs d'une énumération.</param>
     /// <param name="diagnostics">Où consigner un budget atteint.</param>
     /// <returns>Les types, par nom qualifié.</returns>
     internal static IReadOnlyDictionary<string, XsdType> Read(
         XmlSchemaSet set,
+        XsdTypeNames names,
         string document,
         WsdlLimits limits,
         List<Core.Loading.Diagnostic> diagnostics)
     {
         Dictionary<string, XsdType> types = new(StringComparer.Ordinal);
 
-        foreach (XmlSchemaType type in set.GlobalTypes.Values.OfType<XmlSchemaType>())
+        foreach (var (name, type) in names.Types)
         {
-            // Les types intégrés de XSD ne sont pas le contrat : « anyType » y figurait, et la projection
-            // l'aurait parcouru comme un type du service.
-            if (type.QualifiedName.IsEmpty
-                || string.Equals(
-                    type.QualifiedName.Namespace, WsdlNamespaces.Schema, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            XsdType described = Describe(type, document, set);
+            XsdType described = Describe(type, document, set, names) with { Name = name };
 
             if (Enumerations(described) > limits.MaxEnumerationValues)
             {
-                diagnostics.Add(Budget(type.QualifiedName.ToString(), limits, document));
+                diagnostics.Add(Budget(name, limits, document));
 
                 continue;
             }
 
-            types[type.QualifiedName.ToString()] = described;
+            types[name] = described;
         }
 
         return types;
@@ -107,19 +101,19 @@ internal static class XsdTypeReader
                 + limits.MaxEnumerationValues.ToString(CultureInfo.InvariantCulture)
                 + ", et « " + type + " » en déclare davantage.");
 
-    private static XsdType Describe(XmlSchemaType type, string document, XmlSchemaSet set) =>
+    private static XsdType Describe(XmlSchemaType type, string document, XmlSchemaSet set, XsdTypeNames names) =>
         type switch
         {
-            XmlSchemaComplexType complex => Complex(complex, document, set),
+            XmlSchemaComplexType complex => Complex(complex, document, set, names),
             XmlSchemaSimpleType simple => Simple(simple, document),
             _ => Empty(type, document),
         };
 
-    private static XsdType Complex(XmlSchemaComplexType type, string document, XmlSchemaSet set)
+    private static XsdType Complex(XmlSchemaComplexType type, string document, XmlSchemaSet set, XsdTypeNames names)
     {
         List<XsdParticle> particles = [];
 
-        Collect(type.ContentTypeParticle, document, particles);
+        Collect(type.ContentTypeParticle, document, particles, names);
 
         return new XsdType(
             type.QualifiedName.ToString(),
@@ -219,19 +213,19 @@ internal static class XsdTypeReader
 
     /// <summary>Descend dans une particule, groupes imbriqués compris.</summary>
     private static void Collect(
-        XmlSchemaParticle particle, string document, List<XsdParticle> into)
+        XmlSchemaParticle particle, string document, List<XsdParticle> into, XsdTypeNames names)
     {
         switch (particle)
         {
             case XmlSchemaElement element:
-                into.Add(Element(element, document));
+                into.Add(Element(element, document, names));
 
                 break;
 
             case XmlSchemaGroupBase group:
                 foreach (XmlSchemaParticle child in group.Items.OfType<XmlSchemaParticle>())
                 {
-                    Collect(child, document, into);
+                    Collect(child, document, into, names);
                 }
 
                 break;
@@ -241,10 +235,10 @@ internal static class XsdTypeReader
         }
     }
 
-    private static XsdParticle Element(XmlSchemaElement element, string document) =>
+    private static XsdParticle Element(XmlSchemaElement element, string document, XsdTypeNames names) =>
         new(
             element.QualifiedName.Name,
-            element.ElementSchemaType?.QualifiedName.ToString() ?? element.SchemaTypeName.ToString(),
+            names.NameOf(element.ElementSchemaType),
             (int)element.MinOccurs,
             element.MaxOccurs == decimal.MaxValue ? null : (int)element.MaxOccurs,
             element.IsNillable,

@@ -19,6 +19,13 @@ public sealed record ProjectionResult(
     ProjectionFigures Figures)
 {
     /// <summary>
+    /// Les opérations projetées par nom WSDL, indépendamment des suggestions de routes.
+    /// Deux suggestions identiques ne doivent ni écraser une opération ni empêcher sa composition.
+    /// </summary>
+    public IReadOnlyDictionary<string, SpecNode> OperationSources { get; init; } =
+        new Dictionary<string, SpecNode>(StringComparer.Ordinal);
+
+    /// <summary>
     /// Les écarts, dans un ordre que deux exécutions ne peuvent pas se partager autrement.
     /// </summary>
     /// <remarks>

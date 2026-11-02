@@ -52,4 +52,7 @@ public enum ProjectionGapReason
 
     /// <summary>L'obligation d'un en-tête SOAP survit, son rôle ne survit pas.</summary>
     SoapRole,
+
+    /// <summary>Plusieurs opérations partagent une suggestion de route, à départager par l'utilisateur.</summary>
+    RouteSuggestionCollision,
 }

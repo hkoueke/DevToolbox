@@ -23,6 +23,7 @@ public static class AuthoredProjection
         // Une suggestion non retenue ne réserve rien. Les schémas restent disponibles pour la fermeture des dépendances.
         SpecNode root = TreeEdits.Insert(projection.Document.Root, paths, TreeEdits.Mapping(paths, []));
         Dictionary<string, DerivedRoute> routes = new(StringComparer.Ordinal);
+        Dictionary<string, SpecNode> sources = new(StringComparer.Ordinal);
         foreach (AuthoredRoute route in authoring.Routes)
         {
             if (!projection.Routes.TryGetValue(route.Operation, out DerivedRoute? derived))
@@ -31,7 +32,8 @@ public static class AuthoredProjection
             }
 
             SpecPointer source = At(derived.Path, derived.Method.ToLowerInvariant());
-            SpecNode operation = PointerNavigator.Find(projection.Document.Root, source.Json)
+            SpecNode operation = projection.OperationSources.GetValueOrDefault(route.Operation)
+                ?? PointerNavigator.Find(projection.Document.Root, source.Json)
                 ?? throw new InvalidOperationException("La route source de « " + route.Operation + " » est introuvable.");
             SpecNode composed = OperationAssembly.Compose(operation, route, route.Headers, projection.Document.Root);
             // L'identifiant est facultatif en OpenAPI ; le dupliquer rendrait le contrat invalide.
@@ -47,10 +49,11 @@ public static class AuthoredProjection
             }
 
             root = TreeEdits.Insert(root, target, composed);
+            sources[route.Operation] = composed;
             routes[route.Operation] = derived with { Path = route.Path, Method = route.Method.ToString().ToUpperInvariant() };
         }
 
-        return projection with { Document = projection.Document with { Root = root }, Routes = routes };
+        return projection with { Document = projection.Document with { Root = root }, Routes = routes, OperationSources = sources };
     }
 
     private static SpecPointer At(string path, string method) => SpecPointer.Root.Child("paths").Child(path).Child(method);
