@@ -18,11 +18,12 @@ function ValidVersion([string]$Name) {
  Require ($Name -cmatch "^v$num\.$num\.$num(?:-$id(?:\.$id)*)?$") "Tag SemVer invalide: $Name"
 }
 if ($EventName -eq 'pull_request') {
- if ($HeadRef -notmatch '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]* ($BaseRef -in @('master','develop')) "Cible PR interdite: $BaseRef"
+ if ($HeadRef -notmatch '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]*$') { ValidBranch $HeadRef }
+ Require ($BaseRef -in @('master','develop')) "Cible PR interdite: $BaseRef"
  if ($BaseRef -eq 'master') {
    Require ($HeadRef -match '^(release/v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?|hotfix/[A-Za-z0-9][A-Za-z0-9._/-]*)$') 'master accepte release/* ou hotfix/*'
  } else {
-   Require ($HeadRef -eq 'master' -or $HeadRef -match '^(feature|release|hotfix)/' -or $HeadRef -match '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]* 'develop accepte feature/*, release/*, hotfix/* ou master'
+   Require ($HeadRef -eq 'master' -or $HeadRef -match '^(feature|release|hotfix)/' -or $HeadRef -match '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]*$') 'develop accepte feature/*, release/*, hotfix/*, master et Dependabot'
  }
 } elseif ($RefType -eq 'tag') {
  ValidVersion $RefName
