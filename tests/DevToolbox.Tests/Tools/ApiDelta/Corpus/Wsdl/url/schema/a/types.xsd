@@ -1,0 +1,5 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:types:a" targetNamespace="urn:types:a" elementFormDefault="qualified">
+ <xs:include schemaLocation="extra.xsd"/>
+ <xs:element name="Request" type="tns:Payload"/>
+ <xs:element name="Failure" type="xs:string"/>
+</xs:schema>

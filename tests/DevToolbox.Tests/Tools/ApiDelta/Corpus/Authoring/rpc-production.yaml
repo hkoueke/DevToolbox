@@ -1,0 +1,137 @@
+# Une production de forme RPC : la forme qu'aucune règle de nommage ne reproduit.
+#
+# Trois propriétés, et chacune porte des assertions :
+#   - les chemins gardent le nom de l'opération derrière un préfixe de famille, si bien qu'une
+#     dérivation « verbe + sujet au pluriel » tombe toujours à côté ;
+#   - ils sont groupés à la main, par famille, ce qui donne un sens au point d'insertion choisi ;
+#   - cinq paramètres d'en-tête sont déclarés en composants réutilisables et référencés par toutes
+#     les routes, ce qui est le signal d'une convention de maison et non d'une particularité.
+openapi: 3.0.3
+info:
+  title: Gisement documentaire
+  version: 2.3.1
+tags:
+  - name: Dossier
+  - name: Document
+paths:
+  /Dossiers/:
+    get:
+      tags: [Dossier]
+      summary: Liste les dossiers
+      parameters:
+        - $ref: '#/components/parameters/X-idCorrelation'
+        - $ref: '#/components/parameters/X-serviceEmetteur'
+        - $ref: '#/components/parameters/X-serviceInitial'
+        - $ref: '#/components/parameters/X-utilisateur'
+        - $ref: '#/components/parameters/X-MARCHE'
+      responses:
+        '200':
+          description: Les dossiers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dossier'
+  /Dossier/CreerDossierDocument:
+    post:
+      tags: [Dossier]
+      summary: Cree un dossier
+      parameters:
+        - $ref: '#/components/parameters/X-idCorrelation'
+        - $ref: '#/components/parameters/X-serviceEmetteur'
+        - $ref: '#/components/parameters/X-serviceInitial'
+        - $ref: '#/components/parameters/X-utilisateur'
+        - $ref: '#/components/parameters/X-MARCHE'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Dossier'
+      responses:
+        '201':
+          description: Cree.
+  /Dossier/SupprimerDossierDocuments:
+    post:
+      tags: [Dossier]
+      summary: Supprime un dossier
+      parameters:
+        - $ref: '#/components/parameters/X-idCorrelation'
+        - $ref: '#/components/parameters/X-serviceEmetteur'
+        - $ref: '#/components/parameters/X-serviceInitial'
+        - $ref: '#/components/parameters/X-utilisateur'
+        - $ref: '#/components/parameters/X-MARCHE'
+      responses:
+        '204':
+          description: Supprime.
+  /Document/ModifierDocument:
+    patch:
+      tags: [Document]
+      summary: Modifie un document
+      parameters:
+        - $ref: '#/components/parameters/X-idCorrelation'
+        - $ref: '#/components/parameters/X-serviceEmetteur'
+        - $ref: '#/components/parameters/X-serviceInitial'
+        - $ref: '#/components/parameters/X-utilisateur'
+        - $ref: '#/components/parameters/X-MARCHE'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '200':
+          description: Modifie.
+components:
+  parameters:
+    X-idCorrelation:
+      name: X-idCorrelation
+      in: header
+      required: true
+      schema:
+        type: string
+    X-serviceEmetteur:
+      name: X-serviceEmetteur
+      in: header
+      required: true
+      schema:
+        type: string
+    X-serviceInitial:
+      name: X-serviceInitial
+      in: header
+      required: false
+      schema:
+        type: string
+    X-utilisateur:
+      name: X-utilisateur
+      in: header
+      required: true
+      schema:
+        type: string
+    X-MARCHE:
+      name: X-MARCHE
+      in: header
+      required: false
+      schema:
+        type: string
+  schemas:
+    Dossier:
+      type: object
+      required: [identifiant]
+      properties:
+        identifiant:
+          type: string
+          format: uuid
+        libelle:
+          type: string
+    Document:
+      type: object
+      required: [identifiant]
+      properties:
+        identifiant:
+          type: string
+          format: uuid
+        titre:
+          type: string

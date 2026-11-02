@@ -1,0 +1,20 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:m="urn:model"
+ xmlns:s11="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:s12="http://schemas.xmlsoap.org/wsdl/soap12/" targetNamespace="urn:binding">
+ <import namespace="urn:model" location="../model/contract.wsdl"/>
+ <binding name="Soap11" type="m:Port">
+  <s11:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+  <operation name="Call"><s11:operation soapAction="urn:call"/>
+   <input><s11:body use="literal"/></input><output><s11:body use="literal"/></output>
+   <fault name="Failed"><s11:fault name="Failed" use="literal"/></fault>
+  </operation>
+  <operation name="Send"><s11:operation soapAction="urn:send"/><input><s11:body use="literal"/></input></operation>
+ </binding>
+ <binding name="Soap12" type="m:Port">
+  <s12:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+  <operation name="Call"><s12:operation soapAction="urn:call"/>
+   <input><s12:body use="literal"/></input><output><s12:body use="literal"/></output>
+   <fault name="Failed"><s12:fault name="Failed" use="literal"/></fault>
+  </operation>
+  <operation name="Send"><s12:operation soapAction="urn:send"/><input><s12:body use="literal"/></input></operation>
+ </binding>
+</definitions>

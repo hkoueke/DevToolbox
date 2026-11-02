@@ -231,6 +231,30 @@ Un commentaire de revue sur la demande #23, classé P2, et exact.
   chaque règle qui renonce dit pourquoi. Ce qui est éprouvé là est la tenue sous le nombre, et la tenue
   n'a jamais voulu dire l'omniscience.
 
+### Session 2026-10-28 — trois réponses qui passaient pour deux, et un écran jamais nettoyé
+
+Relevé en se servant de l'outil : « j'ai comme l'impression qu'il y a des doublons, et aucune de ces
+options ne nettoie l'écran quand il le faut ».
+
+- Q: « Oublier cette exécution et repartir de zéro » et « Repartir de zéro » sont-elles un doublon ? → A:
+  **Non, mais leurs libellés le laissaient croire.** La première supprime la séance mémorisée, la seconde
+  la garde — et les deux finissaient par les mêmes mots sans dire ce qu'elles en faisaient. La seule chose
+  qui les sépare est : redemandera-t-on au prochain lancement ? C'est maintenant ce que chacune dit.
+  Vérification faite, seule « Reprendre » était couverte par un essai, et de biais : les trois branches le
+  sont désormais une par une.
+- Q: La promesse de laisser une séance « disponible pour un autre jour » est-elle tenue ? → A: **Non, et
+  elle ne pouvait pas l'être.** L'invite reçoit la liste des séances reprenables et n'en lit que la
+  première : les autres n'étaient jamais proposées. Entre offrir la liste et n'en garder qu'une, la
+  seconde est retenue — ce qu'un outil garde doit être ce qu'il sait proposer. `SaveAsync` élague les
+  autres séances du même outil, celles des autres outils survivant. Le libellé promet le prochain
+  lancement, et non l'éternité.
+- Q: Quelle est la bonne place pour nettoyer l'écran ? → A: **À l'entrée de l'outil, et après l'invite de
+  reprise.** La coquille nettoie au retour au choix d'onglet et nulle part ailleurs ; apidelta
+  n'appelait `Clear` à aucun endroit, là où varcompare le faisait avant chacune de ses vues. Les invites
+  s'empilaient donc sous le bandeau, le menu et le panneau de reprise. Ce nettoyage n'est couvert par
+  aucun essai : l'observer demanderait de piloter l'outil interactif de bout en bout, ce qu'aucun
+  harnais ne fait aujourd'hui. C'est consigné comme tel plutôt que présenté comme éprouvé.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Know what this candidate would do to production (Priority: P1)

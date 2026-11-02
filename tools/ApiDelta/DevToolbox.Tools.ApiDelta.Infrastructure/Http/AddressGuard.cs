@@ -64,9 +64,26 @@ public sealed class AddressGuard
         ArgumentNullException.ThrowIfNull(address);
         ArgumentNullException.ThrowIfNull(policy);
 
+        if (!address.IsAbsoluteUri)
+        {
+            return AddressCheck.Refused(Refusal(WsdlDiagnosticCodes.SchemeRefused, "Une URL absolue est requise."));
+        }
+
         if (Scheme(address, policy) is { } refusal)
         {
             return AddressCheck.Refused(refusal);
+        }
+
+        if (!policy.AllowRemote || !policy.AllowedHosts.Contains(address.IdnHost, StringComparer.OrdinalIgnoreCase))
+        {
+            return AddressCheck.Refused(Refusal(WsdlDiagnosticCodes.ImportRemoteRefused,
+                "Hôte non autorisé pour cette collecte. Ajoutez explicitement cet hôte aux imports autorisés."));
+        }
+
+        if (address.UserInfo.Length > 0 || address.Fragment.Length > 0 || !SafeQuery(address.Query))
+        {
+            return AddressCheck.Refused(Refusal(WsdlDiagnosticCodes.AuthenticationRequired,
+                "Les identifiants, fragments et paramètres sensibles ne sont pas acceptés dans une URL de collecte."));
         }
 
         IPAddress[] resolved;
@@ -82,11 +99,30 @@ public sealed class AddressGuard
                 "« " + address.Host + " » ne se résout pas : " + failure.Message));
         }
 
+        if (resolved.Length == 0)
+        {
+            return AddressCheck.Refused(Refusal(WsdlDiagnosticCodes.AddressUnresolved, "Aucune adresse IP résolue."));
+        }
+
         string[] names = [.. resolved.Select(one => one.ToString())];
 
         return Internal(resolved, names, policy, address) is { } internals
             ? AddressCheck.Refused(internals)
             : new AddressCheck(null, names);
+    }
+
+    private static bool SafeQuery(string query)
+    {
+        if (query.Length == 0 || string.Equals(query, "?wsdl", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(query, "?singleWsdl", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string[] pair = query[1..].Split('=');
+        return pair.Length == 2 && (pair[0] is "wsdl" or "xsd")
+            && pair[1].StartsWith(pair[0], StringComparison.Ordinal)
+            && pair[1].Length > pair[0].Length && pair[1][pair[0].Length..].All(char.IsAsciiDigit);
     }
 
     /// <summary>Refuse un modèle d'adresse en le nommant.</summary>
@@ -161,6 +197,11 @@ public sealed class AddressGuard
             return true;
         }
 
+        if (address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any) || address.IsIPv6Multicast)
+        {
+            return true;
+        }
+
         if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {
             return address.IsIPv4MappedToIPv6
@@ -172,12 +213,14 @@ public sealed class AddressGuard
 
         return bytes[0] switch
         {
+            0 => true,
             10 => true,
             100 => bytes[1] >= 64 && bytes[1] <= 127,
             127 => true,
             169 => bytes[1] == 254,
             172 => bytes[1] >= 16 && bytes[1] <= 31,
             192 => bytes[1] == 168,
+            >= 224 => true,
             _ => false,
         };
     }

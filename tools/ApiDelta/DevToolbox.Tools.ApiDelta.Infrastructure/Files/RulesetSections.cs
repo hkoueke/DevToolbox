@@ -193,7 +193,7 @@ internal static class RulesetSections
             "maxDocumentCount",
             "maxEnumerationValues",
             "maxResponseBytes",
-            "fetchTimeoutSeconds");
+            "fetchTimeoutSeconds", "maxGraphBytes");
 
         return limits with
         {
@@ -211,6 +211,7 @@ internal static class RulesetSections
                 node, "wsdl.limits", "maxResponseBytes", limits.MaxResponseBytes),
             FetchTimeoutSeconds = (int)reader.Number(
                 node, "wsdl.limits", "fetchTimeoutSeconds", limits.FetchTimeoutSeconds),
+            MaxGraphBytes = reader.Number(node, "wsdl.limits", "maxGraphBytes", limits.MaxGraphBytes),
         };
     }
 

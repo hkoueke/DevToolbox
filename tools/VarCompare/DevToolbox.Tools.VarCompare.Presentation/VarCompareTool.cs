@@ -1,6 +1,7 @@
 using DevToolbox.Application.Abstractions;
 using DevToolbox.Domain.AzureDevOps;
 using DevToolbox.Domain.Runs;
+using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.VarCompare.Core.Abstractions;
 using DevToolbox.Tools.VarCompare.Core.Groups;
 using DevToolbox.Tools.VarCompare.Core.Comparison;
@@ -98,6 +99,7 @@ public sealed class VarCompareTool : ITool
         await _resume.TryResumeAsync(Id, context, cancellationToken).ConfigureAwait(false);
 
         await _runner.RunAsync(context, _steps, cancellationToken).ConfigureAwait(false);
+        ResumePrompt.RenderCleanupWarning(_console, context);
 
         if (run.Outcome == RunOutcome.Success)
         {
@@ -161,6 +163,7 @@ public sealed class VarCompareTool : ITool
             RestartRetrievalSteps(run);
 
             await _runner.RunAsync(context, _steps, cancellationToken).ConfigureAwait(false);
+            ResumePrompt.RenderCleanupWarning(_console, context);
 
             if (run.Outcome != RunOutcome.Success)
             {

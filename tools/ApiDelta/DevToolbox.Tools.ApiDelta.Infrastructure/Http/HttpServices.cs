@@ -31,6 +31,7 @@ internal static class HttpServices
         // bibliothèque la suivait pour nous.
         _ = services.AddHttpClient<IContractFetcher, ContractFetcher>(client =>
             client.DefaultRequestHeaders.Accept.ParseAdd("text/xml, application/xml, */*"))
+            .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false,
@@ -79,6 +80,13 @@ internal static class HttpServices
     private static async ValueTask<Stream> ConnectToValidatedAddress(
         SocketsHttpConnectionContext context, CancellationToken cancellationToken)
     {
+        if (context.InitialRequestMessage.RequestUri is not { } requested
+            || context.DnsEndPoint.Port != requested.Port
+            || !string.Equals(context.DnsEndPoint.Host.Trim('[', ']'), requested.IdnHost.Trim('[', ']'), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new HttpRequestException("Le proxy ne permet pas de garantir l'épinglage de l'adresse. Utilisez une collecte locale.");
+        }
+
         if (PinnedAddress.Of(context.InitialRequestMessage) is not { Count: > 0 } pinned)
         {
             throw new HttpRequestException(

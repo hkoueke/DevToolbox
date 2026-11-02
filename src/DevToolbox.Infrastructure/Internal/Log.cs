@@ -38,6 +38,12 @@ internal static partial class Log
     internal static partial void CheckpointsSwept(ILogger logger, int removedCount);
 
     [LoggerMessage(
+        EventId = 2005,
+        Level = LogLevel.Warning,
+        Message = "A superseded run checkpoint could not be removed: {Reason}.")]
+    internal static partial void CheckpointSweepFailed(ILogger logger, string reason);
+
+    [LoggerMessage(
         EventId = 2004,
         Level = LogLevel.Error,
         Message = "A log argument of type {ArgumentType} was redacted at the sink boundary. This is a defect: "

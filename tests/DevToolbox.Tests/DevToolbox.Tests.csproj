@@ -44,6 +44,10 @@
     <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.wsdl" />
     <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.xsd" />
     <EmbeddedResource Include="Tools\ApiDelta\Corpus\Wsdl\**\*.yaml" />
+    <!-- Le corpus de la composition de routes : une production de forme RPC, qu'aucune dérivation ne
+         retrouve, et le contrat de six opérations qui couvre toutes les branches de placement. -->
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\Authoring\**\*.wsdl" />
+    <EmbeddedResource Include="Tools\ApiDelta\Corpus\Authoring\**\*.yaml" />
   </ItemGroup>
 
   <ItemGroup>

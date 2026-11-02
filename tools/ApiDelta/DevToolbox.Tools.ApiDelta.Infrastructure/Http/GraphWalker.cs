@@ -26,28 +26,29 @@ internal static class GraphWalker
     /// <param name="content">Ses octets.</param>
     /// <param name="origin">L'adresse d'où il vient.</param>
     /// <returns>Les adresses à récupérer à leur tour.</returns>
-    internal static IReadOnlyList<Uri> Designated(ReadOnlyMemory<byte> content, Uri origin)
+    internal static IEnumerable<Uri> Designated(ReadOnlyMemory<byte> content, Uri origin)
     {
         ArgumentNullException.ThrowIfNull(origin);
+        return Enumerate(content, origin);
+    }
 
+    private static IEnumerable<Uri> Enumerate(ReadOnlyMemory<byte> content, Uri origin)
+    {
         XElement? root = Parse(content);
 
         if (root is null)
         {
-            return [];
+            yield break;
         }
-
-        List<Uri> designated = [];
 
         foreach (string where in Locations(root))
         {
             if (Uri.TryCreate(origin, where, out Uri? address) && !address.IsFile)
             {
-                designated.Add(address);
+                yield return address;
             }
         }
 
-        return designated;
     }
 
     /// <summary>Les emplacements écrits dans le document, à n'importe quelle profondeur.</summary>

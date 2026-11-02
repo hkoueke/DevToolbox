@@ -206,11 +206,14 @@ public sealed class SpecReader : ISpecReader
 
     private static SpecNode BuildYaml(byte[] content, LoadLimits limits, List<Diagnostic> diagnostics)
     {
-        string decoded = Encoding.UTF8.GetString(content);
+        // La nomenclature d'octets est retirée du texte analysé, et comptée dans la base des étendues :
+        // l'analyseur lit le document, et les étendues désignent le fichier.
+        int preamble = Preamble.Length(content);
+        string decoded = Preamble.Trim(Encoding.UTF8.GetString(content));
 
         using StringReader text = new(decoded);
 
-        YamlTreeBuilder builder = new(new Parser(text), limits, new ByteOffsets(decoded));
+        YamlTreeBuilder builder = new(new Parser(text), limits, new ByteOffsets(decoded, preamble));
         SpecNode? root = builder.Build();
 
         diagnostics.AddRange(builder.Diagnostics);
@@ -220,8 +223,15 @@ public sealed class SpecReader : ISpecReader
 
     private static SpecNode BuildJson(byte[] content, LoadLimits limits, List<Diagnostic> diagnostics)
     {
-        JsonTreeBuilder builder = new(new LineIndex(content), limits);
-        SpecNode root = builder.Build(content);
+        // Même raison qu'en YAML, et un symptôme différent : « Utf8JsonReader » ne saute pas la
+        // nomenclature, il refuse l'octet. Un fichier JSON enregistré sous Windows échouait donc à
+        // l'analyse. La table des lignes est bâtie sur le document, pour que la première colonne soit
+        // la première ; seules les étendues reçoivent la base, parce qu'elles désignent le fichier.
+        int preamble = Preamble.Length(content);
+        ReadOnlySpan<byte> document = content.AsSpan(preamble);
+
+        JsonTreeBuilder builder = new(new LineIndex(document), limits, preamble);
+        SpecNode root = builder.Build(document);
 
         diagnostics.AddRange(builder.Diagnostics);
 

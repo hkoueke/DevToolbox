@@ -105,6 +105,9 @@ public static class ApiDeltaContextKeys
     /// <summary>L'appariement retenu, confirmé ou non.</summary>
     public const string Correspondence = "apidelta.correspondence";
 
+    /// <summary>Les routes que le développeur a composées, et le placement de leurs champs.</summary>
+    public const string Authoring = "apidelta.authoring";
+
     /// <summary>Ce que la production couvre du contrat de service.</summary>
     public const string Coverage = "apidelta.coverage";
 

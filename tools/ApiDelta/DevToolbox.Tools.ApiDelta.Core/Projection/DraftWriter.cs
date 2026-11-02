@@ -88,8 +88,15 @@ public static class DraftWriter
     /// un arbre dont l'écriture est fausse attend seulement le premier émetteur qu'on y branchera.
     /// </remarks>
     private static ScalarStyle Style(string text) =>
-        text.Length > 0 && (text[0] is '#' or '*' or '&' or '!' or '%' or '@' or '`'
-            || text.Contains(": ", StringComparison.Ordinal))
+        text.Length == 0
+        || char.IsWhiteSpace(text[0]) || char.IsWhiteSpace(text[^1])
+        || text[0] is '#' or '*' or '&' or '!' or '%' or '@' or '`' or '{' or '[' or '"' or '\''
+            or '}' or ']' or ',' or '|' or '>' or '-' or '?' or ':'
+        || text.Contains(": ", StringComparison.Ordinal)
+        || text.Contains(" #", StringComparison.Ordinal)
+        || text.EndsWith(':')
+        || text.Any(character => char.IsControl(character) || character is '\u2028' or '\u2029')
+        || CoreSchemaResolver.ResolvePlain(text).Kind != ScalarValueKind.Text
             ? ScalarStyle.DoubleQuoted
             : ScalarStyle.Plain;
 

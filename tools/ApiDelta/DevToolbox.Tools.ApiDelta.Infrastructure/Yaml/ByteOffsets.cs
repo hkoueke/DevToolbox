@@ -22,13 +22,23 @@ internal sealed class ByteOffsets
 
     /// <summary>Construit la table pour un texte donné.</summary>
     /// <param name="text">Le texte, tel que l'analyseur le lira.</param>
-    internal ByteOffsets(string text)
+    /// <param name="baseOffset">
+    /// Le décalage, dans le fichier, du premier caractère de <paramref name="text" />.
+    /// </param>
+    /// <remarks>
+    /// La base est exigée et non facultative. Elle vaut trois lorsque le fichier porte une nomenclature
+    /// d'octets : l'analyseur lit alors un texte qui commence après elle, tandis que les étendues doivent
+    /// désigner le fichier réel. Une base oubliée ne se voit sur aucun document sans nomenclature, et
+    /// décale de trois octets tout ce qu'une épissure écrit sur les autres.
+    /// </remarks>
+    internal ByteOffsets(string text, int baseOffset)
     {
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentOutOfRangeException.ThrowIfNegative(baseOffset);
 
         _offsets = new int[text.Length + 1];
 
-        int bytes = 0;
+        int bytes = baseOffset;
         int at = 0;
 
         while (at < text.Length)

@@ -82,11 +82,16 @@ public sealed class SuppressionStore : ISuppressionStore
     {
         try
         {
-            string decoded = Encoding.UTF8.GetString(content);
+            // Un jeu de règles enregistré sous Windows porte lui aussi une nomenclature d'octets, et
+            // sa première clé était lue comme « FEFFrules » : le fichier était refusé en nommant une
+            // clé inconnue que son auteur voyait pourtant écrite correctement.
+            int preamble = Preamble.Length(content);
+            string decoded = Preamble.Trim(Encoding.UTF8.GetString(content));
 
             using StringReader text = new(decoded);
 
-            YamlTreeBuilder builder = new(new Parser(text), LoadLimits.Default, new ByteOffsets(decoded));
+            YamlTreeBuilder builder =
+                new(new Parser(text), LoadLimits.Default, new ByteOffsets(decoded, preamble));
             SpecNode? root = builder.Build();
 
             found.AddRange(builder.Diagnostics);

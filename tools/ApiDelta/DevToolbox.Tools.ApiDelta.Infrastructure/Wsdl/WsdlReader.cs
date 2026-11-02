@@ -40,7 +40,12 @@ public sealed class WsdlReader : IWsdlReader
         ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(policy);
 
-        byte[] content = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        byte[]? content = await BoundedDocumentReader.ReadAsync(path, limits.MaxDocumentBytes, cancellationToken)
+            .ConfigureAwait(false);
+        if (content is null)
+        {
+            return WsdlReadResult.Refused([Budget("la taille d'un document", limits.MaxDocumentBytes, path)]);
+        }
 
         return Read(content, path, limits, policy, retrieved ?? RetrievalMap.Empty);
     }
@@ -147,11 +152,58 @@ public sealed class WsdlReader : IWsdlReader
             return WsdlReadResult.Refused(diagnostics);
         }
 
-        Definitions? definitions = new DefinitionsReader(name, diagnostics).Read(root);
+        List<(string Path, Definitions Definitions, WsdlDocument Document)> imported =
+            ReadImports(root, name, limits, policy, retrieved, diagnostics);
 
-        return definitions is null
-            ? WsdlReadResult.Refused(diagnostics)
-            : Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+        Definitions? definitions = new DefinitionsReader(name, diagnostics)
+            .Read(root, importsResolved: imported.Count > 0 && !diagnostics.Any(d => d.IsBlocking));
+
+        if (definitions is null || diagnostics.Any(d => d.IsBlocking))
+        {
+            return WsdlReadResult.Refused(diagnostics);
+        }
+
+        if (imported.Count == 0)
+        {
+            return Assemble(name, content, definitions, limits, policy, retrieved, diagnostics);
+        }
+
+        return AssembleGraph(name, content, definitions, imported, limits, policy, retrieved, diagnostics);
+    }
+
+    /// <summary>Lit les définitions importées sous les limites et la politique courantes.</summary>
+    private static List<(string Path, Definitions Definitions, WsdlDocument Document)> ReadImports(
+        XElement root, string name, WsdlLimits limits, ImportPolicy policy,
+        RetrievalMap retrieved, List<Diagnostic> diagnostics)
+    {
+        List<(string Path, Definitions Definitions, WsdlDocument Document)> definitions = [];
+        XNamespace wsdl = WsdlNamespaces.Wsdl11;
+        if (root.Name != wsdl + "definitions" || !root.Elements(wsdl + "import").Any())
+        {
+            return definitions;
+        }
+
+        WsdlImportWalker imports = new(limits, policy, retrieved, diagnostics);
+        imports.Walk(root, name);
+        foreach (var imported in imports.Documents)
+        {
+            if (Deeper(imported.Root, limits.MaxNestingDepth))
+            {
+                diagnostics.Add(Budget(
+                    "la profondeur d'imbrication d'un document",
+                    limits.MaxNestingDepth, imported.Path));
+                continue;
+            }
+
+            Definitions? read = new DefinitionsReader(imported.Path, diagnostics)
+                .Read(imported.Root, importsResolved: true);
+            if (read is not null)
+            {
+                definitions.Add((imported.Path, read, imported.Document));
+            }
+        }
+
+        return definitions;
     }
 
     /// <summary>
@@ -245,7 +297,9 @@ public sealed class WsdlReader : IWsdlReader
         WsdlLimits limits,
         ImportPolicy policy,
         RetrievalMap retrieved,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        IReadOnlyList<WsdlDocument>? importedDocuments = null,
+        IReadOnlyList<WsdlOperation>? importedOperations = null)
     {
         SchemaSetResult schemas = SchemaCompiler.Compile(
             name, definitions, limits, policy, retrieved, diagnostics);
@@ -255,6 +309,7 @@ public sealed class WsdlReader : IWsdlReader
             new WsdlDocument(
                 name, WsdlDocumentKind.Definitions, content.LongLength, Hash(content),
                 definitions.TargetNamespace),
+            .. importedDocuments ?? [],
             .. schemas.Documents,
         ];
 
@@ -273,13 +328,38 @@ public sealed class WsdlReader : IWsdlReader
         return new WsdlReadResult(
             new WsdlContract(
                 documents,
-                [.. Operations(definitions)],
+                importedOperations ?? [.. Operations(definitions)],
                 schemas.Types,
                 definitions.Services,
                 schemas.Unresolved,
                 policy.ConfinementRoot,
                 schemas.Elements),
             diagnostics);
+    }
+
+    /// <summary>Assemble les documents du graphe après résolution stricte des messages.</summary>
+    private static WsdlReadResult AssembleGraph(
+        string name, byte[] content, Definitions root,
+        IReadOnlyList<(string Path, Definitions Definitions, WsdlDocument Document)> imported,
+        WsdlLimits limits, ImportPolicy policy, RetrievalMap retrieved, List<Diagnostic> diagnostics)
+    {
+        List<Definitions> all = [root, .. imported.Select(item => item.Definitions)];
+        Definitions combined = new(
+            root.TargetNamespace,
+            [.. all.SelectMany(item => item.Messages)],
+            [.. all.SelectMany(item => item.Operations)],
+            new Dictionary<string, WsdlBinding>(StringComparer.Ordinal),
+            [.. all.SelectMany(item => item.Services)],
+            [.. all.SelectMany(item => item.InlineSchemas)]);
+
+        IReadOnlyList<WsdlOperation> operations = WsdlGraphBinding.Bind(all, diagnostics);
+        if (diagnostics.Any(diagnostic => diagnostic.IsBlocking))
+        {
+            return WsdlReadResult.Refused(diagnostics);
+        }
+
+        return Assemble(name, content, combined, limits, policy, retrieved, diagnostics,
+            [.. imported.Select(item => item.Document)], operations);
     }
 
     /// <summary>Relie chaque opération à ses messages et à sa liaison.</summary>
@@ -331,8 +411,15 @@ public sealed class WsdlReader : IWsdlReader
             return null;
         }
 
-        return messages.TryGetValue(qualified, out WsdlMessage? message)
-            || messages.TryGetValue(Local(qualified), out message)
+        // A qualified QName must never fall back to an unrelated namespace.
+        // The local-name fallback is reserved for genuinely unqualified references.
+        if (messages.TryGetValue(qualified, out WsdlMessage? message))
+        {
+            return message;
+        }
+
+        return string.Equals(qualified, Local(qualified), StringComparison.Ordinal)
+            && messages.TryGetValue(Local(qualified), out message)
                 ? message
                 : null;
     }

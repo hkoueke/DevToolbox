@@ -194,3 +194,35 @@ Le corpus de performance du dépôt porte un anneau de dix mille schémas : la t
 réelle**, et l'audit s'y déclarait complet après avoir vu quatre cents maillons sur dix mille. Un essai
 affirmait même cette complétude, et passait. C'est la forme la plus coûteuse du motif voisin — un
 garde-fou dont le signal existe, mais que personne n'écoute.
+
+## Un outil garde un seul point de reprise, parce qu'il n'en offre qu'un
+
+L'invite n'offre que la session la plus récente. Une nouvelle sélection remplace l'ancienne dès son premier enregistrement automatique : « garder pour plus tard » ne doit donc pas promettre un rappel après qu'une autre session a déjà enregistré ses choix. L'interface annonce explicitement cette conservation provisoire.
+
+Une session réussie retire son point de reprise. Une remise à zéro efface le point courant et celui dont la session avait repris les choix, avant de vider l'état en mémoire et de redemander la sélection. Une annulation immédiate de cette nouvelle sélection ne peut donc pas faire réapparaître l'ancien point. Une étape volontairement passée après erreur laisse, elle, une session reprenable et un bilan indiquant que le résultat peut être incomplet.
+
+L'écriture d'un point de reprise passe par un fichier temporaire puis un déplacement : une écriture annulée ne détruit pas les choix précédents. L'oubli ne touche jamais aux fichiers métier ni aux rapports déjà produits. Un échec de suppression est signalé et ne doit pas être présenté comme une remise à zéro réussie.
+
+## Les libellés d'un choix nomment ce qui les sépare
+
+Trois réponses à une séance interrompue, dont deux finissaient par « repartir de zéro » : l'une
+supprimait la séance mémorisée, l'autre la gardait, et rien dans les mots ne le disait. Elles passaient
+pour un doublon, et c'est ainsi qu'elles ont été signalées.
+
+Un libellé de choix ne décrit pas l'action de l'outil, il nomme **ce qui distingue cette réponse des
+autres**. Ici, la seule chose qui les sépare est : redemandera-t-on au prochain lancement ? C'est donc
+cela que chacune dit.
+
+Corollaire éprouvé : seule « Reprendre » était couverte, et de biais — par un essai de reprise qui pousse
+Entrée sur le premier choix. Un choix dont les branches ne sont pas éprouvées une par une est un choix
+dont deux entrées peuvent devenir identiques sans que rien ne rougisse.
+
+## La coquille nettoie l'écran une fois ; un outil nettoie le sien
+
+`Program` nettoie au retour au choix d'onglet, et nulle part ailleurs. Un outil qui pose des questions
+hérite donc de tout ce que le développeur venait de quitter — bandeau, menu, panneau de reprise — et lit
+ses invites au milieu. Varcompare nettoyait avant chacune de ses vues ; apidelta ne le faisait nulle part,
+et c'est ce qui a été remarqué.
+
+Un outil interactif nettoie donc au moins deux fois : en entrant, avant sa première question, et après
+une invite qui a fait son travail et dont le contenu devient du bruit.

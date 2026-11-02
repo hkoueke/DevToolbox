@@ -51,6 +51,18 @@ public sealed class CompositionRootTests
     }
 
     [Fact]
+    public void Standalone_wsdl_export_is_registered_in_the_real_composition_root()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetRequiredService<IWsdlOpenApiExporter>().Should().NotBeNull();
+        WsdlOpenApiTool tool = provider.GetServices<ITool>().OfType<WsdlOpenApiTool>().Single();
+        tool.Id.Should().Be("wsdl-openapi");
+        tool.Tab.Should().Be("OpenAPI");
+        tool.RequiresServer.Should().BeFalse();
+    }
+
+    [Fact]
     public void Pairing_the_operations_resolves_from_the_real_graph()
     {
         // Comme pour la lecture : cet essai ne résout que ce qu'on lui nomme, et une étape absente du

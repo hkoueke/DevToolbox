@@ -22,12 +22,24 @@ internal sealed class JsonTreeBuilder
 {
     private readonly LineIndex _lines;
     private readonly LoadLimits _limits;
+    private readonly long _baseOffset;
     private readonly List<Diagnostic> _diagnostics = [];
 
-    internal JsonTreeBuilder(LineIndex lines, LoadLimits limits)
+    /// <summary>Crée le constructeur.</summary>
+    /// <param name="lines">Situe un décalage en ligne et colonne, dans le document analysé.</param>
+    /// <param name="limits">Le budget de lecture.</param>
+    /// <param name="baseOffset">
+    /// Le décalage, dans le fichier, du premier octet analysé. Vaut trois lorsque le fichier porte une
+    /// nomenclature d'octets : l'analyseur lit après elle, tandis que les étendues doivent désigner le
+    /// fichier réel, parce que c'est sur lui que l'épissure écrit.
+    /// </param>
+    internal JsonTreeBuilder(LineIndex lines, LoadLimits limits, long baseOffset)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(baseOffset);
+
         _lines = lines;
         _limits = limits;
+        _baseOffset = baseOffset;
     }
 
     internal IReadOnlyList<Diagnostic> Diagnostics => _diagnostics;
@@ -87,7 +99,7 @@ internal sealed class JsonTreeBuilder
             ScalarNode keyNode = new(
                 location.Child(key),
                 keyPosition,
-                new ByteSpan(keyStart, reader.BytesConsumed - keyStart),
+                new ByteSpan(keyStart + _baseOffset, reader.BytesConsumed - keyStart),
                 key,
                 ScalarStyle.DoubleQuoted,
                 CoreSchemaResolver.ResolveQuoted(key));
@@ -179,6 +191,6 @@ internal sealed class JsonTreeBuilder
         seen[key] = position;
     }
 
-    private static ByteSpan Extent(long start, ref Utf8JsonReader reader) =>
-        new(start, reader.BytesConsumed - start);
+    private ByteSpan Extent(long start, ref Utf8JsonReader reader) =>
+        new(start + _baseOffset, reader.BytesConsumed - start);
 }

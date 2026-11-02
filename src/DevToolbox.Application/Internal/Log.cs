@@ -56,4 +56,8 @@ internal static partial class Log
         Level = LogLevel.Warning,
         Message = "No checkpoint factory is registered for tool {ToolId}; the run is not resumable.")]
     internal static partial void NoCheckpointFactory(ILogger logger, string toolId);
+
+    [LoggerMessage(EventId = 1011, Level = LogLevel.Warning,
+        Message = "Checkpoint cleanup could not be completed for run {RunId}.")]
+    internal static partial void CheckpointCleanupFailed(ILogger logger, Guid runId);
 }

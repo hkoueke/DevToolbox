@@ -9,6 +9,8 @@ namespace DevToolbox.Tools.ApiDelta.Infrastructure.Wsdl;
 /// <param name="Operations">Les opérations de ses types de port, non encore liées.</param>
 /// <param name="Bindings">Ses liaisons, par nom d'opération.</param>
 /// <param name="Services">Ses services.</param>
+/// <param name="QualifiedBindings">Bindings identifiés par namespace, nom de liaison et opération.</param>
+/// <param name="BindingPortTypes">Correspondance des bindings avec leurs portTypes qualifiés.</param>
 /// <param name="InlineSchemas">Les schémas écrits dans <c>wsdl:types</c>.</param>
 /// <remarks>
 /// Une forme intermédiaire, interne à l'infrastructure : les opérations y portent encore des noms de
@@ -21,4 +23,6 @@ internal sealed record Definitions(
     IReadOnlyList<OperationDeclaration> Operations,
     IReadOnlyDictionary<string, WsdlBinding> Bindings,
     IReadOnlyList<WsdlService> Services,
-    IReadOnlyList<InlineSchema> InlineSchemas);
+    IReadOnlyList<InlineSchema> InlineSchemas,
+    IReadOnlyDictionary<string, string>? BindingPortTypes = null,
+    IReadOnlyDictionary<string, WsdlBinding>? QualifiedBindings = null);

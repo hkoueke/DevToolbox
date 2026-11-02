@@ -14,7 +14,7 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 /// ceux de la spécification. « Description de production » et « description candidate » sont justes et ne
 /// disent rien à personne : ce qu'on a devant soi, c'est le fichier de production et le nouveau.
 /// <para>
-/// Le fichier de production est demandé avant le mode, et le mode décide si le nouveau est demandé du tout :
+/// Le mode est demandé avant les fichiers, et décide si le nouveau est demandé du tout :
 /// un examen n'a qu'un fichier, et poser la question pour l'ignorer ensuite serait une cérémonie.
 /// </para>
 /// </remarks>
@@ -32,8 +32,8 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     /// </remarks>
     private static readonly (RunMode Mode, string Label)[] Modes =
     [
-        (RunMode.Consolidate, "Fusionner deux fichiers en un seul"),
-        (RunMode.Analyse, "Nettoyer un fichier"),
+        (RunMode.Consolidate, "Comparer deux fichiers et choisir les changements à reprendre"),
+        (RunMode.Analyse, "Vérifier un fichier et préparer son nettoyage"),
     ];
 
     /// <summary>
@@ -52,10 +52,10 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 
     private static readonly string[] ReviewableRules =
     [
-        "OPT-006 — extraire les schémas écrits sur place (renomme des types chez les appelants)",
-        "OPT-007 — retirer les composants inaccessibles (sans index des références externes)",
-        "OPT-008 — remonter les en-têtes communs au niveau du chemin",
-        "OPT-009 — poser le drapeau de dépréciation",
+        "OPT-006 — nommer les descriptions de données intégrées (peut changer les types générés)",
+        "OPT-007 — retirer les définitions sans usage connu (vérifier les autres fichiers)",
+        "OPT-008 — regrouper les en-têtes communs d’une même adresse",
+        "OPT-009 — signaler les éléments dont l’abandon est prévu",
     ];
 
     private readonly IAnsiConsole _console;
@@ -87,9 +87,10 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         // fichier compagnon pour l'ignorer après, ou réclamait un fichier de production sans dire pour
         // quoi faire — et c'est en demandant avant de savoir qu'on finit par demander pour rien.
         RunMode mode = AskForMode();
+        ExplainMode(mode);
 
         string production = AskForPath(
-            "Votre fichier de [bold]production[/]");
+            "Votre fichier OpenAPI [bold]de référence[/] (.yaml ou .json)");
 
         if (string.IsNullOrWhiteSpace(production))
         {
@@ -103,7 +104,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         {
             return Result.Fail<RunSelection>(
                 FailureReason.Cancelled,
-                "Consolider demande deux fichiers, et le compagnon n'a pas été indiqué.");
+                "Le deuxième fichier est nécessaire pour comparer. Retour au menu.");
         }
 
         string? candidate = asked?.Path;
@@ -130,6 +131,13 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 SuppressionsPath: suppressions)));
     }
 
+    private void ExplainMode(RunMode mode)
+    {
+        _console.MarkupLine(mode == RunMode.Consolidate
+            ? "[grey]Choisissez votre fichier de référence, puis le nouveau fichier. Vous choisirez ensuite les changements à reprendre dans une copie.[/]"
+            : "[grey]Le rapport indiquera les problèmes et les possibilités de nettoyage. Vous pourrez aussi demander une copie nettoyée.[/]");
+    }
+
     /// <inheritdoc />
     public bool ConfirmCreateDirectory(string directory)
     {
@@ -139,7 +147,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
             "[yellow]Ce dossier n'existe pas encore :[/] " + Markup.Escape(directory));
 
         return _console.Prompt(
-            new ConfirmationPrompt("Le créer et y écrire les rapports ?") { DefaultValue = true });
+            new ConfirmationPrompt("Le créer et y écrire les résultats ?") { DefaultValue = true });
     }
 
     /// <inheritdoc />
@@ -147,14 +155,14 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     {
         ArgumentNullException.ThrowIfNull(fileNames);
 
-        _console.MarkupLine("[yellow]Ces rapports existent déjà et seront remplacés :[/]");
+        _console.MarkupLine("[yellow]Ces fichiers de résultat existent déjà et seront remplacés :[/]");
 
         foreach (string fileName in fileNames)
         {
             _console.MarkupLine("  [grey]" + Markup.Escape(fileName) + "[/]");
         }
 
-        return _console.Prompt(new ConfirmationPrompt("Continuer ?") { DefaultValue = true });
+        return _console.Prompt(new ConfirmationPrompt("Remplacer ces fichiers ?") { DefaultValue = true });
     }
 
     /// <inheritdoc />
@@ -169,7 +177,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _console.MarkupLine(
-            "[yellow]Vous allez réécrire le fichier de production :[/] " + Markup.Escape(path));
+            "[yellow]Vous allez remplacer ce fichier :[/] " + Markup.Escape(path));
 
         _console.MarkupLine(string.IsNullOrEmpty(backupPath)
             ? "[red]Aucune sauvegarde ne sera créée : vous l'avez refusée.[/]"
@@ -177,11 +185,10 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 + Markup.Escape(Path.GetFileName(backupPath)));
 
         _console.MarkupLine(
-            "[grey]C'est la seule action de cet outil qui ne se défait pas en supprimant un "
-            + "rapport.[/]");
+            "[grey]Cette action remplace l’original. Vérifiez le chemin avant de confirmer.[/]");
 
         return _console.Prompt(
-            new ConfirmationPrompt("Réécrire ce fichier ?") { DefaultValue = false });
+            new ConfirmationPrompt("Remplacer ce fichier ?") { DefaultValue = false });
     }
 
     /// <summary>
@@ -206,17 +213,25 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
             return (null, null);
         }
 
+        bool found = File.Exists(Path.Combine(directory, RulesetFileName))
+            || File.Exists(Path.Combine(directory, SuppressionsFileName));
+        if (!found && !_console.Prompt(new ConfirmationPrompt(
+            "Utiliser des réglages personnalisés ? [grey](facultatif)[/]") { DefaultValue = false }))
+        {
+            return (null, null);
+        }
+
         return (
             Beside(
                 directory,
                 RulesetFileName,
-                "jeu de règles",
-                "règle la sévérité des constats et les limites de lecture"),
+                "règles de vérification",
+                "choisit les vérifications et leur importance"),
             Beside(
                 directory,
                 SuppressionsFileName,
-                "mises en sourdine",
-                "tait nommément des constats que vous avez déjà jugés"));
+                "exceptions aux vérifications",
+                "masque des points que vous avez déjà examinés"));
     }
 
     /// <summary>
@@ -233,7 +248,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
                 + " [grey](" + what + " : " + does + ")[/]");
 
             return _console.Prompt(
-                new ConfirmationPrompt("L'employer ?") { DefaultValue = true })
+                new ConfirmationPrompt("Utiliser ces réglages ?") { DefaultValue = true })
                 ? candidate
                 : null;
         }
@@ -242,13 +257,11 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         // règles ? » sans que rien, nulle part, ne dise ce qu'un jeu de règles est ni sous quel nom
         // l'outil le reconnaît : on ne peut répondre oui qu'en sachant déjà, et celui qui sait déjà n'a
         // pas besoin qu'on lui demande.
-        _console.MarkupLine(
-            "[grey]" + char.ToUpperInvariant(what[0]) + what[1..] + " : " + does
-            + ". Fichier YAML, reconnu sous le nom[/] [bold]" + Markup.Escape(fileName) + "[/]"
-            + " [grey]s'il est posé à côté de votre fichier. Aucun n'est nécessaire.[/]");
+        _console.MarkupLine("[grey]" + char.ToUpperInvariant(what[0]) + what[1..]
+            + " : " + does + ". Vous pouvez garder les réglages par défaut.[/]");
 
         if (!_console.Prompt(
-                new ConfirmationPrompt("En employer un ?") { DefaultValue = false }))
+                new ConfirmationPrompt("Choisir un fichier pour ces réglages ?") { DefaultValue = false }))
         {
             return null;
         }
@@ -281,23 +294,23 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 
         if (!_console.Prompt(
                 new ConfirmationPrompt(
-                    "Écrire un fichier nettoyé ? (une copie, dans l'ordre du fichier d'origine)")
+                    "Créer une copie nettoyée ? [grey](non : rapport seulement)[/]")
                 { DefaultValue = false }))
         {
             return selection;
         }
 
+        IReadOnlyList<string> allowed = AskForAllowedRules();
+        bool inPlace = _console.Prompt(new ConfirmationPrompt(
+            "Remplacer le fichier d’origine au lieu de créer une copie ?") { DefaultValue = false });
+        bool backup = !inPlace || _console.Prompt(new ConfirmationPrompt(
+            "Conserver une sauvegarde de l’original ?") { DefaultValue = true });
         return selection with
         {
             ApplySafeOptimizations = true,
-            AllowedReviewRequiredRules = AskForAllowedRules(),
-            InPlace = _console.Prompt(
-                new ConfirmationPrompt(
-                    "Réécrire votre fichier plutôt qu'une copie ?")
-                { DefaultValue = false }),
-            Backup = _console.Prompt(
-                new ConfirmationPrompt("Créer une sauvegarde avant d'écrire ?")
-                { DefaultValue = true }),
+            AllowedReviewRequiredRules = allowed,
+            InPlace = inPlace,
+            Backup = backup,
         };
     }
 
@@ -306,7 +319,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     {
         if (!_console.Prompt(
                 new ConfirmationPrompt(
-                    "Autoriser aussi des transformations à relire ?")
+                    "Inclure des changements qui demandent une vérification manuelle ?")
                 { DefaultValue = false }))
         {
             return [];
@@ -316,7 +329,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         [
             .. _console.Prompt(
                 new MultiSelectionPrompt<string>()
-                    .Title("Lesquelles ? [grey](espace pour cocher, entrée pour valider)[/]")
+                    .Title("Quels changements autorisez-vous ? [grey](espace : cocher · entrée : valider)[/]")
                     .NotRequired()
                     .AddChoices(ReviewableRules))
                 .Select(label => label[..7]),
@@ -362,7 +375,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     /// </remarks>
     private Companion? AskForCompanion(RunMode mode) => mode is RunMode.Consolidate
         ? new Companion(AskForPath(
-            "L'autre fichier [bold].yaml, .json ou .wsdl[/]"))
+            "Le fichier à comparer [bold](.yaml, .json ou .wsdl)[/]"))
         : null;
 
     private RunMode AskForMode()
@@ -392,7 +405,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         }
 
         return _console.Prompt(
-            new TextPrompt<string>("Dans quel dossier écrire les rapports ?")
+            new TextPrompt<string>("Dans quel dossier écrire les résultats ?")
                 .DefaultValue(suggestion)
                 .ShowDefaultValue());
     }

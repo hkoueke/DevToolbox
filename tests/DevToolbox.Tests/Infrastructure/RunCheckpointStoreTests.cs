@@ -140,6 +140,65 @@ public sealed class RunCheckpointStoreTests
         (await store.ListResumableAsync("varcompare", CancellationToken.None)).Should().BeEmpty();
         (await store.SweepExpiredAsync(TimeSpan.FromDays(7), CancellationToken.None)).Should().Be(1);
     }
+    [Fact]
+    public async Task Only_the_latest_checkpoint_of_a_tool_is_kept()
+    {
+        // L'invite de reprise n'offre que le plus récent : elle reçoit la liste entière et n'en lit que
+        // la première entrée. Les précédents dormaient donc sur le disque sans jamais être proposés,
+        // pendant que l'invite promettait de laisser une séance « disponible pour un autre jour ». Ce
+        // que l'outil garde est désormais ce qu'il sait proposer.
+        using TempPaths temp = new();
+        FileRunCheckpointStore store = CreateStore(temp, Now);
+
+        PersistedRun first = Checkpoint();
+        PersistedRun second = Checkpoint();
+
+        await store.SaveAsync(first, CancellationToken.None);
+        await store.SaveAsync(second, CancellationToken.None);
+
+        IReadOnlyList<PersistedRun> resumable =
+            await store.ListResumableAsync("varcompare", CancellationToken.None);
+
+        resumable.Should().ContainSingle("une séance gardée est remplacée par la suivante");
+        resumable[0].RunId.Should().Be(second.RunId, "celle qui reste est la plus récente");
+    }
+
+    [Fact]
+    public async Task A_checkpoint_of_another_tool_survives_a_save()
+    {
+        // La limite de la règle précédente : un outil ne doit pas effacer la séance interrompue d'un
+        // autre. Deux outils peuvent très bien être en cours la même semaine.
+        using TempPaths temp = new();
+        FileRunCheckpointStore store = CreateStore(temp, Now);
+
+        PersistedRun elsewhere = Checkpoint() with { ToolId = "apidelta" };
+
+        await store.SaveAsync(elsewhere, CancellationToken.None);
+        await store.SaveAsync(Checkpoint(), CancellationToken.None);
+
+        (await store.ListResumableAsync("apidelta", CancellationToken.None))
+            .Should().ContainSingle("la séance de l'autre outil n'avait pas à disparaître");
+
+        (await store.ListResumableAsync("varcompare", CancellationToken.None))
+            .Should().ContainSingle();
+    }
+
+
+    [Fact]
+    public async Task A_cancelled_checkpoint_update_keeps_the_previous_session_and_no_temporary_file()
+    {
+        using TempPaths temp = new();
+        FileRunCheckpointStore store = CreateStore(temp, Now);
+        PersistedRun original = Checkpoint();
+        await store.SaveAsync(original, CancellationToken.None);
+        string before = await File.ReadAllTextAsync(SingleRunFile(temp));
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+        Func<Task> update = () => store.SaveAsync(original with { CompletedSteps = ["Changed"] }, cancellation.Token);
+        await update.Should().ThrowAsync<OperationCanceledException>();
+        (await File.ReadAllTextAsync(SingleRunFile(temp))).Should().Be(before);
+        Directory.GetFiles(temp.Paths.RunsDirectory, "*.tmp").Should().BeEmpty();
+    }
 
     private static string SingleRunFile(TempPaths temp) =>
         Directory.EnumerateFiles(temp.Paths.RunsDirectory, "*.json").Single();

@@ -58,7 +58,8 @@ public sealed class SequenceElementRule : ProjectionRule
 
         if (subject.KnownTypes.Contains(type))
         {
-            target.Set("$ref", "#/components/schemas/" + Local(type));
+            target.Set("$ref", subject.SchemaNames?.Reference(type)
+                ?? "#/components/schemas/" + Local(type));
 
             return;
         }
@@ -78,7 +79,8 @@ public sealed class SequenceElementRule : ProjectionRule
         // Ni un type du contrat, ni un type intégré reconnu. Cela ne peut arriver que si un import n'a
         // pas été résolu, ce que la lecture refuse déjà : le renvoi est posé quand même, pour que le
         // document reste cohérent plutôt que silencieusement permissif.
-        target.Set("$ref", "#/components/schemas/" + Local(type));
+        target.Set("$ref", subject.SchemaNames?.Reference(type)
+            ?? "#/components/schemas/" + Local(type));
     }
 
     private static string Local(string qualified)

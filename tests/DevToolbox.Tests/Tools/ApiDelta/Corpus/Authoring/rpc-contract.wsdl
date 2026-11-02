@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le contrat de la composition de routes : six opérations, choisies pour couvrir toutes les branches
+     de placement avec le plus petit corpus possible.
+
+       ObtenirDossiers        entrée de scalaires plats     -> la branche « requête » d'un verbe de lecture
+       GetDocument            entrée de scalaires plats     -> un nom dont le verbe « get » est connu
+       CreerDossierDocument   entrée d'un seul composite    -> la branche « corps » d'un verbe d'écriture
+       AjouterDocuments       entrée d'un seul composite    -> un composite refusé pour la requête
+       PasserEnRecu           aucune entrée                 -> l'opération sans champ à placer
+       Flotte                 un seul mot                   -> le repli, aucun verbe ne s'en dégage
+
+     Les scalaires sont tous minOccurs="0" nillable="true", comme un DataContract WCF les écrit : c'est ce
+     qui établit qu'aucun caractère obligatoire ne se déduit du contrat. -->
+<wsdl:definitions
+    name="ServiceDossierDocuments"
+    targetNamespace="http://entreprise.local/gdd/wsdl"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://entreprise.local/gdd/wsdl">
+
+  <wsdl:types>
+    <xs:schema targetNamespace="http://entreprise.local/gdd/wsdl"
+               elementFormDefault="qualified">
+
+      <xs:element name="ObtenirDossiers">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="categorie" nillable="true" type="xs:string"/>
+            <xs:element minOccurs="0" name="depuis" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="ObtenirDossiersResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="resultat" nillable="true" type="tns:Dossier"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="GetDocument">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="identifiant" nillable="true" type="xs:string"/>
+            <xs:element minOccurs="0" name="date" nillable="true" type="xs:string"/>
+            <xs:element minOccurs="0" name="groupes" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="GetDocumentResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="resultat" nillable="true" type="tns:Document"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="CreerDossierDocument">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="request" nillable="true" type="tns:Dossier"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="CreerDossierDocumentResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="identifiant" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="AjouterDocuments">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="request" nillable="true" type="tns:Document"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="AjouterDocumentsResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="ajoutes" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="PasserEnRecu">
+        <xs:complexType>
+          <xs:sequence/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="PasserEnRecuResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="etat" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:element name="Flotte">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="reference" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="FlotteResponse">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="0" name="duplique" nillable="true" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <xs:complexType name="Dossier">
+        <xs:sequence>
+          <xs:element minOccurs="0" name="identifiant" nillable="true" type="xs:string"/>
+          <xs:element minOccurs="0" name="libelle" nillable="true" type="xs:string"/>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="Document">
+        <xs:sequence>
+          <xs:element minOccurs="0" name="identifiant" nillable="true" type="xs:string"/>
+          <xs:element minOccurs="0" name="titre" nillable="true" type="xs:string"/>
+        </xs:sequence>
+      </xs:complexType>
+
+    </xs:schema>
+  </wsdl:types>
+
+  <wsdl:message name="ObtenirDossiersIn">
+    <wsdl:part name="parameters" element="tns:ObtenirDossiers"/>
+  </wsdl:message>
+  <wsdl:message name="ObtenirDossiersOut">
+    <wsdl:part name="parameters" element="tns:ObtenirDossiersResponse"/>
+  </wsdl:message>
+  <wsdl:message name="GetDocumentIn">
+    <wsdl:part name="parameters" element="tns:GetDocument"/>
+  </wsdl:message>
+  <wsdl:message name="GetDocumentOut">
+    <wsdl:part name="parameters" element="tns:GetDocumentResponse"/>
+  </wsdl:message>
+  <wsdl:message name="CreerDossierDocumentIn">
+    <wsdl:part name="parameters" element="tns:CreerDossierDocument"/>
+  </wsdl:message>
+  <wsdl:message name="CreerDossierDocumentOut">
+    <wsdl:part name="parameters" element="tns:CreerDossierDocumentResponse"/>
+  </wsdl:message>
+  <wsdl:message name="AjouterDocumentsIn">
+    <wsdl:part name="parameters" element="tns:AjouterDocuments"/>
+  </wsdl:message>
+  <wsdl:message name="AjouterDocumentsOut">
+    <wsdl:part name="parameters" element="tns:AjouterDocumentsResponse"/>
+  </wsdl:message>
+  <wsdl:message name="PasserEnRecuIn">
+    <wsdl:part name="parameters" element="tns:PasserEnRecu"/>
+  </wsdl:message>
+  <wsdl:message name="PasserEnRecuOut">
+    <wsdl:part name="parameters" element="tns:PasserEnRecuResponse"/>
+  </wsdl:message>
+  <wsdl:message name="FlotteIn">
+    <wsdl:part name="parameters" element="tns:Flotte"/>
+  </wsdl:message>
+  <wsdl:message name="FlotteOut">
+    <wsdl:part name="parameters" element="tns:FlotteResponse"/>
+  </wsdl:message>
+
+  <wsdl:portType name="IServiceDossierDocuments">
+    <wsdl:operation name="ObtenirDossiers">
+      <wsdl:input message="tns:ObtenirDossiersIn"/>
+      <wsdl:output message="tns:ObtenirDossiersOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="GetDocument">
+      <wsdl:input message="tns:GetDocumentIn"/>
+      <wsdl:output message="tns:GetDocumentOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="CreerDossierDocument">
+      <wsdl:input message="tns:CreerDossierDocumentIn"/>
+      <wsdl:output message="tns:CreerDossierDocumentOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="AjouterDocuments">
+      <wsdl:input message="tns:AjouterDocumentsIn"/>
+      <wsdl:output message="tns:AjouterDocumentsOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="PasserEnRecu">
+      <wsdl:input message="tns:PasserEnRecuIn"/>
+      <wsdl:output message="tns:PasserEnRecuOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="Flotte">
+      <wsdl:input message="tns:FlotteIn"/>
+      <wsdl:output message="tns:FlotteOut"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <wsdl:binding name="ServiceDossierDocumentsSoap" type="tns:IServiceDossierDocuments">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="ObtenirDossiers">
+      <soap:operation soapAction="http://entreprise.local/gdd/ObtenirDossiers"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetDocument">
+      <soap:operation soapAction="http://entreprise.local/gdd/GetDocument"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CreerDossierDocument">
+      <soap:operation soapAction="http://entreprise.local/gdd/CreerDossierDocument"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="AjouterDocuments">
+      <soap:operation soapAction="http://entreprise.local/gdd/AjouterDocuments"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="PasserEnRecu">
+      <soap:operation soapAction="http://entreprise.local/gdd/PasserEnRecu"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="Flotte">
+      <soap:operation soapAction="http://entreprise.local/gdd/Flotte"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="ServiceDossierDocuments">
+    <wsdl:port name="Soap" binding="tns:ServiceDossierDocumentsSoap">
+      <soap:address location="http://entreprise.local/gdd/service.svc"/>
+    </wsdl:port>
+  </wsdl:service>
+
+</wsdl:definitions>

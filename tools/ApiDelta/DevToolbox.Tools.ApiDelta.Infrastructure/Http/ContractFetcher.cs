@@ -68,7 +68,17 @@ public sealed class ContractFetcher : IContractFetcher
         + " seconde(s). La limite se règle, et elle se nomme : « wsdl.limits.fetchTimeoutSeconds ».";
 
     /// <inheritdoc />
-    public async Task<Result<WsdlContract>> FetchAsync(
+    public async Task<Result<WsdlContract>> FetchAsync(Uri entry, string outputDirectory, WsdlLimits limits,
+        ImportPolicy policy, CancellationToken cancellationToken)
+    {
+        var collected = await CollectAsync(entry, outputDirectory, limits, policy, cancellationToken).ConfigureAwait(false);
+        return collected.IsSuccess
+            ? await ReadAsync(collected.Value.Entry, outputDirectory, limits, collected.Value.Retrieval, cancellationToken).ConfigureAwait(false)
+            : Result.Fail<WsdlContract>(collected.Failure!);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CollectedWsdlGraph>> CollectAsync(
         Uri entry,
         string outputDirectory,
         WsdlLimits limits,
@@ -106,22 +116,29 @@ public sealed class ContractFetcher : IContractFetcher
             // Le dépassement remonte en exception depuis le client, et doit ressortir en refus nommé :
             // une pile d'appels dirait « opération annulée » sans dire par qui ni pourquoi, et le
             // développeur chercherait un défaut de réseau au lieu de régler une limite.
-            return Result.Fail<WsdlContract>(FailureReason.ServiceUnavailable, Overrun(limits));
+            return Result.Fail<CollectedWsdlGraph>(FailureReason.ServiceUnavailable, Overrun(limits));
+        }
+        catch (HttpRequestException)
+        {
+            return Result.Fail<CollectedWsdlGraph>(FailureReason.ServerUnreachable, "Le serveur du contrat est injoignable.");
+        }
+        catch (Polly.Timeout.TimeoutRejectedException)
+        {
+            return Result.Fail<CollectedWsdlGraph>(FailureReason.ServiceUnavailable, Overrun(limits));
         }
 
         if (Expired(budget, cancellationToken))
         {
-            return Result.Fail<WsdlContract>(FailureReason.ServiceUnavailable, Overrun(limits));
+            return Result.Fail<CollectedWsdlGraph>(FailureReason.ServiceUnavailable, Overrun(limits));
         }
 
         if (!entered.IsSuccess)
         {
-            return Result.Fail<WsdlContract>(entered.Failure!);
+            return Result.Fail<CollectedWsdlGraph>(entered.Failure!);
         }
 
-        return await ReadAsync(
-            entered.Value, outputDirectory, limits, new RetrievalMap(correspondence),
-            cancellationToken).ConfigureAwait(false);
+        return Result.Success(new CollectedWsdlGraph(entered.Value,
+            materialiser.Written.Values.ToArray(), Path.GetFullPath(outputDirectory), new RetrievalMap(correspondence)));
     }
 
     /// <summary>
@@ -141,20 +158,27 @@ public sealed class ContractFetcher : IContractFetcher
         ImportPolicy policy,
         CancellationToken cancellationToken)
     {
-        Queue<Uri> pending = new([entry]);
+        Queue<(Uri Address, int Depth)> pending = new([(entry, 0)]);
         HashSet<string> seen = new(StringComparer.Ordinal);
+        HashSet<string> scheduled = new(StringComparer.Ordinal) { entry.ToString() };
         MaterialisedDocument? entered = null;
+        long receivedBytes = 0;
 
         while (pending.Count > 0)
         {
-            Uri address = pending.Dequeue();
+            var (address, depth) = pending.Dequeue();
 
             if (!seen.Add(address.ToString()))
             {
                 continue;
             }
 
-            if (correspondence.Count >= limits.MaxDocumentCount)
+            if (correspondence.ContainsKey(address))
+            {
+                continue;
+            }
+
+            if (seen.Count > limits.MaxDocumentCount || depth > limits.MaxImportChainDepth)
             {
                 return Result.Fail<MaterialisedDocument>(
                     FailureReason.InvalidInput,
@@ -163,7 +187,10 @@ public sealed class ContractFetcher : IContractFetcher
             }
 
             Result<RetrievedContent> content =
-                await RetrieveAsync(address, limits, policy, cancellationToken).ConfigureAwait(false);
+                await RetrieveAsync(address, limits with
+                {
+                    MaxResponseBytes = Math.Min(limits.MaxResponseBytes, limits.MaxGraphBytes - receivedBytes),
+                }, policy, cancellationToken).ConfigureAwait(false);
 
             if (!content.IsSuccess)
             {
@@ -171,20 +198,44 @@ public sealed class ContractFetcher : IContractFetcher
             }
 
             RetrievedContent got = content.Value;
+            receivedBytes += got.Bytes.Length;
 
             MaterialisedDocument written = materialiser.Materialise(
                 got.Origin, got.Bytes, outputDirectory, _clock.UtcNow);
 
             correspondence[got.Origin] = written.Path;
+            correspondence[address] = written.Path;
             entered ??= written;
 
-            foreach (Uri designated in GraphWalker.Designated(got.Bytes, got.Origin))
+            if (!QueueImports(got, pending, scheduled, correspondence, limits.MaxDocumentCount, depth))
             {
-                pending.Enqueue(designated);
+                return Result.Fail<MaterialisedDocument>(FailureReason.InvalidInput,
+                    "Le graphe dépasse le budget de documents de la collecte.");
             }
         }
 
         return Result.Success(entered!);
+    }
+
+    private static bool QueueImports(RetrievedContent content, Queue<(Uri Address, int Depth)> pending,
+        HashSet<string> scheduled, Dictionary<Uri, string> correspondence, int maximum, int depth)
+    {
+        foreach (Uri designated in GraphWalker.Designated(content.Bytes, content.Origin))
+        {
+            if (correspondence.ContainsKey(designated) || !scheduled.Add(designated.ToString()))
+            {
+                continue;
+            }
+
+            if (scheduled.Count > maximum)
+            {
+                return false;
+            }
+
+            pending.Enqueue((designated, depth + 1));
+        }
+
+        return true;
     }
 
     /// <summary>Relit depuis les fichiers, politique confinée au dossier de sortie.</summary>

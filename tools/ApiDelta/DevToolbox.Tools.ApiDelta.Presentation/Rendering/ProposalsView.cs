@@ -26,6 +26,8 @@ public sealed class ProposalsView
 
     private const string GroupsChoice = "Voir toutes les répétitions mesurées";
 
+    private const string NextView = "Terminer la consultation";
+
     private readonly IAnsiConsole _console;
 
     /// <summary>Crée la vue.</summary>
@@ -49,7 +51,7 @@ public sealed class ProposalsView
     {
         ArgumentNullException.ThrowIfNull(plan);
 
-        RenderSummary(plan, currentBytes);
+        RenderSummary(plan, currentBytes, applied is not null);
         RenderApplied(applied);
 
         if (plan.Groups.Count == 0)
@@ -62,9 +64,9 @@ public sealed class ProposalsView
             string chosen = _console.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Que souhaitez-vous regarder ?")
-                    .AddChoices(SafeChoice, ReviewChoice, GroupsChoice, NavigationLabels.Back));
+                    .AddChoices(SafeChoice, ReviewChoice, GroupsChoice, NextView));
 
-            if (string.Equals(chosen, NavigationLabels.Back, StringComparison.Ordinal))
+            if (string.Equals(chosen, NextView, StringComparison.Ordinal))
             {
                 return;
             }
@@ -99,7 +101,7 @@ public sealed class ProposalsView
     }
 
     /// <summary>Le panneau : ce que le fichier pèse, ce qu'il pèserait, et à quel titre.</summary>
-    private void RenderSummary(OptimizationPlan plan, long currentBytes)
+    private void RenderSummary(OptimizationPlan plan, long currentBytes, bool applied)
     {
         Grid grid = new();
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
@@ -110,19 +112,21 @@ public sealed class ProposalsView
         grid.AddRow("[grey]propositions à relire[/]", Count(plan.ReviewRequired.Count()));
         grid.AddRow("[grey]taille actuelle[/]", Bytes(currentBytes) + " octets");
         grid.AddRow("[grey]économie estimée[/]", Bytes(plan.TotalEstimatedSaving) + " octets");
-        grid.AddRow("[grey]taille projetée[/]", Bytes(plan.Growth.ProjectedBytes) + " octets");
+        grid.AddRow("[grey]taille estimée après nettoyage[/]", Bytes(plan.Growth.ProjectedBytes) + " octets");
 
         _console.Write(new Panel(grid)
-            .Header("[bold]Ce que le nettoyage rapporterait[/]")
+            .Header("[bold]Propositions de nettoyage[/]")
             .Border(BoxBorder.Rounded));
 
         _console.MarkupLine(
-            "[grey]Ce chiffrage est un devis : aucun fichier n'a été modifié.[/]");
+            applied
+                ? "[grey]Estimation avant nettoyage. Le bilan ci-dessous indique ce qui a été appliqué.[/]"
+                : "[grey]Estimation uniquement : aucun fichier n'a été modifié par ce plan.[/]");
 
         if (plan.Growth.Exceeded)
         {
             _console.MarkupLine(
-                "[yellow]La sortie dépasserait la croissance tolérée : rien ne serait publié.[/]");
+                "[yellow]Le fichier nettoyé dépasserait la taille autorisée : il ne sera pas créé.[/]");
         }
 
         RenderUncovered(plan);
@@ -155,10 +159,9 @@ public sealed class ProposalsView
         }
 
         _console.MarkupLine(applied.Verification.Established
-            ? "[green]Copie vérifiée :[/] [grey]"
-                + Markup.Escape(applied.Verification.Explanation) + "[/]"
-            : "[red]Rien n'a été publié :[/] [grey]"
-                + Markup.Escape(applied.Verification.Explanation) + "[/]");
+            ? "[green]Fichier nettoyé vérifié.[/]"
+            : "[red]Aucun fichier nettoyé n’a été créé.[/]");
+        _console.MarkupLine("  [grey]" + Markup.Escape(applied.Verification.Explanation) + "[/]");
 
         _console.WriteLine();
     }
@@ -182,9 +185,7 @@ public sealed class ProposalsView
 
         _console.MarkupLine(
             "[yellow]" + Count(uncovered)
-            + " répétition(s) mesurée(s) ne sont couvertes par aucune proposition :[/] [grey]soit "
-            + "l'extraction coûterait plus qu'elle ne rapporte, soit l'outil ne sait pas établir que "
-            + "le remède laisse les appelants inchangés.[/]");
+            + " répétition(s) ne sont couvertes par aucune proposition de nettoyage :[/] [grey]le gain serait trop faible, ou l’effet sur les applications n’est pas suffisamment établi.[/]");
     }
 
     private void RenderProposals(

@@ -18,6 +18,10 @@ namespace DevToolbox.Tools.ApiDelta.Core.Abstractions;
 /// </remarks>
 public interface IContractFetcher
 {
+    /// <summary>Collecte les documents sous budgets et politique réseau, sans imposer une projection métier.</summary>
+    Task<Result<CollectedWsdlGraph>> CollectAsync(Uri entry, string outputDirectory, WsdlLimits limits,
+        ImportPolicy policy, CancellationToken cancellationToken);
+
     /// <summary>Récupère le graphe que l'adresse d'entrée atteint, et l'écrit sur le disque.</summary>
     /// <param name="entry">L'adresse que le développeur a donnée.</param>
     /// <param name="outputDirectory">Où matérialiser les documents.</param>
