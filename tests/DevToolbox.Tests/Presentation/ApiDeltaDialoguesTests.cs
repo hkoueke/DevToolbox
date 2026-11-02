@@ -1,3 +1,4 @@
+using NSubstitute;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Authoring;
@@ -37,7 +38,26 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
         result.IsSuccess.Should().BeTrue(result.Failure?.Message);
         context.Get<RunSelection>(DevToolbox.Tools.ApiDelta.Core.Steps.ApiDeltaContextKeys.Selection)!
             .CandidatePath.Should().Be(source);
-        console.Output.Should().Contain("collecte sécurisée").And.NotContain("Entrée introuvable");
+        console.Output.Should().Contain("collecte").And.Contain("sécurisée").And.NotContain("Entrée introuvable");
+    }
+
+    [Theory]
+    [InlineData("https://user:secret@contracts.example/service?singleWsdl")]
+    [InlineData("https://contracts.example/service?token=secret")]
+    [InlineData("https://contracts.example/service#secret")]
+    public async Task Sensitive_remote_sources_are_rejected_before_selection_can_be_checkpointed(string source)
+    {
+        string file = Path.Combine(_directory, "reference.yaml");
+        await File.WriteAllTextAsync(file, "{}");
+        var selection = new RunSelection(RunMode.Consolidate, file, "", _directory, CandidatePath: source);
+        var context = new ToolRunContext(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, ["Sélection"]));
+        var prompt = NSubstitute.Substitute.For<DevToolbox.Tools.ApiDelta.Core.Abstractions.IApiDeltaPrompt>();
+        prompt.AskForSelection(null, CancellationToken.None).Returns(DevToolbox.Domain.Results.Result.Success(selection));
+        var result = await DevToolbox.Tests.Tools.ApiDelta.Golden.WriteStepFactory.Select(prompt)
+            .ExecuteAsync(context, CancellationToken.None);
+        result.IsFailure.Should().BeTrue();
+        context.Get<RunSelection>(DevToolbox.Tools.ApiDelta.Core.Steps.ApiDeltaContextKeys.Selection).Should().BeNull();
+        result.Failure!.Message.Should().Contain("paramètres sensibles").And.NotContain("secret");
     }
 
     [Fact]

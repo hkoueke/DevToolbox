@@ -12,10 +12,11 @@ public interface IDependencyResolver
     /// <param name="candidate">La description d'où viennent les racines.</param>
     /// <param name="production">La description de référence, pour reconnaître les homonymes.</param>
     /// <param name="cancellationToken">Annule la traversée.</param>
+    /// <param name="expandContainingObjects">Étend les champs à leur objet porteur pour les exports complets.</param>
     /// <returns>La fermeture, ou un échec déjà affichable.</returns>
     Result<DependencyClosure> Close(
         IReadOnlyList<SpecPointer> roots,
         SpecDocument candidate,
         SpecDocument production,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, bool expandContainingObjects = true);
 }

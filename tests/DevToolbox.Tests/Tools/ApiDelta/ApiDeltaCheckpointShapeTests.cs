@@ -20,6 +20,23 @@ public sealed class ApiDeltaCheckpointShapeTests
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
+    [Theory]
+    [InlineData("https://user:secret@example.test/service?singleWsdl")]
+    [InlineData("https://example.test/service?token=secret")]
+    [InlineData("https://example.test/service?singleWsdl")]
+    public void Remote_selections_are_never_persisted_or_restored(string url)
+    {
+        ToolRunContext context = CreateContext();
+        context.Set(ApiDeltaContextKeys.Selection, Selection() with { CandidatePath = url });
+        Factory().TryCreate(context).Should().BeNull("le graphe distant n'a pas d'identité vérifiable pour la reprise");
+
+        context.Set(ApiDeltaContextKeys.Selection, Selection());
+        PersistedRun local = Factory().TryCreate(context)!;
+        var legacy = local with { Selection = local.Selection.Select(entry =>
+            string.Equals(entry.Kind, ApiDeltaSelectionKinds.Candidate, StringComparison.Ordinal) ? entry with { Key = url } : entry).ToArray() };
+        ApiDeltaCheckpointFactory.TryRead(legacy).Should().BeNull("aucun choix confirmé ne doit être repris sur un contrat distant modifié");
+    }
+
     [Fact]
     public void Nothing_is_worth_resuming_before_a_selection_exists()
     {

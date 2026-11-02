@@ -1,3 +1,8 @@
+using NSubstitute;
+using DevToolbox.Domain.Runs;
+using DevToolbox.Tools.ApiDelta.Core.Abstractions;
+using DevToolbox.Tools.ApiDelta.Core.Steps;
+using DevToolbox.Tools.ApiDelta.Infrastructure.Semantic;
 using System.Text;
 using DevToolbox.Domain.Results;
 using DevToolbox.Tools.ApiDelta.Core;
@@ -26,24 +31,76 @@ public sealed class CorrectionBuilderTests
     private readonly CorrectionBuilder _builder = new(
         new OperationCatalog(), new SplicingEmitter(new CanonicalEmitter()));
 
-    [Fact]
-    public void A_conflicting_WarningResult_cannot_silently_reuse_the_production_definition()
-    {
-        const string template = """
-            {"openapi":"3.0.3","info":{"title":"Test","version":"1.0.0"},
-            "paths":{"/warnings":{"get":{"responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/WarningResult"}}}}}}}},
-            "components":{"schemas":{"WarningResult":{"type":"TYPE"}}}}
+    private const string WarningTemplate = """
+            openapi: 3.0.3
+            info:
+              title: Test
+              version: 1.0.0
+            paths:
+              /warnings:
+                get:
+                  description: DESCRIPTION
+                  responses:
+                    '200':
+                      description: OK
+                      content:
+                        application/json:
+                          schema:
+                            $ref: '#/components/schemas/WarningResult'
+            components:
+              schemas:
+                WarningResult:
+                  type: TYPE
             """;
-        SpecDocument production = _reader.ReadBytes(Encoding.UTF8.GetBytes(template.Replace("TYPE", "string", StringComparison.Ordinal)),
-            "production.json", DocumentRole.Production, LoadLimits.Default).Document!;
-        SpecDocument candidate = _reader.ReadBytes(Encoding.UTF8.GetBytes(template.Replace("TYPE", "integer", StringComparison.Ordinal)),
-            "candidate.json", DocumentRole.Candidate, LoadLimits.Default).Document!;
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WarningResult_blocks_imported_responses_but_not_an_unrelated_description(bool descriptionOnly)
+    {
+        SpecDocument production = _reader.ReadBytes(Encoding.UTF8.GetBytes(WarningTemplate.Replace("TYPE", "string", StringComparison.Ordinal).Replace("DESCRIPTION", "Before", StringComparison.Ordinal)),
+            "production.yaml", DocumentRole.Production, LoadLimits.Default).Document!;
+        SpecDocument candidate = _reader.ReadBytes(Encoding.UTF8.GetBytes(WarningTemplate.Replace("TYPE", "integer", StringComparison.Ordinal).Replace("DESCRIPTION", "After", StringComparison.Ordinal)),
+            "candidate.yaml", DocumentRole.Candidate, LoadLimits.Default).Document!;
+        SpecPointer operation = SpecPointer.Root.Child("paths").Child("/warnings").Child("get");
+        var differences = new DocumentComparer(new OpenApiMetamodel()).Compare(candidate, production, CancellationToken.None).Value;
+        Difference description = differences.Single(d => string.Equals(d.Location.Json, operation.Child("description").Json, StringComparison.Ordinal));
         var closure = new DependencyResolver(new OpenApiMetamodel()).Close(
-            [SpecPointer.Root.Child("paths").Child("/warnings").Child("get")], candidate, production, CancellationToken.None);
+            [descriptionOnly ? description.Location : operation], candidate, production, CancellationToken.None,
+            expandContainingObjects: false);
         closure.IsSuccess.Should().BeTrue();
+        CorrectionSelection selected = descriptionOnly
+            ? new CorrectionSelection(Differences: [new DifferenceSelector(new("/warnings", HttpOperationMethod.Get), description.ChangeId, description.Location.Json)])
+            : new CorrectionSelection([new("/warnings", HttpOperationMethod.Get)]);
+        CorrectionRequest request = new(production, candidate, differences, selected, closure.Value, null, CanonicalFormatting.Default);
+        if (descriptionOnly)
+        {
+            closure.Value.Conflicts.Should().BeEmpty();
+            var corrected = _builder.Build(request);
+            corrected.IsSuccess.Should().BeTrue(corrected.Failure?.Message);
+            string text = Encoding.UTF8.GetString(corrected.Value.Serialized.Span);
+            text.Should().Contain("After").And.Contain("string").And.NotContain("integer");
+            var context = new ToolRunContext(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, ["Correction"]));
+            context.Set(ApiDeltaContextKeys.Selection, new RunSelection(RunMode.Consolidate, "production.yaml", "", ".", Correction: selected));
+            context.Set(ApiDeltaContextKeys.ProductionDocument, production);
+            context.Set(ApiDeltaContextKeys.CandidateDocument, candidate);
+            context.Set(ApiDeltaContextKeys.Differences, differences);
+            var prompt = Substitute.For<ICorrectionSelectionPrompt>();
+            prompt.Confirm(Arg.Any<CorrectionPlan>()).Returns(true);
+            var step = new CorrectStep(new OperationCatalog(), prompt, _builder,
+                new CorrectionVerifier(_reader, new OpenApiSemanticAdapter(), new ReferenceGraph()),
+                new DependencyResolver(new OpenApiMetamodel()), ApiDeltaOptions.Default);
+            var outcome = await step.ExecuteAsync(context, CancellationToken.None);
+            outcome.IsSuccess.Should().BeTrue(outcome.Failure?.Message);
+            context.Get<BuiltCorrection>(ApiDeltaContextKeys.ConsolidatedDocument).Should().NotBeNull();
+            return;
+        }
+
         closure.Value.Conflicts.Should().ContainSingle().Which.Name.Should().Be("WarningResult");
-        CorrectionRequest request = new(production, candidate, [],
-            new CorrectionSelection([new("/warnings", HttpOperationMethod.Get)]), closure.Value, null, CanonicalFormatting.Default);
+        var referenceClosure = new DependencyResolver(new OpenApiMetamodel()).Close(
+            [operation.Child("responses").Child("200").Child("content").Child("application/json").Child("schema").Child("$ref")],
+            candidate, production, CancellationToken.None, expandContainingObjects: false);
+        referenceClosure.Value.Conflicts.Should().ContainSingle().Which.Name.Should().Be("WarningResult");
         var plan = _builder.Plan(request);
         var built = _builder.Build(request);
         plan.IsFailure.Should().BeTrue();

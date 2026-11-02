@@ -215,9 +215,9 @@ public sealed class SelectStep : IToolStep
         // Les URLs WSDL sont contrôlées et matérialisées par ReadWsdl, jamais sondées comme fichiers.
         if (Uri.TryCreate(selection.CandidatePath, UriKind.Absolute, out Uri? remote) && !remote.IsFile)
         {
-            return remote.Scheme is "https" or "http"
+            return Wsdl.RemoteWsdlSource.IsSafe(remote)
                 ? Result.Success(verified)
-                : Result.Fail<RunSelection>(FailureReason.InvalidInput, "Le WSDL distant exige une URL HTTP(S) absolue.");
+                : Result.Fail<RunSelection>(FailureReason.InvalidInput, "Le WSDL distant exige une URL HTTP(S) sans identifiants, fragment ni paramètres sensibles.");
         }
 
         Result<SpecFileFacts> candidate = await _probe

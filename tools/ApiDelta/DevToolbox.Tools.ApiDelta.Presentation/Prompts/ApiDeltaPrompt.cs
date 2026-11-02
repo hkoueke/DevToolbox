@@ -173,11 +173,14 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
 
     private string AskForPath(string title, bool allowUrl = false)
     {
+        string invalid = allowUrl
+            ? "[red]Indiquez un fichier existant ou une URL HTTP(S) sans identifiants, fragment ni paramètres sensibles (seuls les paramètres WSDL/XSD sont acceptés).[/]"
+            : "[red]Ce fichier est introuvable. Indiquez son chemin complet, ou laissez vide pour revenir.[/]";
         _console.MarkupLine("[grey]Collez le chemin complet du fichier. Les guillemets sont acceptés. Laissez vide pour revenir au menu.[/]");
         string chosen = NormalizePath(_console.Prompt(ApiDeltaDialog.Text(title).AllowEmpty()
             .Validate(value => string.IsNullOrWhiteSpace(value) || File.Exists(NormalizePath(value)) || (allowUrl && IsWebUrl(NormalizePath(value)))
                 ? ValidationResult.Success()
-                : ValidationResult.Error("[red]Ce fichier est introuvable. Indiquez son chemin complet, ou laissez vide pour revenir.[/]"))));
+                : ValidationResult.Error(invalid))));
         if (string.IsNullOrWhiteSpace(chosen))
         {
             return string.Empty;
@@ -194,7 +197,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
         }
 
         ApiDeltaDialog.Step(_console, 2, "Choisir le nouveau fichier");
-        _console.MarkupLine("[grey]Un WSDL peut aussi être fourni par URL HTTP(S), notamment ?singleWsdl. La collecte sécurisée contrôle les imports ; les autres hôtes et IP internes doivent être autorisés dans les réglages wsdl.imports.[/]");
+        _console.MarkupLine("[grey]Un WSDL peut aussi être fourni par URL HTTP(S), notamment ?singleWsdl. Les choix d’une collecte distante ne sont pas enregistrés pour reprise. La collecte sécurisée contrôle les imports ; les autres hôtes et IP internes doivent être autorisés dans les réglages wsdl.imports.[/]");
         return new Companion(AskForPath("Fichier à comparer ou URL du WSDL", allowUrl: true));
     }
 
@@ -320,7 +323,7 @@ public sealed class ApiDeltaPrompt : IApiDeltaPrompt
     }
 
     private static bool IsWebUrl(string value) => Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
-        && uri.Scheme is "http" or "https";
+        && DevToolbox.Tools.ApiDelta.Core.Wsdl.RemoteWsdlSource.IsSafe(uri);
 
     private static bool ValidDirectory(string value)
     {

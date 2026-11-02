@@ -80,7 +80,7 @@ public sealed class AddressGuard
                 "Hôte non autorisé pour cette collecte. Ajoutez explicitement cet hôte aux imports autorisés."));
         }
 
-        if (address.UserInfo.Length > 0 || address.Fragment.Length > 0 || !SafeQuery(address.Query))
+        if (address.UserInfo.Length > 0 || address.Fragment.Length > 0 || !RemoteWsdlSource.IsMetadataQuery(address.Query))
         {
             return AddressCheck.Refused(Refusal(WsdlDiagnosticCodes.AuthenticationRequired,
                 "Les identifiants, fragments et paramètres sensibles ne sont pas acceptés dans une URL de collecte."));
@@ -109,20 +109,6 @@ public sealed class AddressGuard
         return Internal(resolved, names, policy, address) is { } internals
             ? AddressCheck.Refused(internals)
             : new AddressCheck(null, names);
-    }
-
-    private static bool SafeQuery(string query)
-    {
-        if (query.Length == 0 || string.Equals(query, "?wsdl", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(query, "?singleWsdl", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        string[] pair = query[1..].Split('=');
-        return pair.Length == 2 && (pair[0] is "wsdl" or "xsd")
-            && pair[1].StartsWith(pair[0], StringComparison.Ordinal)
-            && pair[1].Length > pair[0].Length && pair[1][pair[0].Length..].All(char.IsAsciiDigit);
     }
 
     /// <summary>Refuse un modèle d'adresse en le nommant.</summary>
