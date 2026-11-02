@@ -1,5 +1,6 @@
 using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.ApiDelta.Core.Audit;
+using DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation.Rendering;
@@ -19,12 +20,11 @@ namespace DevToolbox.Tools.ApiDelta.Presentation.Rendering;
 public sealed class FindingsView
 {
     private const int PageSize = 10;
+    private const string BackToReport = "Revenir au menu des vérifications";
 
     private const string Everything = "Voir tous les points à vérifier";
 
     private const string ByRule = "Voir les résultats par vérification";
-
-    private const string NextView = "Continuer";
 
     private readonly IAnsiConsole _console;
 
@@ -39,9 +39,11 @@ public sealed class FindingsView
     /// <summary>Affiche le résumé de l'examen, puis propose d'entrer dans le détail.</summary>
     /// <param name="audit">Ce que l'examen a constaté.</param>
     /// <param name="cancellationToken">Annule la navigation.</param>
-    public void Show(AuditResult audit, CancellationToken cancellationToken)
+    /// <param name="hasNextView">Un bilan du nettoyage sera présenté après cet écran.</param>
+    public void Show(AuditResult audit, CancellationToken cancellationToken, bool hasNextView = true)
     {
         ArgumentNullException.ThrowIfNull(audit);
+        string nextView = hasNextView ? "Passer au bilan du nettoyage" : "Revenir au menu OpenAPI";
 
         RenderSummary(audit);
 
@@ -53,11 +55,10 @@ public sealed class FindingsView
         while (!cancellationToken.IsCancellationRequested)
         {
             string chosen = _console.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Que souhaitez-vous regarder ?")
-                    .AddChoices(Everything, ByRule, NextView));
+                ApiDeltaDialog.Choice("Rapport de vérification : que souhaitez-vous consulter ?")
+                    .AddChoices(Everything, ByRule, nextView));
 
-            if (string.Equals(chosen, NextView, StringComparison.Ordinal))
+            if (string.Equals(chosen, nextView, StringComparison.Ordinal))
             {
                 return;
             }
@@ -68,10 +69,7 @@ public sealed class FindingsView
                 continue;
             }
 
-            if (!RenderRule(audit, cancellationToken))
-            {
-                return;
-            }
+            RenderRule(audit, cancellationToken);
         }
     }
 
@@ -148,8 +146,7 @@ public sealed class FindingsView
     }
 
     /// <summary>Propose une règle, puis en montre les constats.</summary>
-    /// <returns><see langword="false"/> si le développeur veut revenir en arrière.</returns>
-    private bool RenderRule(AuditResult audit, CancellationToken cancellationToken)
+    private void RenderRule(AuditResult audit, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> rules =
         [
@@ -160,14 +157,15 @@ public sealed class FindingsView
         ];
 
         string chosen = _console.Prompt(
-            new SelectionPrompt<string>()
-                .Title("Quelle vérification voulez-vous consulter ?")
+            ApiDeltaDialog.Choice("Quelle vérification voulez-vous consulter ?")
                 .PageSize(Math.Max(3, Math.Min(rules.Count + 1, 20)))
-                .AddChoices([.. rules, NavigationLabels.Back]));
+                .AddChoices([.. rules, BackToReport])
+                .UseConverter(rule => string.Equals(rule, BackToReport, StringComparison.Ordinal)
+                    ? rule : RuleLabel(audit, rule)));
 
-        if (string.Equals(chosen, NavigationLabels.Back, StringComparison.Ordinal))
+        if (string.Equals(chosen, BackToReport, StringComparison.Ordinal))
         {
-            return false;
+            return;
         }
 
         RenderPaged(
@@ -176,7 +174,14 @@ public sealed class FindingsView
             chosen,
             cancellationToken);
 
-        return true;
+    }
+
+    private static string RuleLabel(AuditResult audit, string rule)
+    {
+        string message = audit.Findings.First(finding => string.Equals(finding.RuleId, rule, StringComparison.Ordinal)).Message
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Points à vérifier";
+        string brief = message.Length > 90 ? message[..87] + "…" : message;
+        return Markup.Escape(brief + " (" + rule + ")");
     }
 
     private void RenderPaged(
@@ -222,9 +227,9 @@ public sealed class FindingsView
             choices.Add("Page précédente");
         }
 
-        choices.Add(NavigationLabels.Back);
+        choices.Add(BackToReport);
 
-        string chosen = _console.Prompt(new SelectionPrompt<string>().AddChoices(choices));
+        string chosen = _console.Prompt(ApiDeltaDialog.Choice("Naviguer dans les résultats").AddChoices(choices));
 
         next = chosen switch
         {
@@ -233,7 +238,7 @@ public sealed class FindingsView
             _ => page,
         };
 
-        return !string.Equals(chosen, NavigationLabels.Back, StringComparison.Ordinal);
+        return !string.Equals(chosen, BackToReport, StringComparison.Ordinal);
     }
 
     /// <summary>Écrit un constat : ce qu'il dit, où, et ce qu'il coûterait de le corriger.</summary>

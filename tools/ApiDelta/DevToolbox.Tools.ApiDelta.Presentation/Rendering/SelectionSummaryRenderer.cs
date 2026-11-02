@@ -36,7 +36,8 @@ public sealed class SelectionSummaryRenderer
         grid.AddColumn();
 
         grid.AddRow("[grey]objectif[/]", Markup.Escape(RunModeNames.Of(selection.Mode)));
-        grid.AddRow("[grey]fichier de référence[/]", Markup.Escape(selection.ProductionPath));
+        grid.AddRow(selection.Mode is RunMode.Analyse ? "[grey]fichier vérifié[/]" : "[grey]fichier de référence[/]",
+            Markup.Escape(selection.ProductionPath));
 
         if (selection.CandidatePath is { } candidate)
         {

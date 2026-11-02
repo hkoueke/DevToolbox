@@ -22,31 +22,33 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
     public void Default_analysis_asks_only_for_relevant_files_and_explains_the_report()
     {
         using TestConsole console = StartAnalysis();
-        console.Input.PushKey(ConsoleKey.Enter); // default configuration
-        console.Input.PushKey(ConsoleKey.Enter); // report directory
         console.Input.PushKey(ConsoleKey.Enter); // report only
+        console.Input.PushKey(ConsoleKey.Enter); // standard configuration
+        console.Input.PushKey(ConsoleKey.Enter); // report directory
         var result = new ApiDeltaPrompt(console).AskForSelection(null, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         result.Value.Mode.Should().Be(RunMode.Analyse);
         result.Value.CandidatePath.Should().BeNull();
         result.Value.ApplySafeOptimizations.Should().BeFalse();
-        console.Output.Should().Contain("rapport").And.Contain("facultatif").And.NotContain("mises en sourdine");
+        console.Output.Should().Contain("Étape 1/3").And.Contain("Étape 2/3").And.Contain("Étape 3/3")
+            .And.Contain("rapport").And.Contain("facultatifs").And.Contain("Vos choix").And.NotContain("mises en sourdine");
     }
 
     [Fact]
     public void Copy_cleanup_does_not_ask_about_a_backup_of_the_untouched_original()
     {
         using TestConsole console = StartAnalysis();
-        console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushTextWithEnter("y"); // create copy
-        console.Input.PushKey(ConsoleKey.Enter); // no changes requiring manual review
-        console.Input.PushKey(ConsoleKey.Enter); // keep original
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Enter); // copy
+        console.Input.PushKey(ConsoleKey.Enter); // standard cleanup
+        console.Input.PushKey(ConsoleKey.Enter); // standard configuration
+        console.Input.PushKey(ConsoleKey.Enter); // output directory
         var result = new ApiDeltaPrompt(console).AskForSelection(null, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         result.Value.ApplySafeOptimizations.Should().BeTrue();
         result.Value.InPlace.Should().BeFalse();
         result.Value.Backup.Should().BeTrue();
+        result.Value.AllowedReviewRequiredRules.Should().BeEmpty();
         console.Output.Should().NotContain("sauvegarde");
     }
 
@@ -54,20 +56,22 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
     public void Replacing_the_original_keeps_backup_and_final_confirmation_by_default()
     {
         using TestConsole console = StartAnalysis();
-        console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushTextWithEnter("y");
-        console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushTextWithEnter("y"); // replace original
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Enter); // replace original
+        console.Input.PushKey(ConsoleKey.Enter); // standard cleanup
         console.Input.PushKey(ConsoleKey.Enter); // backup
+        console.Input.PushKey(ConsoleKey.Enter); // standard configuration
+        console.Input.PushKey(ConsoleKey.Enter); // output directory
         ApiDeltaPrompt prompt = new(console);
         var result = prompt.AskForSelection(null, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         result.Value.InPlace.Should().BeTrue();
         result.Value.Backup.Should().BeTrue();
-        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushKey(ConsoleKey.Enter); // decline final replacement
         prompt.ConfirmInPlaceWrite(result.Value.ProductionPath, "reference.backup.yaml").Should().BeFalse();
-        console.Output.Should().Contain("reference.yaml").And.Contain("reference.backup.yaml");
+        console.Output.Should().Contain("reference.yaml").And.Contain("reference.backup.yaml")
+            .And.Contain("confirmation avant écriture");
     }
 
     [Fact]
@@ -76,10 +80,10 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
         string rules = Path.Combine(_directory, "apidelta.ruleset.yaml");
         File.WriteAllText(rules, "{}");
         using TestConsole console = StartAnalysis();
-        console.Input.PushKey(ConsoleKey.Enter); // use discovered rules
-        console.Input.PushKey(ConsoleKey.Enter); // no custom suppression file
-        console.Input.PushKey(ConsoleKey.Enter); // output directory
         console.Input.PushKey(ConsoleKey.Enter); // report only
+        console.Input.PushKey(ConsoleKey.Enter); // discovered rules
+        console.Input.PushKey(ConsoleKey.Enter); // no suppression file
+        console.Input.PushKey(ConsoleKey.Enter); // output directory
         var result = new ApiDeltaPrompt(console).AskForSelection(null, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         result.Value.RulesetPath.Should().Be(rules);
@@ -250,7 +254,9 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
         TestConsole console = NewConsole();
         console.Input.PushKey(ConsoleKey.DownArrow);
         console.Input.PushKey(ConsoleKey.Enter);
-        console.Input.PushTextWithEnter(Path.Combine(_directory, "reference.yaml"));
+        string file = Path.Combine(_directory, "reference.yaml");
+        File.WriteAllText(file, "{}");
+        console.Input.PushTextWithEnter(file);
         return console;
     }
 

@@ -1,6 +1,7 @@
 using DevToolbox.Presentation.Shell;
 using DevToolbox.Tools.ApiDelta.Core.Audit;
 using DevToolbox.Tools.ApiDelta.Core.Optimization;
+using DevToolbox.Tools.ApiDelta.Presentation.Prompts;
 using Spectre.Console;
 
 namespace DevToolbox.Tools.ApiDelta.Presentation.Rendering;
@@ -26,7 +27,7 @@ public sealed class ProposalsView
 
     private const string GroupsChoice = "Voir toutes les répétitions mesurées";
 
-    private const string NextView = "Terminer la consultation";
+    private const string NextView = "Revenir au menu OpenAPI";
 
     private readonly IAnsiConsole _console;
 
@@ -62,8 +63,7 @@ public sealed class ProposalsView
         while (!cancellationToken.IsCancellationRequested)
         {
             string chosen = _console.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Que souhaitez-vous regarder ?")
+                ApiDeltaDialog.Choice("Bilan du nettoyage : que souhaitez-vous consulter ?")
                     .AddChoices(SafeChoice, ReviewChoice, GroupsChoice, NextView));
 
             if (string.Equals(chosen, NextView, StringComparison.Ordinal))
