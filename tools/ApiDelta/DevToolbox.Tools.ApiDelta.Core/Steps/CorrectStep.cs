@@ -114,7 +114,7 @@ public sealed class CorrectStep : IToolStep
         context.Set(ApiDeltaContextKeys.Selection, selection with { Correction = chosen });
 
         Result<DependencyClosure> closure = _dependencies.Close(
-            [.. Roots(chosen, differences)], candidate, production, cancellationToken);
+            [.. Roots(chosen, differences)], candidate, production, cancellationToken, expandContainingObjects: false);
 
         if (closure.IsFailure)
         {

@@ -44,7 +44,7 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
 
         RunSelection? selection = context.Get<RunSelection>(ApiDeltaContextKeys.Selection);
 
-        if (selection is null)
+        if (selection is null || IsRemote(selection.CandidatePath))
         {
             // Tant que rien n'est choisi, il n'y a rien qui vaille d'être repris.
             return null;
@@ -115,6 +115,9 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
     /// Nomme un fichier et le début de son empreinte : assez pour que l'invite de reprise dise de quoi il
     /// s'agit, sans étaler soixante-quatre caractères sur un écran.
     /// </summary>
+    private static bool IsRemote(string? path) =>
+        Uri.TryCreate(path, UriKind.Absolute, out Uri? uri) && !uri.IsFile;
+
     private static string Label(string path, string? hash) =>
         string.IsNullOrWhiteSpace(hash)
             ? Path.GetFileName(path)
@@ -139,6 +142,12 @@ public sealed class ApiDeltaCheckpointFactory : IRunCheckpointFactory
 
         if (mode is null || production is null || output is null
             || !Enum.TryParse(mode, out RunMode parsed))
+        {
+            return null;
+        }
+
+        // Une collecte distante n'a pas d'identité de graphe vérifiée : aucun choix ancien ne doit survivre.
+        if (IsRemote(Key(run, ApiDeltaSelectionKinds.Candidate)))
         {
             return null;
         }

@@ -65,8 +65,14 @@ public sealed class NothingIsLostTests
 
         foreach (OperationSelector route in absent)
         {
-            Result<BuiltCorrection> built = _builder.Build(
-                Request(production, candidate, new CorrectionSelection([route])));
+            CorrectionRequest request = Request(production, candidate, new CorrectionSelection([route]));
+            Result<BuiltCorrection> built = _builder.Build(request);
+            if (request.Closure.Conflicts.Count > 0)
+            {
+                built.IsFailure.Should().BeTrue("une définition incompatible ne doit pas être substituée");
+                built.Failure!.Message.Should().Contain("Fusion refusée");
+                continue;
+            }
 
             built.IsSuccess.Should().BeTrue(
                 productionName + " + " + route.Display + " : " + built.Failure?.Message);
@@ -109,6 +115,12 @@ public sealed class NothingIsLostTests
                 production, candidate, new CorrectionSelection([route]));
 
             Result<BuiltCorrection> built = _builder.Build(request);
+            if (request.Closure.Conflicts.Count > 0)
+            {
+                built.IsFailure.Should().BeTrue("une définition incompatible ne doit pas être substituée");
+                built.Failure!.Message.Should().Contain("Fusion refusée");
+                continue;
+            }
 
             built.IsSuccess.Should().BeTrue(built.Failure?.Message);
 
