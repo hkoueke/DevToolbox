@@ -5,6 +5,7 @@ updates:
   # que l'on veut relire, plutôt que de laisser une référence vieillir en silence.
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
     commit-message:
