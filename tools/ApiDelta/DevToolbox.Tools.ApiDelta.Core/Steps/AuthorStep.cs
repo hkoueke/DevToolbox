@@ -44,8 +44,8 @@ public sealed class AuthorStep : IToolStep
 
     /// <inheritdoc />
     /// <remarks>
-    /// Idempotente au sens de la chaîne : rejouée, elle repose les questions que le registre n'a pas
-    /// déjà résolues. Le candidat est toujours reconstruit depuis la projection source intacte.
+    /// Rejouée, elle reconstruit le candidat depuis la projection source intacte et les décisions
+    /// courantes. Une ancienne sélection ne réserve donc aucune route dans la nouvelle.
     /// </remarks>
     public bool IsIdempotent => true;
 

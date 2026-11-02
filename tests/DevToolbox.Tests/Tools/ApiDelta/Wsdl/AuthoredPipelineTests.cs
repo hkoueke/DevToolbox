@@ -143,6 +143,104 @@ public sealed class AuthoredPipelineTests
         context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument).Should().BeSameAs(run.Candidate);
     }
 
+    [Theory]
+    [InlineData("creerClient", "modifierClient", HttpOperationMethod.Put)]
+    [InlineData("modifierClient", "creerClient", HttpOperationMethod.Post)]
+    public async Task An_unselected_suggestion_cannot_reserve_a_retained_route(
+        string selected, string unselected, HttpOperationMethod method)
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        AuthoredRoute route = Route(selected, "/clients", method) with { Placements = Fields(run, selected, false) };
+        run.Route(unselected).Should().Be(route.Selector, "le cas doit réutiliser la suggestion non retenue");
+        ToolRunContext context = await Author(run, new AuthoringRecord([route]));
+        SpecDocument candidate = context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument)!;
+        new OperationCatalog().List(candidate).Should().ContainSingle().Which.Selector.Should().Be(route.Selector);
+        WsdlFooting footing = context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting)!;
+        footing.Derivation.ForRoute(method.ToString(), "/clients")!.Subject.Should().Be(selected);
+        footing.Projection!.Routes.Keys.Should().Equal(selected);
+        AtId(run.Candidate, run.Route(unselected)).Should().Be(unselected, "la projection source reste intacte");
+
+        var compared = await new CompareStep(new DocumentComparer(new OpenApiMetamodel())).ExecuteAsync(context, CancellationToken.None);
+        compared.IsSuccess.Should().BeTrue(compared.Failure?.Message);
+        var differences = context.Get<IReadOnlyList<Difference>>(ApiDeltaContextKeys.Differences)!;
+        var catalogue = CorrectionCatalog.Build(run.Production, candidate, differences, new OperationCatalog(), footing);
+        catalogue.Should().ContainSingle().Which.Selector.Should().Be(route.Selector);
+        using TestConsole console = new();
+        console.Interactive();
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.Enter);
+        CorrectionSelection selection = new CorrectionPicker(console).Ask(catalogue);
+        selection.Routes.Should().Equal(route.Selector);
+        selection.Differences.Should().BeEmpty();
+        BuiltCorrection built = Build(run, context, selection, differences);
+        SpecDocument corrected = run.Reread(built.Serialized);
+        AtId(corrected, route.Selector).Should().Be(selected);
+        new OperationCatalog().List(corrected).Select(operation => operation.Selector).Should().Contain(
+            new OperationCatalog().List(run.Production).Select(operation => operation.Selector));
+        var verification = run.Verify(built);
+        verification.Established.Should().BeTrue(verification.Explanation);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Production_routes_and_actual_retained_decisions_still_block_real_collisions(bool productionCollision)
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        string path = productionCollision ? "/dossiers" : "/clients";
+        HttpOperationMethod method = productionCollision ? HttpOperationMethod.Get : HttpOperationMethod.Put;
+        AuthoredRoute first = Route("creerClient", path, method);
+        AuthoringRecord record = new(productionCollision ? [first] : [first, Route("modifierClient", path, method)]);
+        var (step, context) = Setup(run, record);
+
+        var result = await step.ExecuteAsync(context, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Failure!.Message.Should().Contain(first.Display).And.Contain("creerClient");
+        context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument).Should().BeSameAs(run.Candidate);
+        context.Get<SpecDocument>(ApiDeltaContextKeys.ProductionDocument).Should().BeSameAs(run.Production);
+    }
+
+    [Fact]
+    public async Task Retaining_nothing_produces_no_candidate_operations_and_no_selectable_corrections()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        ToolRunContext context = await Author(run, AuthoringRecord.Empty);
+        SpecDocument candidate = context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument)!;
+        new OperationCatalog().List(candidate).Should().BeEmpty();
+        var compared = await new CompareStep(new DocumentComparer(new OpenApiMetamodel())).ExecuteAsync(context, CancellationToken.None);
+        compared.IsSuccess.Should().BeTrue(compared.Failure?.Message);
+        var catalogue = CorrectionCatalog.Build(run.Production, candidate,
+            context.Get<IReadOnlyList<Difference>>(ApiDeltaContextKeys.Differences)!, new OperationCatalog());
+        catalogue.Should().BeEmpty();
+        using TestConsole console = new();
+        new CorrectionPicker(console).Ask(catalogue).IsEmpty.Should().BeTrue();
+        context.Get<SpecDocument>(ApiDeltaContextKeys.ProductionDocument).Should().BeSameAs(run.Production);
+        run.Projection.Routes.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Changing_selection_rebuilds_the_candidate_and_its_provenance_from_the_source()
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("placements.wsdl", "placements.wsdl");
+        ToolRunContext context = await Author(run, new AuthoringRecord([Route("creerClient", "/first", HttpOperationMethod.Post)]));
+        AuthoredRoute second = Route("modifierClient", "/second", HttpOperationMethod.Put);
+
+        var result = await StepFor(new AuthoringRecord([second])).ExecuteAsync(context, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Failure?.Message);
+        SpecDocument candidate = context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument)!;
+        new OperationCatalog().List(candidate).Should().ContainSingle().Which.Selector.Should().Be(second.Selector);
+        PointerNavigator.Find(candidate.Root, "/paths/~1first").Should().BeNull();
+        context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting)!.Derivation.ForRoute("PUT", "/second")!
+            .Subject.Should().Be("modifierClient");
+        run.Projection.Routes.Should().HaveCount(2);
+        AtId(run.Candidate, run.Route("creerClient")).Should().Be("creerClient");
+    }
+
+    private static string AtId(SpecDocument document, OperationSelector route) =>
+        PointerNavigator.Find(document.Root, At(route).Child("operationId").Json).Should().BeOfType<ScalarNode>().Subject.Text;
+
     private static async Task<ToolRunContext> Author(WsdlCorrectionRun run, AuthoringRecord record)
     {
         var (step, context) = Setup(run, record);
@@ -159,16 +257,21 @@ public sealed class AuthoredPipelineTests
 
     private static (AuthorStep Step, ToolRunContext Context) Setup(WsdlCorrectionRun run, AuthoringRecord record)
     {
-        IRouteAuthoringPrompt prompt = Substitute.For<IRouteAuthoringPrompt>();
-        prompt.AuthorAsync(Arg.Any<IReadOnlyList<AuthoringSubject>>(), Arg.Any<IReadOnlyList<string>>(),
-            Arg.Any<IReadOnlyList<OfferedHeader>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(record));
         ToolRunContext context = new(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, [ApiDeltaStepNames.Author, ApiDeltaStepNames.Compare]));
         context.Set(ApiDeltaContextKeys.WsdlContract, run.Contract);
         context.Set(ApiDeltaContextKeys.WsdlProjection, run.Projection);
         context.Set(ApiDeltaContextKeys.CandidateDocument, run.Candidate);
         context.Set(ApiDeltaContextKeys.ProductionDocument, run.Production);
         context.Set(ApiDeltaContextKeys.WsdlFooting, run.Footing);
-        return (new AuthorStep(prompt), context);
+        return (StepFor(record), context);
+    }
+
+    private static AuthorStep StepFor(AuthoringRecord record)
+    {
+        IRouteAuthoringPrompt prompt = Substitute.For<IRouteAuthoringPrompt>();
+        prompt.AuthorAsync(Arg.Any<IReadOnlyList<AuthoringSubject>>(), Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<IReadOnlyList<OfferedHeader>>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(record));
+        return new AuthorStep(prompt);
     }
 
     private static BuiltCorrection Build(WsdlCorrectionRun run, ToolRunContext context, CorrectionSelection selection,

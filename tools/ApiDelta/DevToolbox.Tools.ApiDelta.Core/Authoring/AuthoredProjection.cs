@@ -7,7 +7,7 @@ namespace DevToolbox.Tools.ApiDelta.Core.Authoring;
 /// <summary>Applique les décisions au candidat avant sa comparaison, sans altérer la projection source.</summary>
 public static class AuthoredProjection
 {
-    /// <summary>Compose les opérations et déplace leurs routes en conservant leur origine.</summary>
+    /// <summary>Compose uniquement les opérations retenues, avec leurs routes et leur origine.</summary>
     /// <param name="projection">La projection source, réutilisable lors d'une reprise.</param>
     /// <param name="authoring">Les décisions validées.</param>
     /// <param name="production">La production, dont les identifiants d'opération doivent rester uniques.</param>
@@ -19,12 +19,13 @@ public static class AuthoredProjection
         ArgumentNullException.ThrowIfNull(authoring);
         ArgumentNullException.ThrowIfNull(production);
         HashSet<string> heldIds = OperationIds(production);
-        SpecNode root = projection.Document.Root;
-        Dictionary<string, DerivedRoute> routes = new(projection.Routes, StringComparer.Ordinal);
-        List<(AuthoredRoute Route, SpecNode Operation)> operations = [];
+        SpecPointer paths = SpecPointer.Root.Child("paths");
+        // Une suggestion non retenue ne réserve rien. Les schémas restent disponibles pour la fermeture des dépendances.
+        SpecNode root = TreeEdits.Insert(projection.Document.Root, paths, TreeEdits.Mapping(paths, []));
+        Dictionary<string, DerivedRoute> routes = new(StringComparer.Ordinal);
         foreach (AuthoredRoute route in authoring.Routes)
         {
-            if (!routes.TryGetValue(route.Operation, out DerivedRoute? derived))
+            if (!projection.Routes.TryGetValue(route.Operation, out DerivedRoute? derived))
             {
                 throw new InvalidOperationException("L'opération « " + route.Operation + " » n'a pas de projection.");
             }
@@ -39,25 +40,14 @@ public static class AuthoredProjection
                 composed = TreeEdits.Remove(composed, SpecPointer.Root.Child("operationId"));
             }
 
-            operations.Add((route, composed));
-            root = TreeEdits.Remove(root, source);
-            SpecPointer path = SpecPointer.Root.Child("paths").Child(derived.Path);
-            if (PointerNavigator.Find(root, path.Json) is MappingNode { Entries.Count: 0 })
-            {
-                root = TreeEdits.Remove(root, path);
-            }
-        }
-
-        foreach (var (route, operation) in operations)
-        {
             SpecPointer target = At(route.Path, route.Selector.MethodKey);
             if (PointerNavigator.Find(root, target.Json) is not null)
             {
                 throw new InvalidOperationException("La route « " + route.Display + " » est déjà occupée dans le candidat.");
             }
 
-            root = TreeEdits.Insert(root, target, operation);
-            routes[route.Operation] = routes[route.Operation] with { Path = route.Path, Method = route.Method.ToString().ToUpperInvariant() };
+            root = TreeEdits.Insert(root, target, composed);
+            routes[route.Operation] = derived with { Path = route.Path, Method = route.Method.ToString().ToUpperInvariant() };
         }
 
         return projection with { Document = projection.Document with { Root = root }, Routes = routes };
