@@ -18,7 +18,55 @@ function ValidVersion([string]$Name) {
  Require ($Name -cmatch "^v$num\.$num\.$num(?:-$id(?:\.$id)*)?$") "Tag SemVer invalide: $Name"
 }
 if ($EventName -eq 'pull_request') {
- ValidBranch $HeadRef
+ if ($HeadRef -notmatch '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]* ($BaseRef -in @('master','develop')) "Cible PR interdite: $BaseRef"
+ if ($BaseRef -eq 'master') {
+   Require ($HeadRef -match '^(release/v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?|hotfix/[A-Za-z0-9][A-Za-z0-9._/-]*)$') 'master accepte release/* ou hotfix/*'
+ } else {
+   Require ($HeadRef -eq 'master' -or $HeadRef -match '^(feature|release|hotfix)/' -or $HeadRef -match '^dependabot/(github_actions|nuget)/[A-Za-z0-9][A-Za-z0-9._/-]* 'develop accepte feature/*, release/*, hotfix/* ou master'
+ }
+} elseif ($RefType -eq 'tag') {
+ ValidVersion $RefName
+ if (-not $SkipGit) {
+   $tagCommit=(git rev-parse "refs/tags/$RefName^{commit}").Trim()
+   Require ($LASTEXITCODE -eq 0) 'Tag introuvable'
+   $master=(git rev-parse 'refs/remotes/origin/master^{commit}').Trim()
+   Require ($LASTEXITCODE -eq 0) 'master introuvable'
+   Require ($tagCommit -eq $master) 'Le tag doit cibler exactement HEAD de master'
+ }
+} elseif ($EventName -eq 'push' -and $RefType -eq 'branch') { ValidBranch $RefName }
+Write-Host "GitFlow valide: $EventName $RefName"
+) { ValidBranch $HeadRef }
+ Require ($BaseRef -in @('master','develop')) "Cible PR interdite: $BaseRef"
+ if ($BaseRef -eq 'master') {
+   Require ($HeadRef -match '^(release/v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?|hotfix/[A-Za-z0-9][A-Za-z0-9._/-]*)$') 'master accepte release/* ou hotfix/*'
+ } else {
+   Require ($HeadRef -eq 'master' -or $HeadRef -match '^(feature|release|hotfix)/') 'develop accepte feature/*, release/*, hotfix/* ou master'
+ }
+} elseif ($RefType -eq 'tag') {
+ ValidVersion $RefName
+ if (-not $SkipGit) {
+   $tagCommit=(git rev-parse "refs/tags/$RefName^{commit}").Trim()
+   Require ($LASTEXITCODE -eq 0) 'Tag introuvable'
+   $master=(git rev-parse 'refs/remotes/origin/master^{commit}').Trim()
+   Require ($LASTEXITCODE -eq 0) 'master introuvable'
+   Require ($tagCommit -eq $master) 'Le tag doit cibler exactement HEAD de master'
+ }
+} elseif ($EventName -eq 'push' -and $RefType -eq 'branch') { ValidBranch $RefName }
+Write-Host "GitFlow valide: $EventName $RefName"
+) 'develop accepte feature/*, release/*, hotfix/* ou master'
+ }
+} elseif ($RefType -eq 'tag') {
+ ValidVersion $RefName
+ if (-not $SkipGit) {
+   $tagCommit=(git rev-parse "refs/tags/$RefName^{commit}").Trim()
+   Require ($LASTEXITCODE -eq 0) 'Tag introuvable'
+   $master=(git rev-parse 'refs/remotes/origin/master^{commit}').Trim()
+   Require ($LASTEXITCODE -eq 0) 'master introuvable'
+   Require ($tagCommit -eq $master) 'Le tag doit cibler exactement HEAD de master'
+ }
+} elseif ($EventName -eq 'push' -and $RefType -eq 'branch') { ValidBranch $RefName }
+Write-Host "GitFlow valide: $EventName $RefName"
+) { ValidBranch $HeadRef }
  Require ($BaseRef -in @('master','develop')) "Cible PR interdite: $BaseRef"
  if ($BaseRef -eq 'master') {
    Require ($HeadRef -match '^(release/v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?|hotfix/[A-Za-z0-9][A-Za-z0-9._/-]*)$') 'master accepte release/* ou hotfix/*'
