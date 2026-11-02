@@ -212,6 +212,14 @@ public sealed class SelectStep : IToolStep
                 "Ce mode compare deux descriptions, et la description candidate n'a pas été désignée.");
         }
 
+        // Les URLs WSDL sont contrôlées et matérialisées par ReadWsdl, jamais sondées comme fichiers.
+        if (Uri.TryCreate(selection.CandidatePath, UriKind.Absolute, out Uri? remote) && !remote.IsFile)
+        {
+            return remote.Scheme is "https" or "http"
+                ? Result.Success(verified)
+                : Result.Fail<RunSelection>(FailureReason.InvalidInput, "Le WSDL distant exige une URL HTTP(S) absolue.");
+        }
+
         Result<SpecFileFacts> candidate = await _probe
             .ProbeAsync(selection.CandidatePath, selection.Limits.MaxBytes, cancellationToken)
             .ConfigureAwait(false);

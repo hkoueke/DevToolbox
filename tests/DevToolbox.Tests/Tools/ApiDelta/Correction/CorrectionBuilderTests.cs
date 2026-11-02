@@ -27,6 +27,32 @@ public sealed class CorrectionBuilderTests
         new OperationCatalog(), new SplicingEmitter(new CanonicalEmitter()));
 
     [Fact]
+    public void A_conflicting_WarningResult_cannot_silently_reuse_the_production_definition()
+    {
+        const string template = """
+            {"openapi":"3.0.3","info":{"title":"Test","version":"1.0.0"},
+            "paths":{"/warnings":{"get":{"responses":{"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/WarningResult"}}}}}}}},
+            "components":{"schemas":{"WarningResult":{"type":"TYPE"}}}}
+            """;
+        SpecDocument production = _reader.ReadBytes(Encoding.UTF8.GetBytes(template.Replace("TYPE", "string", StringComparison.Ordinal)),
+            "production.json", DocumentRole.Production, LoadLimits.Default).Document!;
+        SpecDocument candidate = _reader.ReadBytes(Encoding.UTF8.GetBytes(template.Replace("TYPE", "integer", StringComparison.Ordinal)),
+            "candidate.json", DocumentRole.Candidate, LoadLimits.Default).Document!;
+        var closure = new DependencyResolver(new OpenApiMetamodel()).Close(
+            [SpecPointer.Root.Child("paths").Child("/warnings").Child("get")], candidate, production, CancellationToken.None);
+        closure.IsSuccess.Should().BeTrue();
+        closure.Value.Conflicts.Should().ContainSingle().Which.Name.Should().Be("WarningResult");
+        CorrectionRequest request = new(production, candidate, [],
+            new CorrectionSelection([new("/warnings", HttpOperationMethod.Get)]), closure.Value, null, CanonicalFormatting.Default);
+        var plan = _builder.Plan(request);
+        var built = _builder.Build(request);
+        plan.IsFailure.Should().BeTrue();
+        built.IsFailure.Should().BeTrue();
+        built.Failure!.Message.Should().Contain("WarningResult").And.Contain("type")
+            .And.Contain("renommez").And.Contain("Aucun fichier fusionné");
+    }
+
+    [Fact]
     public void An_empty_selection_writes_nothing_and_says_why()
     {
         Result<BuiltCorrection> built = _builder.Build(Request(new CorrectionSelection()));

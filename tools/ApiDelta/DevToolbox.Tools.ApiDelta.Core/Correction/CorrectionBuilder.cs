@@ -100,6 +100,15 @@ public sealed class CorrectionBuilder : ICorrectionBuilder
     /// <summary>Établit les épissures, le plan et les traces, sans rien écrire.</summary>
     private Result<Preparation> Prepare(CorrectionRequest request)
     {
+        if (request.Closure.Conflicts.Count > 0)
+        {
+            return Result.Fail<Preparation>(FailureReason.InvalidInput,
+                "Fusion refusée : composants homonymes incompatibles : "
+                + string.Join(" ; ", request.Closure.Conflicts.Select(conflict =>
+                    conflict.Kind + "/" + conflict.Name + " (" + string.Join(", ", conflict.DifferingFields) + ")"))
+                + ". Aucune définition n’a été choisie automatiquement. Harmonisez les définitions ou renommez le composant candidat et ses références, puis relancez la comparaison. Aucun fichier fusionné n’a été écrit.");
+        }
+
         HashSet<OperationSelector> held =
         [
             .. _catalog.List(request.Production).Select(operation => operation.Selector),

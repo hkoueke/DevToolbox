@@ -18,6 +18,42 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
 
     public ApiDeltaDialoguesTests() => Directory.CreateDirectory(_directory);
 
+    [Theory]
+    [InlineData("https://contracts.example/service?singleWsdl")]
+    [InlineData("https://contracts.example/service?wsdl")]
+    public async Task Consolidation_accepts_a_remote_candidate_without_probing_it_as_a_local_file(string source)
+    {
+        using TestConsole console = NewConsole();
+        string file = Path.Combine(_directory, "reference.yaml");
+        await File.WriteAllTextAsync(file, "{}");
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushTextWithEnter(file);
+        console.Input.PushTextWithEnter(source);
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushKey(ConsoleKey.Enter);
+        var context = new ToolRunContext(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, ["Sélection"]));
+        var result = await DevToolbox.Tests.Tools.ApiDelta.Golden.WriteStepFactory.Select(new ApiDeltaPrompt(console))
+            .ExecuteAsync(context, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue(result.Failure?.Message);
+        context.Get<RunSelection>(DevToolbox.Tools.ApiDelta.Core.Steps.ApiDeltaContextKeys.Selection)!
+            .CandidatePath.Should().Be(source);
+        console.Output.Should().Contain("collecte sécurisée").And.NotContain("Entrée introuvable");
+    }
+
+    [Fact]
+    public void A_component_conflict_is_visible_in_the_failed_run_summary()
+    {
+        using TestConsole console = NewConsole();
+        var now = DateTimeOffset.UtcNow;
+        ToolRun run = new(Guid.NewGuid(), "apidelta", now, ["Correction"]);
+        run.Steps[0].Start(now);
+        run.Steps[0].Fail(now, new DevToolbox.Domain.Results.Failure(DevToolbox.Domain.Results.FailureReason.InvalidInput, "Fusion refusée : schemas/WarningResult (type). Harmonisez les définitions ou renommez le composant candidat et ses références."));
+        run.End(RunOutcome.Failed, now);
+        new SelectionSummaryRenderer(console).Render(new RunSelection(RunMode.Consolidate,
+            "reference.yaml", "", _directory), run);
+        console.Output.Should().Contain("WarningResult").And.Contain("renommez").And.NotContain("Traitement terminé");
+    }
+
     [Fact]
     public void Default_analysis_asks_only_for_relevant_files_and_explains_the_report()
     {

@@ -1,3 +1,5 @@
+# Les modèles REST de production ont des noms distincts des modèles SOAP projetés.
+# Les collisions incompatibles sont éprouvées séparément avec WarningResult.
 # La production contre laquelle le WSDL est comparé.
 #
 # Choisie pour que la couverture ait les trois états : elle répond à deux opérations du catalogue, n'en
@@ -22,7 +24,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Document'
+              $ref: '#/components/schemas/ProductionDocument'
       responses:
         '201':
           description: Le document est déposé.
@@ -56,7 +58,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Document'
+                $ref: '#/components/schemas/ProductionDocument'
         '404':
           $ref: '#/components/responses/Erreur'
 
@@ -74,7 +76,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Dossier'
+                  $ref: '#/components/schemas/ProductionDossier'
 components:
   schemas:
     Identifiant:
@@ -84,7 +86,7 @@ components:
     Etat:
       type: string
       enum: [brouillon, publie, archive]
-    Document:
+    ProductionDocument:
       type: object
       required: [id, titre, etat, depose]
       properties:
@@ -105,7 +107,7 @@ components:
         depose:
           type: string
           format: date-time
-    Dossier:
+    ProductionDossier:
       type: object
       required: [id, libelle]
       properties:
