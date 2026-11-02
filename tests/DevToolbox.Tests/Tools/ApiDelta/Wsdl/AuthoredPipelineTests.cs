@@ -238,6 +238,74 @@ public sealed class AuthoredPipelineTests
         AtId(run.Candidate, run.Route("creerClient")).Should().Be("creerClient");
     }
 
+    [Theory]
+    [InlineData("ObtenirTypesDocuments", true)]
+    [InlineData("AjouterDocuments", false)]
+    [InlineData("CategoriserDocuments", false)]
+    public async Task Shared_suggestions_do_not_block_selecting_one_operation_and_preserve_its_message(string name, bool read)
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("authoring-collisions.wsdl", "authoring-collisions.wsdl");
+        run.Projection.OperationSources.Should().HaveCount(3);
+        run.Projection.Routes["AjouterDocuments"].Display.Should().Be("POST /documents");
+        run.Projection.Routes["CategoriserDocuments"].Display.Should().Be("POST /documents");
+        PointerNavigator.Find(run.Candidate.Root, "/paths/~1documents/post").Should().BeNull();
+        AuthoredRoute route = Route(name, "/Document/Chosen", read ? HttpOperationMethod.Get : HttpOperationMethod.Post)
+            with { Placements = Fields(run, name, read) };
+        route.Placements.Should().ContainSingle("le message réel, y compris l'entrée anonyme, doit être retrouvé");
+        ToolRunContext context = await Author(run, new AuthoringRecord([route]));
+        SpecDocument candidate = context.Get<SpecDocument>(ApiDeltaContextKeys.CandidateDocument)!;
+        new OperationCatalog().List(candidate).Should().ContainSingle().Which.Selector.Should().Be(route.Selector);
+        context.Get<WsdlFooting>(ApiDeltaContextKeys.WsdlFooting)!.Derivation.ForRoute(route.Method.ToString(), route.Path)!
+            .Subject.Should().Be(name);
+        var compared = await new CompareStep(new DocumentComparer(new OpenApiMetamodel())).ExecuteAsync(context, CancellationToken.None);
+        compared.IsSuccess.Should().BeTrue(compared.Failure?.Message);
+        var differences = context.Get<IReadOnlyList<Difference>>(ApiDeltaContextKeys.Differences)!;
+        var catalogue = CorrectionCatalog.Build(run.Production, candidate, differences, new OperationCatalog());
+        catalogue.Should().ContainSingle().Which.State.Should().Be(RouteState.Absent);
+        BuiltCorrection built = Build(run, context, new CorrectionSelection([route.Selector]), differences);
+        SpecDocument corrected = run.Reread(built.Serialized);
+        AtId(corrected, route.Selector).Should().Be(name);
+        if (read)
+        {
+            PointerNavigator.Find(corrected.Root, At(route.Selector).Child("requestBody").Json).Should().BeNull();
+            PointerNavigator.Find(corrected.Root, At(route.Selector).Child("parameters").Item(0).Child("name").Json)
+                .Should().BeOfType<ScalarNode>().Which.Text.Should().Be("produit");
+        }
+        else
+        {
+            var properties = PointerNavigator.Find(corrected.Root, At(route.Selector).Json
+                + "/requestBody/content/application~1json/schema/properties").Should().BeOfType<MappingNode>().Subject;
+            properties.Entries.Select(entry => entry.Key.Text).Should().Equal(name is "AjouterDocuments" ? "content" : "category");
+        }
+
+        var verification = run.Verify(built);
+        verification.Established.Should().BeTrue(verification.Explanation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Two_ambiguous_operations_can_be_authored_with_distinct_paths_or_methods(bool samePath)
+    {
+        using WsdlCorrectionRun run = WsdlCorrectionRun.Delivered("authoring-collisions.wsdl", "authoring-collisions.wsdl");
+        AuthoringRecord record = new([
+            Route("AjouterDocuments", "/Document/Actions", HttpOperationMethod.Post)
+                with { Placements = Fields(run, "AjouterDocuments", false) },
+            Route("CategoriserDocuments", samePath ? "/Document/Actions" : "/Document/Categories", HttpOperationMethod.Put)
+                with { Placements = Fields(run, "CategoriserDocuments", false) },
+        ]);
+        ToolRunContext context = await Author(run, record);
+        BuiltCorrection built = Build(run, context, new CorrectionSelection([.. record.Routes.Select(route => route.Selector)]), []);
+        SpecDocument corrected = run.Reread(built.Serialized);
+        foreach (AuthoredRoute route in record.Routes)
+        {
+            AtId(corrected, route.Selector).Should().Be(route.Operation);
+        }
+
+        var verification = run.Verify(built);
+        verification.Established.Should().BeTrue(verification.Explanation);
+    }
+
     private static string AtId(SpecDocument document, OperationSelector route) =>
         PointerNavigator.Find(document.Root, At(route).Child("operationId").Json).Should().BeOfType<ScalarNode>().Subject.Text;
 

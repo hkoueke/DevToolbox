@@ -1,0 +1,15 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:t="urn:anonymous-test"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:anonymous-test">
+ <types><xs:schema targetNamespace="urn:anonymous-test" elementFormDefault="qualified">
+  <xs:complexType name="__inline_Request"><xs:sequence><xs:element name="namedOnly" type="xs:string"/></xs:sequence></xs:complexType>
+  <xs:element name="NamedRequest" type="t:__inline_Request"/>
+  <xs:element name="Request"><xs:complexType><xs:sequence>
+   <xs:element name="filter" minOccurs="0"><xs:simpleType><xs:restriction base="xs:string"><xs:enumeration value="one"/><xs:enumeration value="two"/></xs:restriction></xs:simpleType></xs:element>
+   <xs:element name="children" minOccurs="0" maxOccurs="unbounded" nillable="true"><xs:complexType><xs:sequence><xs:element name="value" type="xs:int"/></xs:sequence></xs:complexType></xs:element>
+  </xs:sequence></xs:complexType></xs:element>
+  <xs:element name="Response"><xs:complexType><xs:sequence><xs:element name="accepted" type="xs:boolean"/></xs:sequence></xs:complexType></xs:element>
+ </xs:schema></types>
+ <message name="Input"><part name="parameters" element="t:Request"/></message>
+ <message name="Output"><part name="parameters" element="t:Response"/></message>
+ <portType name="Service"><operation name="Inspecter"><input message="t:Input"/><output message="t:Output"/></operation></portType>
+</definitions>

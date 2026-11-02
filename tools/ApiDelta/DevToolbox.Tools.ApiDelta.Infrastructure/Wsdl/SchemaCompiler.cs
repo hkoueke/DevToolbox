@@ -93,10 +93,11 @@ internal static class SchemaCompiler
                 Position: new Core.Syntax.SourcePosition(failure.LineNumber, failure.LinePosition)));
         }
 
+        XsdTypeNames names = new(set);
         return new SchemaSetResult(
             set,
-            XsdTypeReader.Read(set, document, limits, diagnostics),
-            XsdTypeReader.Elements(set),
+            XsdTypeReader.Read(set, names, document, limits, diagnostics),
+            XsdTypeReader.Elements(set, names),
             walker.Documents,
             walker.Unresolved);
     }

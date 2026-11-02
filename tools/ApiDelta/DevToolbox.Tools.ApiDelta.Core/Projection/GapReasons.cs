@@ -49,6 +49,8 @@ public static class GapReasons
             "le code de statut d'un défaut SOAP est déduit, et non déclaré.",
         ProjectionGapReason.SoapRole =>
             "l'obligation d'un en-tête SOAP survit, son rôle ne survit pas.",
+        ProjectionGapReason.RouteSuggestionCollision =>
+            "plusieurs opérations partagent cette suggestion d'adresse ; leur adresse HTTP relève d'un choix utilisateur.",
         _ => throw new ArgumentOutOfRangeException(
             nameof(reason), reason, "Ce motif d'écart n'a pas de raison écrite."),
     };

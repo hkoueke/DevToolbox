@@ -193,6 +193,12 @@ public sealed class DerivationIndex
                 continue;
             }
 
+            if (PointerNavigator.Find(projection.Document.Root,
+                SpecPointer.Root.Child(Paths).Child(route.Path).Child(route.Method.ToLowerInvariant()).Json) is null)
+            {
+                continue;
+            }
+
             routes[Key(route.Method, route.Path)] = new DerivedOrigin(
                 operation.Name, operation.Location, Worth(gaps, operation.Name));
         }

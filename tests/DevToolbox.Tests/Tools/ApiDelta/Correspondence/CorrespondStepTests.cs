@@ -26,6 +26,41 @@ public sealed class CorrespondStepTests
     private static readonly DateTimeOffset Now = new(2026, 10, 22, 9, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task A_projection_failure_returns_a_diagnostic_instead_of_terminating_the_application()
+    {
+        Harness harness = Harness.Confirming();
+        IWsdlProjector projector = Substitute.For<IWsdlProjector>();
+        projector.Project(Arg.Any<WsdlContract>(), Arg.Any<OpenApiVersion>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(_ => throw new InvalidOperationException("Projection impossible pour cet essai."));
+
+        var result = await new CorrespondStep(projector, new SimilarityProposer(), harness.Prompt)
+            .ExecuteAsync(harness.Context, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Failure!.Reason.Should().Be(FailureReason.InvalidInput);
+        result.Failure.Message.Should().Contain("contrat WSDL").And.Contain("Projection impossible");
+    }
+
+    [Fact]
+    public async Task Shared_suggestions_do_not_prevent_correspondence_or_hide_operations()
+    {
+        Harness harness = Harness.Confirming();
+        WsdlContract original = harness.Context.Get<WsdlContract>(ApiDeltaContextKeys.WsdlContract)!;
+        WsdlOperation source = original.Operations[0];
+        harness.Context.Set(ApiDeltaContextKeys.WsdlContract, original with { Operations = [
+            source with { Name = "AjouterDocuments" }, source with { Name = "CategoriserDocuments" },
+            source with { Name = "ObtenirTypesDocuments" },
+        ] });
+
+        var result = await harness.RunAsync();
+
+        result.IsSuccess.Should().BeTrue(result.Failure?.Message);
+        var projection = harness.Context.Get<ProjectionResult>(ApiDeltaContextKeys.WsdlProjection)!;
+        projection.OperationSources.Keys.Should().BeEquivalentTo("AjouterDocuments", "CategoriserDocuments", "ObtenirTypesDocuments");
+        harness.Coverage().Entries.Should().HaveCount(3);
+    }
+
+    [Fact]
     public async Task Declining_succeeds_and_establishes_nothing()
     {
         // Renoncer est une réponse. La séance réussit, n'ayant rien comparé, et la couverture n'est pas

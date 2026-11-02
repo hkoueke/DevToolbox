@@ -79,11 +79,18 @@ public sealed class CorrespondStep : IToolStep
 
         context.Set(ApiDeltaContextKeys.ProductionRoutes, production);
 
-        ProjectionResult projected = _projector.Project(
-            contract,
-            production.Version,
-            (context.Get<Configuration.Ruleset>(ApiDeltaContextKeys.Ruleset)
-                ?? Configuration.Ruleset.Default).Wsdl.Table);
+        ProjectionResult projected;
+        try
+        {
+            projected = _projector.Project(contract, production.Version,
+                (context.Get<Configuration.Ruleset>(ApiDeltaContextKeys.Ruleset)
+                    ?? Configuration.Ruleset.Default).Wsdl.Table);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Result.Fail(FailureReason.InvalidInput,
+                "Le contrat WSDL n'a pas pu être préparé : " + exception.Message);
+        }
 
         context.Set(ApiDeltaContextKeys.WsdlProjection, projected);
         context.Set(ApiDeltaContextKeys.WsdlProjectionGaps, projected.Gaps);

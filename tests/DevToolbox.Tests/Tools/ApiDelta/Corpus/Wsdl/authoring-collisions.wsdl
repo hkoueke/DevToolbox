@@ -1,0 +1,30 @@
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:t="urn:authoring-test"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+ targetNamespace="urn:authoring-test">
+ <types><xs:schema targetNamespace="urn:authoring-test" elementFormDefault="qualified">
+ <xs:complexType name="Upload"><xs:sequence><xs:element name="content" type="xs:base64Binary"/></xs:sequence></xs:complexType>
+ <xs:complexType name="Category"><xs:sequence><xs:element name="category" type="xs:int"/></xs:sequence></xs:complexType>
+ <xs:complexType name="DocumentType"><xs:sequence><xs:element name="code" type="xs:string"/><xs:element name="label" type="xs:string"/></xs:sequence></xs:complexType>
+ <xs:complexType name="CatalogResult"><xs:sequence><xs:element name="types" type="t:DocumentType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+<xs:element name="AjouterRequete" type="t:Upload"/>
+<xs:element name="AjouterReponse" type="t:CatalogResult"/>
+<xs:element name="CategoriserRequete" type="t:Category"/>
+<xs:element name="CategoriserReponse" type="t:CatalogResult"/>
+<xs:element name="ObtenirTypesDocuments"><xs:complexType><xs:sequence><xs:element name="produit" type="xs:string" minOccurs="0" nillable="true"/></xs:sequence></xs:complexType></xs:element>
+<xs:element name="ObtenirTypesDocumentsResponse"><xs:complexType><xs:sequence><xs:element name="Result" type="t:CatalogResult" minOccurs="0" nillable="true"/></xs:sequence></xs:complexType></xs:element>
+</xs:schema></types>
+<message name="AjouterDocumentsInput"><part name="parameters" element="t:AjouterRequete"/></message>
+<message name="AjouterDocumentsOutput"><part name="parameters" element="t:AjouterReponse"/></message>
+<message name="CategoriserDocumentsInput"><part name="parameters" element="t:CategoriserRequete"/></message>
+<message name="CategoriserDocumentsOutput"><part name="parameters" element="t:CategoriserReponse"/></message>
+<message name="ObtenirTypesDocumentsInput"><part name="parameters" element="t:ObtenirTypesDocuments"/></message>
+<message name="ObtenirTypesDocumentsOutput"><part name="parameters" element="t:ObtenirTypesDocumentsResponse"/></message>
+<portType name="Service">
+<operation name="AjouterDocuments"><input message="t:AjouterDocumentsInput"/><output message="t:AjouterDocumentsOutput"/></operation>
+<operation name="CategoriserDocuments"><input message="t:CategoriserDocumentsInput"/><output message="t:CategoriserDocumentsOutput"/></operation>
+<operation name="ObtenirTypesDocuments"><input message="t:ObtenirTypesDocumentsInput"/><output message="t:ObtenirTypesDocumentsOutput"/></operation>
+</portType><binding name="Binding" type="t:Service"><soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+<operation name="AjouterDocuments"><soap:operation soapAction="urn:authoring-test:AjouterDocuments"/><input><soap:body use="literal"/></input><output><soap:body use="literal"/></output></operation>
+<operation name="CategoriserDocuments"><soap:operation soapAction="urn:authoring-test:CategoriserDocuments"/><input><soap:body use="literal"/></input><output><soap:body use="literal"/></output></operation>
+<operation name="ObtenirTypesDocuments"><soap:operation soapAction="urn:authoring-test:ObtenirTypesDocuments"/><input><soap:body use="literal"/></input><output><soap:body use="literal"/></output></operation>
+</binding></definitions>
