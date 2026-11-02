@@ -26,7 +26,7 @@ public sealed class ProjectedDocumentTests : IDisposable
     public ProjectedDocumentTests() => Directory.CreateDirectory(_root);
 
     [Fact]
-    public void Colliding_derived_routes_are_refused_instead_of_silently_overwritten()
+    public void Colliding_suggestions_preserve_each_operation_and_require_explicit_authoring()
     {
         WsdlContract original = ReadContract();
         WsdlOperation source = original.Operations[0];
@@ -39,10 +39,20 @@ public sealed class ProjectedDocumentTests : IDisposable
             ],
         };
 
-        Action project = () => new Projector().Project(collision, OpenApiVersion.V30);
+        ProjectionResult projected = new Projector().Project(collision, OpenApiVersion.V30);
 
-        project.Should().Throw<InvalidOperationException>()
-            .WithMessage("*plusieurs opérations WSDL*GET /documents*");
+        projected.Routes.Should().HaveCount(2);
+        projected.OperationSources.Keys.Should().BeEquivalentTo("lireDocument", "getDocument");
+        foreach (var entry in projected.OperationSources)
+        {
+            (entry.Value as MappingNode)!.Find("operationId").Should().BeOfType<ScalarNode>().Which.Text.Should().Be(entry.Key);
+            entry.Value.Span.Should().Be(ByteSpan.None);
+        }
+
+        PointerNavigator.Find(projected.Document.Root, "/paths/~1documents/get").Should().BeNull();
+        projected.Gaps.Count(gap => gap.Reason == ProjectionGapReason.RouteSuggestionCollision).Should().Be(2);
+        DerivationIndex.From(collision, projected).ForRoute("GET", "/documents").Should().BeNull();
+
     }
 
     [Fact]

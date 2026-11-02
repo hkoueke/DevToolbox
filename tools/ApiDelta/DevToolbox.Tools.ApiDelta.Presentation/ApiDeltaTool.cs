@@ -139,10 +139,21 @@ public sealed class ApiDeltaTool : ITool
 
         if (run.Outcome != RunOutcome.Success)
         {
-            Pause();
+            if (run.Outcome is not RunOutcome.Cancelled || context.Get<RunSelection>(ApiDeltaContextKeys.Selection) is not null)
+            {
+                Pause();
+            }
+
             return run;
         }
 
+        Consult(context, cancellationToken);
+
+        return run;
+    }
+
+    private void Consult(ToolRunContext context, CancellationToken cancellationToken)
+    {
         if (context.Get<IReadOnlyList<Difference>>(ApiDeltaContextKeys.Differences) is { } differences)
         {
             _comparison.Show(
@@ -152,9 +163,12 @@ public sealed class ApiDeltaTool : ITool
                 cancellationToken);
         }
 
+        bool finishedThroughMenu = false;
         if (context.Get<AuditResult>(ApiDeltaContextKeys.Audit) is { } audit)
         {
-            _findings.Show(audit, cancellationToken);
+            _findings.Show(audit, cancellationToken,
+                hasNextView: context.Get<OptimizationPlan>(ApiDeltaContextKeys.Plan) is not null);
+            finishedThroughMenu = audit.Findings.Count > 0;
         }
 
         if (context.Get<OptimizationPlan>(ApiDeltaContextKeys.Plan) is { } plan
@@ -165,10 +179,13 @@ public sealed class ApiDeltaTool : ITool
                 production.ByteLength,
                 context.Get<OptimizationOutcome>(ApiDeltaContextKeys.Optimization),
                 cancellationToken);
+            finishedThroughMenu = plan.Groups.Count > 0;
         }
 
-        Pause();
-        return run;
+        if (!finishedThroughMenu)
+        {
+            Pause();
+        }
     }
 
     private void RenderOutcome(ToolRun run, ToolRunContext context)
@@ -204,7 +221,7 @@ public sealed class ApiDeltaTool : ITool
 
     private void Pause()
     {
-        _console.MarkupLine("[grey]Appuyez sur Entrée pour revenir au menu.[/]");
+        _console.MarkupLine("[bold cyan]Entrée : revenir au menu OpenAPI.[/]");
         _console.Input.ReadKey(intercept: true);
     }
 

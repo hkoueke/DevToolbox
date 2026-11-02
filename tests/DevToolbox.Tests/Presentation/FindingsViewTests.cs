@@ -113,6 +113,28 @@ public sealed class FindingsViewTests
         console.Dispose();
     }
 
+    [Fact]
+    public void Returning_from_the_rule_list_keeps_the_user_in_the_verification_menu()
+    {
+        using TestConsole console = new();
+        console.Interactive();
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Enter); // rules
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Enter); // return from rule list
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.DownArrow);
+        console.Input.PushKey(ConsoleKey.Enter); // explicitly continue to cleanup summary
+        AuditResult audit = new([Finding("AUD-100", FindingSeverity.Warning, 100)],
+            [new RuleOutcome("AUD-100", RuleState.Evaluated, 1)]);
+
+        new FindingsView(console).Show(audit, CancellationToken.None);
+
+        console.Input.IsKeyAvailable().Should().BeFalse("retour à la liste ne doit pas quitter le rapport");
+        console.Output.Should().Contain("Revenir au menu des vérifications").And.Contain("Passer au bilan du nettoyage")
+            .And.Contain("Le même paramètre est écrit 14 fois à l’identique".Replace("’", "'", StringComparison.Ordinal));
+    }
+
     private static Finding Finding(string ruleId, FindingSeverity severity, long? saved) =>
         new(
             ruleId,

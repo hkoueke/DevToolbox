@@ -44,24 +44,24 @@ public sealed class Projector : Abstractions.IWsdlProjector
         // niveau est une façon d'écrire, pas une partie du contrat : deux livraisons du même service
         // qui les auraient rangées autrement produiraient sinon deux documents différents, et la
         // comparaison annoncerait un changement là où personne n'en a fait.
-        HashSet<string> occupiedRoutes = new(StringComparer.OrdinalIgnoreCase);
-
-        foreach (WsdlOperation operation in contract.Operations.OrderBy(
-            one => one.Name, StringComparer.Ordinal))
+        var suggestions = contract.Operations.OrderBy(one => one.Name, StringComparer.Ordinal)
+            .Select(operation => (Operation: operation, Route: RouteDerivation.Derive(operation.Name, verbs))).ToArray();
+        Dictionary<string, int> counts = suggestions.GroupBy(one => one.Route.Display, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        Dictionary<string, SpecNode> sources = new(StringComparer.Ordinal);
+        foreach (var (operation, route) in suggestions)
         {
-            DerivedRoute route = RouteDerivation.Derive(operation.Name, verbs);
-
-            string routeKey = route.Method + " " + route.Path;
-            if (!occupiedRoutes.Add(routeKey))
+            routes[operation.Name] = route;
+            SchemaDraft action = Operation(contract, operation, version, gaps, schemaNames);
+            sources[operation.Name] = DraftWriter.Write(action, SpecPointer.Root);
+            if (counts[route.Display] > 1)
             {
-                throw new InvalidOperationException(
-                    "Projection OpenAPI ambiguë : plusieurs opérations WSDL correspondent à "
-                    + routeKey + ". Une correspondance explicite est nécessaire.");
+                gaps.Add(new ProjectionGap(ProjectionGapReason.RouteSuggestionCollision,
+                    ProjectionConfidence.Approximate, route.Display, operation.Name, operation.Location));
+                continue;
             }
 
-            routes[operation.Name] = route;
-
-            Path(paths, contract, operation, route, version, gaps, schemaNames);
+            paths.Section(route.Path).Set(route.Method.ToLowerInvariant(), action);
         }
 
         int declined = Types(contract, schemas, version, gaps, schemaNames);
@@ -70,7 +70,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
             Document(paths, schemas, version),
             gaps,
             routes,
-            Count(contract, gaps, declined));
+            Count(contract, gaps, declined)) { OperationSources = sources };
     }
 
     /// <summary>Assemble le document : son en-tête, ses chemins, ses schémas.</summary>
@@ -105,22 +105,19 @@ public sealed class Projector : Abstractions.IWsdlProjector
             ReadOnlyMemory<byte>.Empty);
     }
 
-    /// <summary>Pose un chemin pour une opération, avec sa charge utile.</summary>
+    /// <summary>Projette une opération et sa charge utile sans lui attribuer de chemin HTTP.</summary>
     /// <remarks>
     /// La charge utile est le cœur de l'affaire. Une première version produisait des opérations sans
     /// corps de requête ni réponse : la comparaison y voyait bien les routes, mais ne pouvait jamais dire
     /// qu'un argument avait changé — c'est-à-dire la moitié de ce que l'outil promet.
     /// </remarks>
-    private static void Path(
-        SchemaDraft paths,
+    private static SchemaDraft Operation(
         WsdlContract contract,
         WsdlOperation operation,
-        DerivedRoute route,
         OpenApiVersion version,
         List<ProjectionGap> gaps,
         SchemaNameRegistry schemaNames)
     {
-        SchemaDraft item = paths.Section(route.Path);
         SchemaDraft action = new();
 
         action.Set("operationId", operation.Name);
@@ -147,7 +144,7 @@ public sealed class Projector : Abstractions.IWsdlProjector
                 gaps);
         }
 
-        item.Set(route.Method.ToLowerInvariant(), action);
+        return action;
     }
 
     /// <summary>Pose le corps de la requête, si l'opération en reçoit un.</summary>
