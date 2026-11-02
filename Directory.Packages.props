@@ -13,7 +13,7 @@
   <ItemGroup Label="Runtime">
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
     <!-- 10.9.0 : la version reprise du dépôt de référence, confirmée à jour lors de la restauration. -->
