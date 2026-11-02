@@ -18,3 +18,6 @@ Ne jamais déplacer un tag publié. Suspendre une livraison défaillante, docume
 
 ## Contrôles
 Les PR vers `master` n'acceptent que `release/*` et `hotfix/*`. Les PR Dependabot `dependabot/github_actions/*` et `dependabot/nuget/*` sont autorisées vers `develop` uniquement ; les autres familles de bots ne bénéficient d'aucune exception. Les PR vers `develop` acceptent `feature/*`, `release/*`, `hotfix/*` et `master`. Les pushes `release/*` et `hotfix/*` sont testés. Les tags suivent SemVer et doivent pointer exactement vers HEAD de `master`. Les règles sont testées dans la CI. La configuration des protections GitHub reste du ressort d'un administrateur.
+
+## Audit automatique de la synchronisation
+Le job GitHub Actions `gitflow-sync` s'exécute chaque lundi et lors d'un lancement manuel du workflow. Il vérifie, sur l'historique Git réel, que `origin/master` est un ancêtre de `origin/develop`. Un échec indique une release ou un hotfix non réintégré : ouvrir une PR `master → develop`, résoudre les conflits si nécessaire, puis relancer l'audit. Cet audit est séparé du job `build` pour permettre la période normale entre publication et backmerge ; il ne fusionne jamais automatiquement. Les tests Git créent un dépôt temporaire et vérifient un tag valide, le refus d'un tag hors master, l'absence de backmerge et sa résolution.

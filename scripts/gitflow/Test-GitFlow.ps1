@@ -29,3 +29,47 @@ foreach($c in $cases) {
 }
 if($fail.Count) { throw "Tests echoues: $($fail -join ', ')" }
 Write-Host "$($cases.Count) scenarios GitFlow OK"
+
+# Integration tests use an isolated real Git repository to exercise ancestry and tag provenance.
+$original=(Get-Location).Path
+$tmp=Join-Path ([IO.Path]::GetTempPath()) ("devtoolbox-gitflow-"+[guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tmp | Out-Null
+try {
+ Set-Location $tmp
+ git init -q
+ if ($LASTEXITCODE -ne 0) { throw 'git init failed' }
+ git config user.email gitflow-tests@example.invalid
+ git config user.name GitFlowTests
+ 'initial' | Set-Content fixture.txt
+ git add fixture.txt
+ git commit -qm initial
+ $initial=(git rev-parse HEAD).Trim()
+ git branch -f master $initial
+ git branch -f develop $initial
+ git update-ref refs/remotes/origin/master $initial
+ git update-ref refs/remotes/origin/develop $initial
+ git tag -a v2.3.0 -m v2.3.0
+ & $script -EventName push -RefType tag -RefName v2.3.0 *> $null
+ & (Join-Path $PSScriptRoot 'Check-GitFlow-Sync.ps1') *> $null
+ git checkout -q -b feature/off-master
+ 'off-master' | Add-Content fixture.txt
+ git commit -qam off-master
+ git tag -a v2.3.1 -m v2.3.1
+ $rejected=$false
+ try { & $script -EventName push -RefType tag -RefName v2.3.1 *> $null } catch { $rejected=$true }
+ if (-not $rejected) { throw 'Off-master tag was accepted' }
+ git checkout -q master
+ 'production' | Add-Content fixture.txt
+ git commit -qam production
+ $production=(git rev-parse HEAD).Trim()
+ git update-ref refs/remotes/origin/master $production
+ $rejected=$false
+ try { & (Join-Path $PSScriptRoot 'Check-GitFlow-Sync.ps1') *> $null } catch { $rejected=$true }
+ if (-not $rejected) { throw 'Missing backmerge was accepted' }
+ git update-ref refs/remotes/origin/develop $production
+ & (Join-Path $PSScriptRoot 'Check-GitFlow-Sync.ps1') *> $null
+ Write-Host 'Git integration: valid tag, off-master rejection, backmerge detection and recovery OK'
+} finally {
+ Set-Location $original
+ Remove-Item -LiteralPath $tmp -Recurse -Force
+}

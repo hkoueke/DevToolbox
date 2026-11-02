@@ -22,6 +22,8 @@ on:
   pull_request:
     branches: [master, develop]
   workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
 
 permissions:
   contents: read
@@ -247,3 +249,16 @@ jobs:
             if ('${{ needs.build.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' }
             gh release create $tag @assets @flags
           }
+
+  # Audit hebdomadaire et manuel de la reintegration des releases/hotfixes.
+  # Independante de build : une release publiee ne bloque pas les PR pendant son backmerge.
+  gitflow-sync:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - name: Extraire les branches pour verifier la synchronisation
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Controler la reintegration master vers develop
+        run: ./scripts/gitflow/Check-GitFlow-Sync.ps1
