@@ -53,6 +53,33 @@ public sealed class ContractFetcherTests : IAsyncLifetime, IDisposable
         return Task.CompletedTask;
     }
 
+    [Theory]
+    [InlineData("?singleWsdl")]
+    [InlineData("?wsdl")]
+    public async Task A_metadata_URL_collects_its_relative_schema_dependencies(string query)
+    {
+        Serve("contrats/v2/catalogue.wsdl", "Wsdl.catalogue.wsdl");
+        Serve("contrats/v2/catalogue-types.xsd", "Wsdl.catalogue-types.xsd");
+        Serve("contrats/v2/commun.xsd", "Wsdl.commun.xsd");
+        var result = await FetchAsync("contrats/v2/catalogue.wsdl" + query);
+        result.IsSuccess.Should().BeTrue(result.Failure?.Message);
+        result.Value.Documents.Should().HaveCount(3);
+        result.Value.Operations.Should().HaveCount(5);
+        _requested.Should().Contain("/contrats/v2/catalogue-types.xsd");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "authentification")]
+    [InlineData(HttpStatusCode.NotFound, "404")]
+    public async Task Metadata_collection_names_a_failed_dependency_without_exposing_the_query(HttpStatusCode status, string expected)
+    {
+        Serve("catalogue.wsdl", "Wsdl.catalogue.wsdl");
+        _served["/catalogue-types.xsd"] = new Served("", "text/plain", status);
+        var fetched = await FetchAsync("catalogue.wsdl?singleWsdl");
+        fetched.IsFailure.Should().BeTrue();
+        fetched.Failure!.Message.Should().Contain(expected).And.NotContain("?singleWsdl");
+    }
+
     [Fact]
     public async Task The_whole_graph_is_written_then_read_back_from_the_files()
     {

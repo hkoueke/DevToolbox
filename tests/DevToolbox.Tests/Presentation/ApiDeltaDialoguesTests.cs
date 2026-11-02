@@ -1,3 +1,4 @@
+using NSubstitute;
 using DevToolbox.Domain.Runs;
 using DevToolbox.Tools.ApiDelta.Core;
 using DevToolbox.Tools.ApiDelta.Core.Authoring;
@@ -17,6 +18,61 @@ public sealed class ApiDeltaDialoguesTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "apidelta-dialogues-" + Guid.NewGuid().ToString("N"));
 
     public ApiDeltaDialoguesTests() => Directory.CreateDirectory(_directory);
+
+    [Theory]
+    [InlineData("https://contracts.example/service?singleWsdl")]
+    [InlineData("https://contracts.example/service?wsdl")]
+    public async Task Consolidation_accepts_a_remote_candidate_without_probing_it_as_a_local_file(string source)
+    {
+        using TestConsole console = NewConsole();
+        string file = Path.Combine(_directory, "reference.yaml");
+        await File.WriteAllTextAsync(file, "{}");
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushTextWithEnter(file);
+        console.Input.PushTextWithEnter(source);
+        console.Input.PushKey(ConsoleKey.Enter);
+        console.Input.PushKey(ConsoleKey.Enter);
+        var context = new ToolRunContext(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, ["Sélection"]));
+        var result = await DevToolbox.Tests.Tools.ApiDelta.Golden.WriteStepFactory.Select(new ApiDeltaPrompt(console))
+            .ExecuteAsync(context, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue(result.Failure?.Message);
+        context.Get<RunSelection>(DevToolbox.Tools.ApiDelta.Core.Steps.ApiDeltaContextKeys.Selection)!
+            .CandidatePath.Should().Be(source);
+        console.Output.Should().Contain("collecte").And.Contain("sécurisée").And.NotContain("Entrée introuvable");
+    }
+
+    [Theory]
+    [InlineData("https://user:secret@contracts.example/service?singleWsdl")]
+    [InlineData("https://contracts.example/service?token=secret")]
+    [InlineData("https://contracts.example/service#secret")]
+    public async Task Sensitive_remote_sources_are_rejected_before_selection_can_be_checkpointed(string source)
+    {
+        string file = Path.Combine(_directory, "reference.yaml");
+        await File.WriteAllTextAsync(file, "{}");
+        var selection = new RunSelection(RunMode.Consolidate, file, "", _directory, CandidatePath: source);
+        var context = new ToolRunContext(new ToolRun(Guid.NewGuid(), "apidelta", DateTimeOffset.UtcNow, ["Sélection"]));
+        var prompt = NSubstitute.Substitute.For<DevToolbox.Tools.ApiDelta.Core.Abstractions.IApiDeltaPrompt>();
+        prompt.AskForSelection(null, CancellationToken.None).Returns(DevToolbox.Domain.Results.Result.Success(selection));
+        var result = await DevToolbox.Tests.Tools.ApiDelta.Golden.WriteStepFactory.Select(prompt)
+            .ExecuteAsync(context, CancellationToken.None);
+        result.IsFailure.Should().BeTrue();
+        context.Get<RunSelection>(DevToolbox.Tools.ApiDelta.Core.Steps.ApiDeltaContextKeys.Selection).Should().BeNull();
+        result.Failure!.Message.Should().Contain("paramètres sensibles").And.NotContain("secret");
+    }
+
+    [Fact]
+    public void A_component_conflict_is_visible_in_the_failed_run_summary()
+    {
+        using TestConsole console = NewConsole();
+        var now = DateTimeOffset.UtcNow;
+        ToolRun run = new(Guid.NewGuid(), "apidelta", now, ["Correction"]);
+        run.Steps[0].Start(now);
+        run.Steps[0].Fail(now, new DevToolbox.Domain.Results.Failure(DevToolbox.Domain.Results.FailureReason.InvalidInput, "Fusion refusée : schemas/WarningResult (type). Harmonisez les définitions ou renommez le composant candidat et ses références."));
+        run.End(RunOutcome.Failed, now);
+        new SelectionSummaryRenderer(console).Render(new RunSelection(RunMode.Consolidate,
+            "reference.yaml", "", _directory), run);
+        console.Output.Should().Contain("WarningResult").And.Contain("renommez").And.NotContain("Traitement terminé");
+    }
 
     [Fact]
     public void Default_analysis_asks_only_for_relevant_files_and_explains_the_report()

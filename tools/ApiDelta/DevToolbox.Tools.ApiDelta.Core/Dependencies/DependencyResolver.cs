@@ -38,7 +38,7 @@ public sealed class DependencyResolver : IDependencyResolver
         IReadOnlyList<SpecPointer> roots,
         SpecDocument candidate,
         SpecDocument production,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool expandContainingObjects = true)
     {
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(candidate);
@@ -51,15 +51,15 @@ public sealed class DependencyResolver : IDependencyResolver
 
         Stack<SpecNode> pending = new();
 
-        // La fermeture part des objets que le correctif emporte, non des emplacements de différence. Un
-        // champ modifié ne porte aucune référence ; l'opération qui le contient en porte, et c'est elle
-        // qui sera écrite. Partir du champ laisserait sortir un document aux références pendantes.
+        // Les exports portent l'objet complet ; les épissures de correction ne portent que le champ
+        // choisi. Ne pas inclure les dépendances d'une réponse lorsqu'on remplace sa description.
         foreach (string carried in roots
-            .Select(CarriedObject.Of)
+            .Select(root => expandContainingObjects ? CarriedObject.Of(root) : root.Json)
             .OfType<string>()
             .Distinct(StringComparer.Ordinal))
         {
-            if (carried.StartsWith("/components/", StringComparison.Ordinal))
+            if (carried.StartsWith("/components/", StringComparison.Ordinal)
+                && (expandContainingObjects || carried.Split('/').Length == 4))
             {
                 required.Add(carried);
             }
@@ -103,7 +103,8 @@ public sealed class DependencyResolver : IDependencyResolver
         }
 
         if (!carried.StartsWith("/paths/", StringComparison.Ordinal)
-            || CarriedObject.IsWholePathItem(carried))
+            || CarriedObject.IsWholePathItem(carried)
+            || carried.Split('/').Length != 4)
         {
             return;
         }
@@ -134,6 +135,13 @@ public sealed class DependencyResolver : IDependencyResolver
         SortedSet<string> required,
         Stack<SpecNode> pending)
     {
+        if (node is ScalarNode selectedReference && selectedReference.Location.Segments.Count > 0
+            && string.Equals(selectedReference.Location.Segments[^1], ReferenceField, StringComparison.Ordinal))
+        {
+            Follow(selectedReference, candidate, visited, cycles, external, required, pending);
+            return;
+        }
+
         switch (node)
         {
             case MappingNode mapping when mapping.Find(ReferenceField) is ScalarNode reference:
